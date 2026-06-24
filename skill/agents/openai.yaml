@@ -1,0 +1,4 @@
+interface:
+  display_name: "GA4 Tracking Plan"
+  short_description: "Design GA4 event schemas and tracking plans"
+  default_prompt: "Use $ga4-tracking-plan to create a GA4 tracking schema for these pages and journeys."
