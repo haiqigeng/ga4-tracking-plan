@@ -18,6 +18,7 @@ Create an implementation-ready GA4 tracking schema that is useful for analysis, 
 - Explicitly flag native, recommended, ecommerce, custom, and implementation-specific fields.
 - Never collect direct PII. Flag PII and consent risks.
 - Avoid low-signal click tracking unless it answers a real analysis question.
+- Consolidate repeated same-name events whenever the trigger logic, parameter structure, and business meaning are materially the same; use one event definition and list possible values per variable instead of creating many near-duplicate event columns.
 - Stop after the GA4 tracking schema or tracking plan is approved unless the user asks for implementation.
 
 ## Official Documentation
@@ -31,6 +32,23 @@ Use official Google sources for GA4 standard decisions. Browse or otherwise veri
 - Measurement Protocol event constraints when relevant: https://developers.google.com/analytics/devguides/collection/protocol/ga4/reference/events
 
 If current docs cannot be checked, say so and mark standard/recommended choices as unverified.
+
+## Default Workbook Template
+
+When the user does not provide an existing tracking-plan template, use `assets/ga4_tracking_plan_template.xlsx` as the default human-facing XLSX structure. Adapt its sheets and event matrix to the user's journeys instead of inventing a new workbook layout.
+
+## Event Scenario Library
+
+Before designing events, read `references/ga4_event_scenario_library.md` when available. Use it to map the user's website or journey to:
+
+- automatic and enhanced-measurement events
+- official GA4 recommended events
+- official GA4 ecommerce events and item parameters
+- typical custom events by scenario
+- expected event variables/parameters
+- dataLayer push formats and GTM mapping notes
+
+Use `references/ga4_event_scenario_library.json` for structured lookup when producing machine-readable tracking-plan outputs. Treat typical custom events in the library as patterns, not standards: always prefer official GA4 events when their semantics match.
 
 ## Step 1: Collect Measurement Brief
 
@@ -82,7 +100,11 @@ Classify every event:
 For ecommerce journeys:
 
 - verify event names and parameters against current official ecommerce docs
+- keep ecommerce events in ecommerce-only event blocks; do not mix ecommerce event slots with page, search, signup, support, account, or other interaction events in the same matrix block
+- list ecommerce rows using the official GA4 event parameter names and item parameter names, for example `currency`, `value`, `transaction_id`, `items`, `items[].item_id`; do not substitute generic interaction fields such as `event_data.*` inside ecommerce event definitions
 - use the official `items` array pattern where applicable
+- include every official required or conditionally required ecommerce parameter for the selected event; if a required parameter is unavailable, mark the event as not implementable for that context rather than weakening the GA4 ecommerce format
+- include official optional ecommerce parameters when the business or page data can provide them, and mark unavailable optional parameters as `-` or `not_available`
 - include stable item identifiers and merchandising context when available
 - require transaction identifiers for purchase-like events to support deduplication
 - avoid inventing ecommerce event names when an official GA4 ecommerce event fits
@@ -103,6 +125,16 @@ Use GA4-safe names:
 - use only letters, numbers, and underscores
 - avoid reserved names and prefixes
 - keep names semantic and stable
+
+Normalize controlled values used for analysis:
+
+- use lowercase ASCII `snake_case` values by default
+- replace spaces, punctuation, and separators with underscores
+- remove accents and other diacritics, especially for French labels
+- keep values concise and stable, for example `Nouveautes` -> `nouveautes`, `Pret-a-porter femme` -> `pret_a_porter_femme`, `60+` -> `60_plus`
+- list finite options as normalized values separated by ` | `
+- preserve official IDs, ISO codes, numeric values, URLs, and raw native/user-entered fields only when required or explicitly intended, such as `page_title`, `page_location`, `search_term`, `item_name`, or product IDs
+- never normalize by sending PII or sensitive raw text to GA4
 
 Classify every parameter, property, or implementation variable:
 
@@ -132,6 +164,16 @@ For each parameter, define:
 - PII or consent risk
 
 ## Step 5: Build The Tracking Schema
+
+In XLSX event matrices, an event slot should represent one reusable event definition, not one visual component whenever the same event can cover multiple components. For example, use one `select_content` slot for category, size, and catalogue-entry selections when the only difference is `content_type`, `content_id`, `content_name`, or `cta_location`. Use one `view_promotion` slot and one `select_promotion` slot for homepage promotions when the same official ecommerce parameter structure applies. Split into separate event slots only when the trigger, data availability, QA method, business meaning, or official GA4 event format is genuinely different.
+
+For ecommerce XLSX blocks:
+
+- use ecommerce-only blocks such as `Ecommerce promotions`, `Product list`, `Cart`, `Checkout`, or `Purchase`
+- use official GA4 ecommerce parameter names in the matrix rows (`currency`, `value`, `items`, `items[].item_id`, etc.)
+- keep dataLayer wrapper paths such as `ecommerce.currency` as implementation notes or GTM mapping details, not as replacements for the official GA4 parameter names
+- do not add custom interaction rows to ecommerce events unless they are clearly documented custom event or item parameters and do not replace required GA4 ecommerce parameters
+- if the page cannot provide required ecommerce parameters, recommend a non-ecommerce intent event instead of forcing an incomplete ecommerce event
 
 Default event table columns:
 
@@ -175,6 +217,10 @@ Before finalizing, review the plan as a web analyst:
 - Are native GA4 events and parameters used where appropriate?
 - Are custom events justified and named consistently?
 - Are parameters useful for segmentation and reporting?
+- Are repeated same-name events consolidated where possible, with possible values listed per variable?
+- Are controlled values normalized to lowercase ASCII `snake_case`, with accents removed where needed?
+- Are ecommerce events isolated from non-ecommerce events and documented with official GA4 ecommerce parameters?
+- Are all required or conditionally required ecommerce parameters present, especially `items`, one of `items[].item_id` or `items[].item_name`, and `transaction_id` for purchase/refund?
 - Are high-cardinality fields avoided or flagged?
 - Are PII, consent, and data minimization risks flagged?
 - Is ecommerce revenue deduplication possible?

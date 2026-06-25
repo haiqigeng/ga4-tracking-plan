@@ -14,37 +14,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
-      - name: Validate skill structure
+      - name: Install validation dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Validate package
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re
-          import sys
-
-          skill = Path("skill/SKILL.md")
-          if not skill.exists():
-              sys.exit("skill/SKILL.md is missing")
-
-          text = skill.read_text(encoding="utf-8")
-          match = re.match(r"^---\n(.*?)\n---", text, re.S)
-          if not match:
-              sys.exit("SKILL.md must start with YAML frontmatter")
-
-          fields = {}
-          for line in match.group(1).splitlines():
-              if ":" in line:
-                  key, value = line.split(":", 1)
-                  fields[key.strip()] = value.strip()
-
-          name = fields.get("name", "")
-          description = fields.get("description", "")
-
-          if not re.fullmatch(r"[a-z0-9-]{1,64}", name):
-              sys.exit("Skill name must be lowercase hyphen-case and <= 64 characters")
-          if not description:
-              sys.exit("Skill description is required")
-          if len(description) > 1024:
-              sys.exit("Skill description must be <= 1024 characters")
-
-          print("Skill structure looks valid.")
-          PY
+          python scripts/validate_package.py
