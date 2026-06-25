@@ -28,8 +28,11 @@ EXPECTED_TABS = [
 WORKBOOKS_TO_VALIDATE = [
     SKILL / "assets" / "ga4_tracking_plan_template.xlsx",
     ROOT / "files" / "ga4_tracking_plan_template_v2_1.xlsx",
-    ROOT / "files" / "daxon_homepage_ga4_tracking_plan.xlsx",
 ]
+ALLOWED_PUBLIC_FILES = {
+    "ga4_tracking_plan_template_v2_1.xlsx",
+    "ga4_event_scenario_library.xlsx",
+}
 TEXT_SUFFIXES = {".md", ".py", ".yml", ".yaml", ".json", ".txt", ".gitignore", ".gitattributes"}
 SECRET_PATTERNS = {
     "private_key": re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
@@ -166,6 +169,21 @@ def check_workbooks() -> None:
         check_event_matrix(workbook_path)
 
 
+def check_public_files_are_generic() -> None:
+    files_dir = ROOT / "files"
+    if not files_dir.exists():
+        fail("files/ is missing")
+    unexpected = sorted(
+        path.name
+        for path in files_dir.iterdir()
+        if path.is_file()
+        and not path.name.startswith("~$")
+        and path.name not in ALLOWED_PUBLIC_FILES
+    )
+    if unexpected:
+        fail(f"files/ contains non-generic or unexpected public artifacts: {unexpected}")
+
+
 def scan_text_for_secrets(path: Path, text: str) -> list[str]:
     findings = []
     for name, pattern in SECRET_PATTERNS.items():
@@ -177,7 +195,7 @@ def scan_text_for_secrets(path: Path, text: str) -> list[str]:
 def check_confidential_patterns() -> None:
     findings: list[str] = []
     for path in ROOT.rglob("*"):
-        if ".git" in path.parts or not path.is_file():
+        if ".git" in path.parts or not path.is_file() or path.name.startswith("~$"):
             continue
         suffix = path.suffix.lower()
         if suffix in TEXT_SUFFIXES or path.name in TEXT_SUFFIXES:
@@ -199,6 +217,7 @@ def main() -> int:
         check_required_files,
         check_skill_frontmatter,
         check_skill_resource_links,
+        check_public_files_are_generic,
         check_workbooks,
         check_confidential_patterns,
     ]

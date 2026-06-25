@@ -7,8 +7,6 @@ Codex skill package for creating GA4 tracking plans from page or journey context
 ## Contents
 
 - `skill/` - Codex skill definition and UI metadata
-- `files/lolivier_homepage_ga4_tracking_plan.xlsx` - Example homepage GA4 tracking plan for `https://www.lolivier.fr/`
-- `files/daxon_homepage_ga4_tracking_plan.xlsx` - Ecommerce homepage example for `https://www.daxon.fr/`
 - `files/ga4_tracking_plan_template_v2_1.xlsx` - Human-ready tracking plan template
 - `files/ga4_event_scenario_library.xlsx` - GA4 event and scenario reference library
 - `skill/references/` - Machine-readable and Markdown event scenario references used by the skill
@@ -51,7 +49,7 @@ Use $ga4-tracking-plan to create a GA4 tracking schema for these pages and journ
 
 ## Release Asset
 
-The latest release includes the template, event scenario library, and example XLSX tracking plans as downloadable assets.
+The latest release includes only generic skill assets: the tracking-plan template and event scenario library. Site-specific tracking plans, tests, client artifacts, and confidential files should not be committed or attached to releases.
 
 ## Validate Locally
 
