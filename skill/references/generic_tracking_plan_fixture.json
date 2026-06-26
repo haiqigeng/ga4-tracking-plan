@@ -1,0 +1,1085 @@
+{
+  "schema_version": "1.0.0",
+  "plan_id": "generic_ecommerce_homepage",
+  "document": {
+    "title": "Generic GA4 ecommerce homepage tracking plan",
+    "version": "v0.1",
+    "status": "draft",
+    "owner": "TBD",
+    "created_date": "2026-06-26",
+    "template_source": "assets/ga4_tracking_plan_template.xlsx",
+    "notes": "Generic fixture for validating the skill contract, workbook generator, and QA-ready output."
+  },
+  "measurement_brief": [
+    {
+      "journey_id": "homepage_discovery",
+      "journey_name": "Homepage discovery",
+      "scope": "Single ecommerce homepage view and the primary discovery interactions visible on the page.",
+      "url_or_route": "https://example.com/",
+      "page_type": "homepage",
+      "expected_user_actions": [
+        "view homepage",
+        "view merchandising promotions",
+        "click a promotion",
+        "submit site search",
+        "select navigation or content module",
+        "open account access"
+      ],
+      "business_goal": "Understand how the homepage supports product discovery, merchandising exposure, and account access intent.",
+      "analysis_needs": [
+        "Measure homepage traffic quality",
+        "Compare promotion exposure and clicks",
+        "Identify search usage and search themes",
+        "Understand which modules or navigation areas drive deeper browsing"
+      ],
+      "success_signals": [
+        "select_promotion",
+        "search",
+        "select_content",
+        "account_access_intent"
+      ],
+      "audience_or_segment_needs": [
+        "device category",
+        "traffic source",
+        "login status when available",
+        "consent state"
+      ],
+      "data_available": [
+        "page URL",
+        "page title",
+        "page template",
+        "promotion metadata",
+        "search term after PII scrubbing",
+        "navigation/content metadata"
+      ],
+      "implementation_context": [
+        "GTM web container",
+        "dataLayer",
+        "GA4 web stream"
+      ],
+      "constraints": [
+        "Do not send direct PII",
+        "Keep ecommerce promotion events in official GA4 ecommerce format",
+        "Normalize controlled values to lowercase ASCII snake_case"
+      ],
+      "priority": "must",
+      "open_questions": [
+        "Confirm the final promotion metadata available in the CMS.",
+        "Confirm whether account access should become a key event."
+      ]
+    }
+  ],
+  "events": [
+    {
+      "event_id": "EVT-HOME-PAGE-VIEW",
+      "journey_id": "homepage_discovery",
+      "event_name": "page_view",
+      "classification": "automatic",
+      "official_ga4_match": "page_view",
+      "page_url_pattern": "https://example.com/",
+      "page_type": "homepage",
+      "business_question": "How many users view the homepage and from which acquisition contexts?",
+      "trigger": "Homepage load or SPA route change to the homepage.",
+      "key_event": false,
+      "priority": "must",
+      "parameters": [
+        "page_location",
+        "page_title",
+        "page_referrer",
+        "page_data.template"
+      ],
+      "data_layer": {
+        "event_key": "page_view",
+        "flush_keys": [
+          "page_data"
+        ],
+        "push": {
+          "event": "page_view",
+          "page_data": {
+            "location": "https://example.com/",
+            "title": "%document_title%",
+            "template": "homepage"
+          }
+        },
+        "mapping_notes": "If GA4 automatic page_view is sufficient, do not duplicate it. Use manual page_view only for controlled SPA routing or enriched page context."
+      },
+      "ga4_payload": {
+        "event_name": "page_view",
+        "parameters": {
+          "page_location": "%current_url%",
+          "page_title": "%document_title%",
+          "page_referrer": "%document_referrer%",
+          "page_template": "homepage"
+        },
+        "items": []
+      },
+      "privacy": {
+        "pii_risk": "low",
+        "consent_dependency": "analytics_storage",
+        "cardinality_risk": "medium",
+        "notes": "Remove sensitive query parameters before sending page_location if the website can contain them."
+      },
+      "qa": {
+        "qa_id": "QA-HOME-PAGE-VIEW",
+        "methods": [
+          "DebugView",
+          "GTM Preview",
+          "Network"
+        ],
+        "steps": [
+          "Open https://example.com/ once.",
+          "Reload only after the first test has been recorded."
+        ],
+        "expected_data_layer": [
+          "page_data.location equals the current URL.",
+          "page_data.template equals homepage."
+        ],
+        "expected_network": [
+          "GA4 request contains en=page_view.",
+          "page_location and page_title are populated."
+        ],
+        "debugview_expectation": "One homepage page_view appears for the initial load.",
+        "status": "not_started"
+      },
+      "implementation_notes": "Avoid duplicate page_view if enhanced measurement already sends the correct event."
+    },
+    {
+      "event_id": "EVT-HOME-PROMO-VIEW",
+      "journey_id": "homepage_discovery",
+      "event_name": "view_promotion",
+      "classification": "recommended_ecommerce",
+      "official_ga4_match": "view_promotion",
+      "page_url_pattern": "https://example.com/",
+      "page_type": "homepage",
+      "business_question": "Which homepage promotions are exposed to users?",
+      "trigger": "Promotion module is visible according to the agreed impression threshold.",
+      "key_event": false,
+      "priority": "should",
+      "parameters": [
+        "promotion_id",
+        "promotion_name",
+        "creative_name",
+        "creative_slot",
+        "items",
+        "items[].item_id",
+        "items[].item_name"
+      ],
+      "data_layer": {
+        "event_key": "view_promotion",
+        "flush_keys": [
+          "ecommerce"
+        ],
+        "push": {
+          "event": "view_promotion",
+          "ecommerce": {
+            "promotion_id": "%promotion_id%",
+            "promotion_name": "%promotion_name%",
+            "creative_name": "%creative_name%",
+            "creative_slot": "%creative_slot%",
+            "items": [
+              {
+                "item_id": "%promotion_item_id%",
+                "item_name": "%promotion_item_name%"
+              }
+            ]
+          }
+        },
+        "mapping_notes": "Rows in the tracking plan use official GA4 parameter names. ecommerce.* is only the GTM source object."
+      },
+      "ga4_payload": {
+        "event_name": "view_promotion",
+        "parameters": {
+          "promotion_id": "%promotion_id%",
+          "promotion_name": "%promotion_name%",
+          "creative_name": "%creative_name%",
+          "creative_slot": "%creative_slot%"
+        },
+        "items": [
+          {
+            "item_id": "%promotion_item_id%",
+            "item_name": "%promotion_item_name%"
+          }
+        ]
+      },
+      "privacy": {
+        "pii_risk": "low",
+        "consent_dependency": "analytics_storage",
+        "cardinality_risk": "low",
+        "notes": "Promotion values should be controlled campaign or merchandising identifiers."
+      },
+      "qa": {
+        "qa_id": "QA-HOME-PROMO-VIEW",
+        "methods": [
+          "GTM Preview",
+          "Network"
+        ],
+        "steps": [
+          "Open the homepage and expose a tracked promotion in the viewport."
+        ],
+        "expected_data_layer": [
+          "ecommerce is flushed before the event.",
+          "promotion_id, promotion_name, creative_name, creative_slot, and items are populated."
+        ],
+        "expected_network": [
+          "GA4 request contains en=view_promotion.",
+          "Promotion parameters and at least one valid item identifier are present."
+        ],
+        "debugview_expectation": "view_promotion appears once per qualified promotion impression.",
+        "status": "not_started"
+      },
+      "implementation_notes": "Use one consolidated view_promotion definition and list allowed promotion values rather than one event per banner."
+    },
+    {
+      "event_id": "EVT-HOME-PROMO-SELECT",
+      "journey_id": "homepage_discovery",
+      "event_name": "select_promotion",
+      "classification": "recommended_ecommerce",
+      "official_ga4_match": "select_promotion",
+      "page_url_pattern": "https://example.com/",
+      "page_type": "homepage",
+      "business_question": "Which exposed promotions drive clicks?",
+      "trigger": "User clicks a tracked homepage promotion.",
+      "key_event": false,
+      "priority": "should",
+      "parameters": [
+        "promotion_id",
+        "promotion_name",
+        "creative_name",
+        "creative_slot",
+        "items",
+        "items[].item_id",
+        "items[].item_name"
+      ],
+      "data_layer": {
+        "event_key": "select_promotion",
+        "flush_keys": [
+          "ecommerce"
+        ],
+        "push": {
+          "event": "select_promotion",
+          "ecommerce": {
+            "promotion_id": "%promotion_id%",
+            "promotion_name": "%promotion_name%",
+            "creative_name": "%creative_name%",
+            "creative_slot": "%creative_slot%",
+            "items": [
+              {
+                "item_id": "%promotion_item_id%",
+                "item_name": "%promotion_item_name%"
+              }
+            ]
+          }
+        },
+        "mapping_notes": "Use the same promotion identifiers as view_promotion for impression-to-click analysis."
+      },
+      "ga4_payload": {
+        "event_name": "select_promotion",
+        "parameters": {
+          "promotion_id": "%promotion_id%",
+          "promotion_name": "%promotion_name%",
+          "creative_name": "%creative_name%",
+          "creative_slot": "%creative_slot%"
+        },
+        "items": [
+          {
+            "item_id": "%promotion_item_id%",
+            "item_name": "%promotion_item_name%"
+          }
+        ]
+      },
+      "privacy": {
+        "pii_risk": "low",
+        "consent_dependency": "analytics_storage",
+        "cardinality_risk": "low",
+        "notes": "Use stable controlled values; avoid visible text when it changes often."
+      },
+      "qa": {
+        "qa_id": "QA-HOME-PROMO-SELECT",
+        "methods": [
+          "GTM Preview",
+          "Network"
+        ],
+        "steps": [
+          "Click a tracked homepage promotion."
+        ],
+        "expected_data_layer": [
+          "ecommerce is flushed before the event.",
+          "select_promotion uses the same promotion_id as the related view_promotion."
+        ],
+        "expected_network": [
+          "GA4 request contains en=select_promotion.",
+          "Promotion parameters and items are present."
+        ],
+        "debugview_expectation": "select_promotion appears after the user click.",
+        "status": "not_started"
+      },
+      "implementation_notes": "Keep this as an ecommerce promotion event, not a generic click event."
+    },
+    {
+      "event_id": "EVT-HOME-SEARCH",
+      "journey_id": "homepage_discovery",
+      "event_name": "search",
+      "classification": "recommended",
+      "official_ga4_match": "search",
+      "page_url_pattern": "https://example.com/",
+      "page_type": "homepage",
+      "business_question": "What do users search for from the homepage?",
+      "trigger": "User submits the site search form.",
+      "key_event": false,
+      "priority": "must",
+      "parameters": [
+        "search_term",
+        "page_data.template"
+      ],
+      "data_layer": {
+        "event_key": "search",
+        "flush_keys": [
+          "event_data"
+        ],
+        "push": {
+          "event": "search",
+          "event_data": {
+            "search_term": "%scrubbed_search_term%"
+          }
+        },
+        "mapping_notes": "Send the official GA4 search_term parameter after PII scrubbing."
+      },
+      "ga4_payload": {
+        "event_name": "search",
+        "parameters": {
+          "search_term": "%scrubbed_search_term%",
+          "page_template": "homepage"
+        },
+        "items": []
+      },
+      "privacy": {
+        "pii_risk": "medium",
+        "consent_dependency": "analytics_storage",
+        "cardinality_risk": "high",
+        "notes": "Search terms can contain PII or high-cardinality data. Scrub email, phone, order IDs, and sensitive values before sending."
+      },
+      "qa": {
+        "qa_id": "QA-HOME-SEARCH",
+        "methods": [
+          "DebugView",
+          "GTM Preview",
+          "Network"
+        ],
+        "steps": [
+          "Submit a safe test query such as summer_dress."
+        ],
+        "expected_data_layer": [
+          "event_data.search_term is present.",
+          "No direct PII is present in the pushed term."
+        ],
+        "expected_network": [
+          "GA4 request contains en=search.",
+          "search_term is populated."
+        ],
+        "debugview_expectation": "search appears with search_term.",
+        "status": "not_started"
+      },
+      "implementation_notes": "Use the official recommended search event instead of a custom search_submit event."
+    },
+    {
+      "event_id": "EVT-HOME-CONTENT-SELECT",
+      "journey_id": "homepage_discovery",
+      "event_name": "select_content",
+      "classification": "recommended",
+      "official_ga4_match": "select_content",
+      "page_url_pattern": "https://example.com/",
+      "page_type": "homepage",
+      "business_question": "Which homepage modules or navigation paths drive user interest?",
+      "trigger": "User clicks a consolidated navigation or content module.",
+      "key_event": false,
+      "priority": "should",
+      "parameters": [
+        "content_type",
+        "content_id",
+        "content_name",
+        "cta_location",
+        "link_url"
+      ],
+      "data_layer": {
+        "event_key": "select_content",
+        "flush_keys": [
+          "event_data"
+        ],
+        "push": {
+          "event": "select_content",
+          "event_data": {
+            "content_type": "%content_type%",
+            "content_id": "%content_id%",
+            "content_name": "%content_name%",
+            "cta_location": "%cta_location%",
+            "link_url": "%destination_url%"
+          }
+        },
+        "mapping_notes": "Group similar navigation/content clicks into one select_content event with controlled values."
+      },
+      "ga4_payload": {
+        "event_name": "select_content",
+        "parameters": {
+          "content_type": "category_navigation | editorial_module | service_link",
+          "content_id": "%stable_content_id%",
+          "content_name": "%normalized_content_name%",
+          "cta_location": "header | hero | body | footer",
+          "link_url": "%destination_url%"
+        },
+        "items": []
+      },
+      "privacy": {
+        "pii_risk": "low",
+        "consent_dependency": "analytics_storage",
+        "cardinality_risk": "medium",
+        "notes": "Remove sensitive query parameters from link_url and keep controlled content names stable."
+      },
+      "qa": {
+        "qa_id": "QA-HOME-CONTENT-SELECT",
+        "methods": [
+          "GTM Preview",
+          "Network"
+        ],
+        "steps": [
+          "Click one representative link for each allowed content_type."
+        ],
+        "expected_data_layer": [
+          "event_data.content_type uses allowed normalized values.",
+          "content_id and content_name identify the selected module."
+        ],
+        "expected_network": [
+          "GA4 request contains en=select_content.",
+          "content_type and content_id are present."
+        ],
+        "debugview_expectation": "select_content appears with normalized controlled values.",
+        "status": "not_started"
+      },
+      "implementation_notes": "Do not create one custom event per homepage link when this consolidated event is sufficient."
+    },
+    {
+      "event_id": "EVT-HOME-ACCOUNT-ACCESS",
+      "journey_id": "homepage_discovery",
+      "event_name": "account_access_intent",
+      "classification": "custom",
+      "official_ga4_match": "no official GA4 event fits account entry intent before login",
+      "page_url_pattern": "https://example.com/",
+      "page_type": "homepage",
+      "business_question": "How often do users try to access the account area from the homepage?",
+      "trigger": "User clicks the account access entry point before the login result is known.",
+      "key_event": false,
+      "priority": "could",
+      "parameters": [
+        "cta_location",
+        "cta_text",
+        "login_status"
+      ],
+      "data_layer": {
+        "event_key": "account_access_intent",
+        "flush_keys": [
+          "event_data"
+        ],
+        "push": {
+          "event": "account_access_intent",
+          "event_data": {
+            "cta_location": "%cta_location%",
+            "cta_text": "%normalized_cta_text%"
+          },
+          "user_data": {
+            "login_status": "%login_status%"
+          }
+        },
+        "mapping_notes": "Use the official login event only when a login actually succeeds."
+      },
+      "ga4_payload": {
+        "event_name": "account_access_intent",
+        "parameters": {
+          "cta_location": "header | menu",
+          "cta_text": "%normalized_cta_text%",
+          "login_status": "logged | not_logged | unknown"
+        },
+        "items": []
+      },
+      "privacy": {
+        "pii_risk": "low",
+        "consent_dependency": "analytics_storage",
+        "cardinality_risk": "low",
+        "notes": "Do not send email, account ID, phone number, or customer number."
+      },
+      "qa": {
+        "qa_id": "QA-HOME-ACCOUNT-ACCESS",
+        "methods": [
+          "GTM Preview",
+          "Network"
+        ],
+        "steps": [
+          "Click the account access entry point."
+        ],
+        "expected_data_layer": [
+          "event_data.cta_location is populated.",
+          "user_data.login_status is logged, not_logged, or unknown."
+        ],
+        "expected_network": [
+          "GA4 request contains en=account_access_intent.",
+          "No direct personal identifiers are present."
+        ],
+        "debugview_expectation": "account_access_intent appears only on account entry click, not on successful login.",
+        "status": "not_started"
+      },
+      "implementation_notes": "This is custom because the official login event should represent successful authentication, not an account-link click."
+    }
+  ],
+  "parameters": [
+    {
+      "parameter_name": "page_location",
+      "display_name": "Page URL",
+      "scope": "event",
+      "type": "string",
+      "classification": "ga4_auto_collected_parameter",
+      "required": "optional",
+      "description": "Current page URL.",
+      "value_rules": "Use the current URL after removing sensitive query parameters.",
+      "example_value": "https://example.com/",
+      "allowed_values": [],
+      "source": "browser location",
+      "register_custom_definition": false,
+      "cardinality_risk": "medium",
+      "pii_risk": "medium",
+      "consent_dependency": "analytics_storage"
+    },
+    {
+      "parameter_name": "page_title",
+      "display_name": "Page title",
+      "scope": "event",
+      "type": "string",
+      "classification": "ga4_auto_collected_parameter",
+      "required": "optional",
+      "description": "Browser document title.",
+      "value_rules": "Use the page title generated by the CMS or browser.",
+      "example_value": "Homepage",
+      "allowed_values": [],
+      "source": "document.title",
+      "register_custom_definition": false,
+      "cardinality_risk": "medium",
+      "pii_risk": "low",
+      "consent_dependency": "analytics_storage"
+    },
+    {
+      "parameter_name": "page_referrer",
+      "display_name": "Page referrer",
+      "scope": "event",
+      "type": "string",
+      "classification": "ga4_auto_collected_parameter",
+      "required": "optional",
+      "description": "Previous page URL or external referrer when available.",
+      "value_rules": "Use browser referrer after removing sensitive query parameters when possible.",
+      "example_value": "https://www.google.com/",
+      "allowed_values": [],
+      "source": "document.referrer",
+      "register_custom_definition": false,
+      "cardinality_risk": "medium",
+      "pii_risk": "medium",
+      "consent_dependency": "analytics_storage"
+    },
+    {
+      "parameter_name": "page_data.template",
+      "display_name": "Page template",
+      "scope": "implementation",
+      "type": "string",
+      "classification": "data_layer_variable",
+      "required": "optional",
+      "description": "Implementation variable used to map page template context to GA4.",
+      "value_rules": "Use controlled lowercase ASCII snake_case values.",
+      "example_value": "homepage",
+      "allowed_values": [
+        "homepage",
+        "listing_page",
+        "product_page",
+        "cart",
+        "checkout",
+        "content_page"
+      ],
+      "source": "CMS page metadata",
+      "register_custom_definition": false,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": ""
+    },
+    {
+      "parameter_name": "promotion_id",
+      "display_name": "Promotion ID",
+      "scope": "event",
+      "type": "string",
+      "classification": "ga4_ecommerce_parameter",
+      "required": "conditional",
+      "description": "Official GA4 promotion identifier.",
+      "value_rules": "Use a stable campaign or merchandising ID shared by impression and click.",
+      "example_value": "home_hero_summer_2026",
+      "allowed_values": [],
+      "source": "CMS or merchandising platform",
+      "register_custom_definition": false,
+      "cardinality_risk": "medium",
+      "pii_risk": "low",
+      "consent_dependency": "analytics_storage"
+    },
+    {
+      "parameter_name": "promotion_name",
+      "display_name": "Promotion name",
+      "scope": "event",
+      "type": "string",
+      "classification": "ga4_ecommerce_parameter",
+      "required": "conditional",
+      "description": "Official GA4 promotion name.",
+      "value_rules": "Use normalized controlled values with accents removed.",
+      "example_value": "summer_sale",
+      "allowed_values": [],
+      "source": "CMS or merchandising platform",
+      "register_custom_definition": false,
+      "cardinality_risk": "medium",
+      "pii_risk": "low",
+      "consent_dependency": "analytics_storage"
+    },
+    {
+      "parameter_name": "creative_name",
+      "display_name": "Creative name",
+      "scope": "event",
+      "type": "string",
+      "classification": "ga4_ecommerce_parameter",
+      "required": "optional",
+      "description": "Official GA4 promotion creative name.",
+      "value_rules": "Use stable creative naming.",
+      "example_value": "banner_blue",
+      "allowed_values": [],
+      "source": "CMS or creative metadata",
+      "register_custom_definition": false,
+      "cardinality_risk": "medium",
+      "pii_risk": "low",
+      "consent_dependency": "analytics_storage"
+    },
+    {
+      "parameter_name": "creative_slot",
+      "display_name": "Creative slot",
+      "scope": "event",
+      "type": "string",
+      "classification": "ga4_ecommerce_parameter",
+      "required": "optional",
+      "description": "Official GA4 promotion creative placement.",
+      "value_rules": "Use section and position.",
+      "example_value": "homepage_hero_1",
+      "allowed_values": [],
+      "source": "page layout metadata",
+      "register_custom_definition": false,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "analytics_storage"
+    },
+    {
+      "parameter_name": "items",
+      "display_name": "Items array",
+      "scope": "event",
+      "type": "array<object>",
+      "classification": "ga4_ecommerce_parameter",
+      "required": "conditional",
+      "description": "Official GA4 ecommerce items array.",
+      "value_rules": "Include at least one item object when ecommerce promotion or item context is available.",
+      "example_value": "[{item_id:'sku_123',item_name:'summer_dress'}]",
+      "allowed_values": [],
+      "source": "ecommerce data object",
+      "register_custom_definition": false,
+      "cardinality_risk": "medium",
+      "pii_risk": "low",
+      "consent_dependency": "analytics_storage"
+    },
+    {
+      "parameter_name": "items[].item_id",
+      "display_name": "Item ID",
+      "scope": "item",
+      "type": "string",
+      "classification": "ga4_ecommerce_item_parameter",
+      "required": "conditional",
+      "description": "Official GA4 item identifier.",
+      "value_rules": "One of items[].item_id or items[].item_name is required when items is sent.",
+      "example_value": "sku_123",
+      "allowed_values": [],
+      "source": "product catalog",
+      "register_custom_definition": false,
+      "cardinality_risk": "high",
+      "pii_risk": "low",
+      "consent_dependency": "analytics_storage"
+    },
+    {
+      "parameter_name": "items[].item_name",
+      "display_name": "Item name",
+      "scope": "item",
+      "type": "string",
+      "classification": "ga4_ecommerce_item_parameter",
+      "required": "conditional",
+      "description": "Official GA4 item name.",
+      "value_rules": "One of items[].item_id or items[].item_name is required when items is sent.",
+      "example_value": "summer_dress",
+      "allowed_values": [],
+      "source": "product catalog",
+      "register_custom_definition": false,
+      "cardinality_risk": "high",
+      "pii_risk": "low",
+      "consent_dependency": "analytics_storage"
+    },
+    {
+      "parameter_name": "search_term",
+      "display_name": "Search term",
+      "scope": "event",
+      "type": "string",
+      "classification": "ga4_recommended_parameter",
+      "required": "required",
+      "description": "Official GA4 search parameter.",
+      "value_rules": "Scrub direct PII and sensitive terms before sending.",
+      "example_value": "summer_dress",
+      "allowed_values": [],
+      "source": "site search form",
+      "register_custom_definition": false,
+      "cardinality_risk": "high",
+      "pii_risk": "medium",
+      "consent_dependency": "analytics_storage"
+    },
+    {
+      "parameter_name": "content_type",
+      "display_name": "Content type",
+      "scope": "event",
+      "type": "string",
+      "classification": "ga4_recommended_parameter",
+      "required": "optional",
+      "description": "Official GA4 parameter for select_content.",
+      "value_rules": "Use controlled lowercase ASCII snake_case values.",
+      "example_value": "category_navigation",
+      "allowed_values": [
+        "category_navigation",
+        "editorial_module",
+        "service_link"
+      ],
+      "source": "component metadata",
+      "register_custom_definition": true,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "analytics_storage"
+    },
+    {
+      "parameter_name": "content_id",
+      "display_name": "Content ID",
+      "scope": "event",
+      "type": "string",
+      "classification": "ga4_recommended_parameter",
+      "required": "optional",
+      "description": "Official GA4 parameter for select_content.",
+      "value_rules": "Use stable IDs or slugs.",
+      "example_value": "nav_women",
+      "allowed_values": [],
+      "source": "component metadata",
+      "register_custom_definition": true,
+      "cardinality_risk": "medium",
+      "pii_risk": "low",
+      "consent_dependency": "analytics_storage"
+    },
+    {
+      "parameter_name": "content_name",
+      "display_name": "Content name",
+      "scope": "event",
+      "type": "string",
+      "classification": "ga4_recommended_parameter",
+      "required": "optional",
+      "description": "Readable selected content name.",
+      "value_rules": "Use normalized lowercase ASCII snake_case values when controlled.",
+      "example_value": "women_category",
+      "allowed_values": [],
+      "source": "component metadata",
+      "register_custom_definition": true,
+      "cardinality_risk": "medium",
+      "pii_risk": "low",
+      "consent_dependency": "analytics_storage"
+    },
+    {
+      "parameter_name": "cta_location",
+      "display_name": "CTA location",
+      "scope": "event",
+      "type": "string",
+      "classification": "custom_event_parameter",
+      "required": "optional",
+      "description": "Location of a clicked CTA or module.",
+      "value_rules": "Use controlled lowercase ASCII snake_case values.",
+      "example_value": "header",
+      "allowed_values": [
+        "header",
+        "hero",
+        "body",
+        "footer",
+        "menu"
+      ],
+      "source": "component metadata",
+      "register_custom_definition": true,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "analytics_storage"
+    },
+    {
+      "parameter_name": "link_url",
+      "display_name": "Link URL",
+      "scope": "event",
+      "type": "string",
+      "classification": "custom_event_parameter",
+      "required": "optional",
+      "description": "Destination URL for a selected link or module.",
+      "value_rules": "Remove sensitive query parameters before sending.",
+      "example_value": "https://example.com/category/women",
+      "allowed_values": [],
+      "source": "clicked element href",
+      "register_custom_definition": false,
+      "cardinality_risk": "high",
+      "pii_risk": "medium",
+      "consent_dependency": "analytics_storage"
+    },
+    {
+      "parameter_name": "cta_text",
+      "display_name": "CTA text",
+      "scope": "event",
+      "type": "string",
+      "classification": "custom_event_parameter",
+      "required": "optional",
+      "description": "Normalized visible CTA text.",
+      "value_rules": "Use lowercase ASCII snake_case controlled values and remove accents.",
+      "example_value": "my_account",
+      "allowed_values": [],
+      "source": "component metadata",
+      "register_custom_definition": true,
+      "cardinality_risk": "medium",
+      "pii_risk": "low",
+      "consent_dependency": "analytics_storage"
+    },
+    {
+      "parameter_name": "login_status",
+      "display_name": "Login status",
+      "scope": "event",
+      "type": "string",
+      "classification": "custom_event_parameter",
+      "required": "optional",
+      "description": "Known anonymous login state.",
+      "value_rules": "Use logged | not_logged | unknown.",
+      "example_value": "not_logged",
+      "allowed_values": [
+        "logged",
+        "not_logged",
+        "unknown"
+      ],
+      "source": "site authentication state",
+      "register_custom_definition": true,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "analytics_storage"
+    }
+  ],
+  "custom_definitions": [
+    {
+      "parameter_name": "content_type",
+      "display_name": "Content type",
+      "scope": "event",
+      "registration_type": "custom_dimension",
+      "reason": "Segment select_content performance by type of homepage component.",
+      "priority": "should"
+    },
+    {
+      "parameter_name": "cta_location",
+      "display_name": "CTA location",
+      "scope": "event",
+      "registration_type": "custom_dimension",
+      "reason": "Compare interaction performance by page area.",
+      "priority": "should"
+    },
+    {
+      "parameter_name": "login_status",
+      "display_name": "Login status",
+      "scope": "event",
+      "registration_type": "custom_dimension",
+      "reason": "Segment account intent without exposing personal identifiers.",
+      "priority": "could"
+    }
+  ],
+  "key_events": [],
+  "not_tracked": [
+    {
+      "interaction": "Hover states",
+      "reason": "Hover interactions are noisy, not reliable on mobile, and do not answer the stated analysis needs."
+    },
+    {
+      "interaction": "Every homepage link as a separate custom event",
+      "reason": "A consolidated select_content event with controlled values is easier to maintain and analyze."
+    }
+  ],
+  "assumptions": [
+    "The page is an ecommerce homepage but no product list, cart, or checkout context is guaranteed from this single-page scope.",
+    "Promotion metadata is available from the CMS or merchandising layer.",
+    "Controlled analytics values are normalized to lowercase ASCII snake_case with accents removed."
+  ],
+  "documentation_sources_checked": [
+    {
+      "name": "GA4 recommended events",
+      "url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
+      "source_type": "official",
+      "checked_for": "search, select_content, and recommended event semantics"
+    },
+    {
+      "name": "GA4 ecommerce measurement",
+      "url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
+      "source_type": "official",
+      "checked_for": "view_promotion, select_promotion, and items array format"
+    },
+    {
+      "name": "GA4 event naming rules",
+      "url": "https://support.google.com/analytics/answer/13316687",
+      "source_type": "official",
+      "checked_for": "custom event naming and reserved-name constraints"
+    },
+    {
+      "name": "GTM data layer",
+      "url": "https://developers.google.com/tag-platform/tag-manager/datalayer",
+      "source_type": "official",
+      "checked_for": "dataLayer.push implementation pattern"
+    }
+  ],
+  "qa_cases": [
+    {
+      "qa_id": "QA-HOME-PAGE-VIEW",
+      "event_id": "EVT-HOME-PAGE-VIEW",
+      "event_name": "page_view",
+      "methods": [
+        "DebugView",
+        "GTM Preview",
+        "Network"
+      ],
+      "steps": [
+        "Open https://example.com/ once."
+      ],
+      "expected_data_layer": [
+        "page_data.location equals current URL.",
+        "page_data.template equals homepage."
+      ],
+      "expected_network": [
+        "en=page_view",
+        "page_location populated"
+      ],
+      "debugview_expectation": "One homepage page_view appears.",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "qa_id": "QA-HOME-PROMO-VIEW",
+      "event_id": "EVT-HOME-PROMO-VIEW",
+      "event_name": "view_promotion",
+      "methods": [
+        "GTM Preview",
+        "Network"
+      ],
+      "steps": [
+        "Expose a tracked promotion."
+      ],
+      "expected_data_layer": [
+        "ecommerce object is flushed.",
+        "promotion_id and items are present."
+      ],
+      "expected_network": [
+        "en=view_promotion",
+        "promotion_id and item identifier present"
+      ],
+      "debugview_expectation": "view_promotion appears for the qualified impression.",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "qa_id": "QA-HOME-PROMO-SELECT",
+      "event_id": "EVT-HOME-PROMO-SELECT",
+      "event_name": "select_promotion",
+      "methods": [
+        "GTM Preview",
+        "Network"
+      ],
+      "steps": [
+        "Click a tracked promotion."
+      ],
+      "expected_data_layer": [
+        "select_promotion uses the same promotion_id as view_promotion."
+      ],
+      "expected_network": [
+        "en=select_promotion",
+        "promotion_id and item identifier present"
+      ],
+      "debugview_expectation": "select_promotion appears after click.",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "qa_id": "QA-HOME-SEARCH",
+      "event_id": "EVT-HOME-SEARCH",
+      "event_name": "search",
+      "methods": [
+        "DebugView",
+        "GTM Preview",
+        "Network"
+      ],
+      "steps": [
+        "Submit a safe search query."
+      ],
+      "expected_data_layer": [
+        "event_data.search_term is present and scrubbed."
+      ],
+      "expected_network": [
+        "en=search",
+        "search_term populated"
+      ],
+      "debugview_expectation": "search appears with search_term.",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "qa_id": "QA-HOME-CONTENT-SELECT",
+      "event_id": "EVT-HOME-CONTENT-SELECT",
+      "event_name": "select_content",
+      "methods": [
+        "GTM Preview",
+        "Network"
+      ],
+      "steps": [
+        "Click one representative content or navigation module."
+      ],
+      "expected_data_layer": [
+        "event_data.content_type uses an allowed value.",
+        "content_id identifies the selected module."
+      ],
+      "expected_network": [
+        "en=select_content",
+        "content_type and content_id present"
+      ],
+      "debugview_expectation": "select_content appears with controlled values.",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "qa_id": "QA-HOME-ACCOUNT-ACCESS",
+      "event_id": "EVT-HOME-ACCOUNT-ACCESS",
+      "event_name": "account_access_intent",
+      "methods": [
+        "GTM Preview",
+        "Network"
+      ],
+      "steps": [
+        "Click the account access entry point."
+      ],
+      "expected_data_layer": [
+        "event_data.cta_location is present.",
+        "user_data.login_status is logged, not_logged, or unknown."
+      ],
+      "expected_network": [
+        "en=account_access_intent",
+        "No direct personal identifiers are present"
+      ],
+      "debugview_expectation": "account_access_intent appears on account entry click.",
+      "status": "not_started",
+      "evidence": ""
+    }
+  ]
+}

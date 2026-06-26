@@ -1,0 +1,748 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/HQ-Guillaume/ga4-tracking-plan/schema/tracking_plan_schema.json",
+  "title": "GA4 tracking plan contract",
+  "description": "Canonical machine-readable structure for GA4 tracking plans produced by the skill. It is designed for human workbook generation and later QA automation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "document",
+    "measurement_brief",
+    "events",
+    "parameters",
+    "custom_definitions",
+    "key_events",
+    "not_tracked",
+    "assumptions",
+    "documentation_sources_checked",
+    "qa_cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "plan_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_\\-]{2,80}$"
+    },
+    "document": {
+      "$ref": "#/$defs/document"
+    },
+    "measurement_brief": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/measurementBrief"
+      }
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "parameters": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/parameter"
+      }
+    },
+    "custom_definitions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/customDefinition"
+      }
+    },
+    "key_events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/keyEvent"
+      }
+    },
+    "not_tracked": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/notTracked"
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "documentation_sources_checked": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/documentationSource"
+      }
+    },
+    "qa_cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/qaCase"
+      }
+    }
+  },
+  "$defs": {
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "version",
+        "status",
+        "owner",
+        "created_date",
+        "template_source"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "draft",
+            "ready_for_review",
+            "approved",
+            "deprecated"
+          ]
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "created_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "template_source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "measurementBrief": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "journey_id",
+        "journey_name",
+        "scope",
+        "url_or_route",
+        "page_type",
+        "expected_user_actions",
+        "business_goal",
+        "analysis_needs",
+        "success_signals",
+        "data_available",
+        "implementation_context",
+        "priority",
+        "open_questions"
+      ],
+      "properties": {
+        "journey_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_\\-]{2,80}$"
+        },
+        "journey_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url_or_route": {
+          "type": "string",
+          "minLength": 1
+        },
+        "page_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_user_actions": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "business_goal": {
+          "type": "string",
+          "minLength": 1
+        },
+        "analysis_needs": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "success_signals": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "audience_or_segment_needs": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "data_available": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "implementation_context": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "constraints": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "priority": {
+          "$ref": "#/$defs/priority"
+        },
+        "open_questions": {
+          "$ref": "#/$defs/stringArray"
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "journey_id",
+        "event_name",
+        "classification",
+        "official_ga4_match",
+        "page_url_pattern",
+        "page_type",
+        "business_question",
+        "trigger",
+        "key_event",
+        "priority",
+        "parameters",
+        "data_layer",
+        "ga4_payload",
+        "privacy",
+        "qa"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_\\-]{2,80}$"
+        },
+        "journey_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event_name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,39}$"
+        },
+        "classification": {
+          "enum": [
+            "automatic",
+            "enhanced_measurement",
+            "recommended",
+            "recommended_ecommerce",
+            "custom"
+          ]
+        },
+        "official_ga4_match": {
+          "type": "string",
+          "minLength": 1
+        },
+        "page_url_pattern": {
+          "type": "string",
+          "minLength": 1
+        },
+        "page_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "business_question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trigger": {
+          "type": "string",
+          "minLength": 1
+        },
+        "key_event": {
+          "type": "boolean"
+        },
+        "priority": {
+          "$ref": "#/$defs/priority"
+        },
+        "parameters": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "data_layer": {
+          "$ref": "#/$defs/dataLayer"
+        },
+        "ga4_payload": {
+          "$ref": "#/$defs/ga4Payload"
+        },
+        "privacy": {
+          "$ref": "#/$defs/privacy"
+        },
+        "qa": {
+          "$ref": "#/$defs/qa"
+        },
+        "implementation_notes": {
+          "type": "string"
+        }
+      }
+    },
+    "dataLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_key",
+        "flush_keys",
+        "push"
+      ],
+      "properties": {
+        "event_key": {
+          "type": "string"
+        },
+        "flush_keys": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "push": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "mapping_notes": {
+          "type": "string"
+        }
+      }
+    },
+    "ga4Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_name",
+        "parameters",
+        "items"
+      ],
+      "properties": {
+        "event_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/anyJsonValue"
+          }
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/anyJsonValue"
+            }
+          }
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pii_risk",
+        "consent_dependency",
+        "cardinality_risk",
+        "notes"
+      ],
+      "properties": {
+        "pii_risk": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "consent_dependency": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cardinality_risk": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "qa": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "qa_id",
+        "methods",
+        "steps",
+        "expected_data_layer",
+        "expected_network",
+        "debugview_expectation",
+        "status"
+      ],
+      "properties": {
+        "qa_id": {
+          "type": "string",
+          "pattern": "^QA-[A-Z0-9_\\-]{2,80}$"
+        },
+        "methods": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "steps": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "expected_data_layer": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "expected_network": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "debugview_expectation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "$ref": "#/$defs/qaStatus"
+        }
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter_name",
+        "display_name",
+        "scope",
+        "type",
+        "classification",
+        "required",
+        "description",
+        "value_rules",
+        "example_value",
+        "allowed_values",
+        "source",
+        "register_custom_definition",
+        "cardinality_risk",
+        "pii_risk",
+        "consent_dependency"
+      ],
+      "properties": {
+        "parameter_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "enum": [
+            "event",
+            "item",
+            "user",
+            "implementation"
+          ]
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "classification": {
+          "$ref": "#/$defs/parameterClassification"
+        },
+        "required": {
+          "enum": [
+            "required",
+            "conditional",
+            "optional"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value_rules": {
+          "type": "string",
+          "minLength": 1
+        },
+        "example_value": {
+          "type": "string"
+        },
+        "allowed_values": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "register_custom_definition": {
+          "type": "boolean"
+        },
+        "cardinality_risk": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "pii_risk": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "consent_dependency": {
+          "type": "string"
+        }
+      }
+    },
+    "customDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter_name",
+        "display_name",
+        "scope",
+        "registration_type",
+        "reason",
+        "priority"
+      ],
+      "properties": {
+        "parameter_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "enum": [
+            "event",
+            "item",
+            "user"
+          ]
+        },
+        "registration_type": {
+          "enum": [
+            "custom_dimension",
+            "custom_metric",
+            "user_property"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "priority": {
+          "$ref": "#/$defs/priority"
+        }
+      }
+    },
+    "keyEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_name",
+        "reason",
+        "conditions"
+      ],
+      "properties": {
+        "event_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conditions": {
+          "type": "string"
+        }
+      }
+    },
+    "notTracked": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "interaction",
+        "reason"
+      ],
+      "properties": {
+        "interaction": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "documentationSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "url",
+        "source_type",
+        "checked_for"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_type": {
+          "enum": [
+            "official",
+            "trusted_practitioner",
+            "client_template",
+            "internal"
+          ]
+        },
+        "checked_for": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "qaCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "qa_id",
+        "event_id",
+        "event_name",
+        "methods",
+        "steps",
+        "expected_data_layer",
+        "expected_network",
+        "debugview_expectation",
+        "status",
+        "evidence"
+      ],
+      "properties": {
+        "qa_id": {
+          "type": "string",
+          "pattern": "^QA-[A-Z0-9_\\-]{2,80}$"
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "methods": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "steps": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "expected_data_layer": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "expected_network": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "debugview_expectation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "$ref": "#/$defs/qaStatus"
+        },
+        "evidence": {
+          "type": "string"
+        }
+      }
+    },
+    "priority": {
+      "enum": [
+        "must",
+        "should",
+        "could"
+      ]
+    },
+    "qaStatus": {
+      "enum": [
+        "not_started",
+        "OK",
+        "KO",
+        "Cannot test"
+      ]
+    },
+    "parameterClassification": {
+      "enum": [
+        "ga4_auto_collected_parameter",
+        "ga4_native_parameter",
+        "ga4_recommended_parameter",
+        "ga4_ecommerce_parameter",
+        "ga4_ecommerce_item_parameter",
+        "custom_event_parameter",
+        "custom_user_property",
+        "gtm_builtin_variable",
+        "data_layer_variable",
+        "custom_javascript_variable",
+        "dom_selector_variable",
+        "server_variable"
+      ]
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "anyJsonValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array"
+        },
+        {
+          "type": "object"
+        }
+      ]
+    }
+  }
+}

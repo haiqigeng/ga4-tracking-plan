@@ -19,6 +19,10 @@ Create an implementation-ready GA4 tracking schema that is useful for analysis, 
 - Never collect direct PII. Flag PII and consent risks.
 - Avoid low-signal click tracking unless it answers a real analysis question.
 - Consolidate repeated same-name events whenever the trigger logic, parameter structure, and business meaning are materially the same; use one event definition and list possible values per variable instead of creating many near-duplicate event columns.
+- Do not block plan creation when implementation context is unknown. If the user gives only a page or journey, assume a standard GTM web container with dataLayer and GA4 web stream, then flag the assumption.
+- When a plan should be reusable, testable, or converted to XLSX, design it against `references/tracking_plan_schema.json`.
+- Keep future QA usage in mind: each testable event should have a stable `event_id`, `qa_id`, expected dataLayer behavior, expected GA4/network payload, and test status.
+- Never commit or release client-specific tracking plans, screenshots, test evidence, URLs, exports, or confidential data into a generic skill package.
 - Stop after the GA4 tracking schema or tracking plan is approved unless the user asks for implementation.
 
 ## Official Documentation
@@ -37,7 +41,9 @@ If current docs cannot be checked, say so and mark standard/recommended choices 
 
 When the user does not provide an existing tracking-plan template, use `assets/ga4_tracking_plan_template.xlsx` as the default human-facing XLSX structure. Adapt its sheets and event matrix to the user's journeys instead of inventing a new workbook layout.
 
-## Event Scenario Library
+When working inside this package repository and the plan is available as canonical JSON, use `scripts/generate_tracking_plan_workbook.py` to generate the XLSX workbook rather than manually rebuilding every sheet.
+
+## Reference Routing
 
 Before designing events, read `references/ga4_event_scenario_library.md` when available. Use it to map the user's website or journey to:
 
@@ -49,6 +55,19 @@ Before designing events, read `references/ga4_event_scenario_library.md` when av
 - dataLayer push formats and GTM mapping notes
 
 Use `references/ga4_event_scenario_library.json` for structured lookup when producing machine-readable tracking-plan outputs. Treat typical custom events in the library as patterns, not standards: always prefer official GA4 events when their semantics match.
+
+Read only the additional scenario references that match the requested scope:
+
+- `references/scenario_ecommerce.md` for product, cart, checkout, purchase, refund, and promotion journeys
+- `references/scenario_lead_generation.md` for forms, quote flows, signup, appointment, callback, and lead submission
+- `references/scenario_search_listing.md` for search, filters, listing pages, result selection, and product discovery lists
+- `references/scenario_account_support_content.md` for account entry, login/signup context, support, FAQ, downloads, content, video, and contact intent
+- `references/scenario_spa_routing.md` for single-page apps, client-side routing, virtual pages, and duplicate page_view risk
+- `references/data_quality_privacy.md` for naming, value normalization, data minimization, cardinality, and privacy checks
+- `references/qa_contract.md` for DebugView, GTM Preview, network, evidence, and future testing-skill readiness
+- `references/tracking_plan_schema.json` when producing machine-readable JSON
+- `references/generic_tracking_plan_fixture.json` as a generic example of the contract only, never as client evidence
+- `references/official_ga4_recommended_events.json` for structured official recommended-event lookup when available
 
 ## Step 1: Collect Measurement Brief
 
@@ -66,7 +85,7 @@ Collect:
 - `success_signals`: conversions, key events, funnel steps, revenue actions, qualified engagement
 - `audience_or_segment_needs`: user type, login state, customer type, country, device, campaign, consent state
 - `data_available`: page metadata, product data, form metadata, transaction data, user/account state
-- `implementation_context`: GTM, gtag.js, dataLayer, CMS, ecommerce platform, SPA routing, server-side tagging
+- `implementation_context`: GTM, gtag.js, dataLayer, CMS, ecommerce platform, SPA routing, server-side tagging. If unknown, assume standard GTM + dataLayer and continue.
 - `constraints`: privacy, consent, PII risk, technical limits, reporting limits
 - `priority`: `must`, `should`, or `could`
 
@@ -194,18 +213,22 @@ When the user requests a machine-readable artifact, produce `ga4-tracking-schema
 
 ```json
 {
+  "schema_version": "1.0.0",
+  "plan_id": "project_or_journey_id",
+  "document": {},
   "measurement_brief": [],
   "events": [],
-  "common_parameters": [],
-  "custom_dimensions": [],
-  "custom_metrics": [],
+  "parameters": [],
+  "custom_definitions": [],
   "key_events": [],
   "not_tracked": [],
+  "assumptions": [],
   "documentation_sources_checked": [],
-  "assumptions_and_open_questions": [],
-  "qa_notes": []
+  "qa_cases": []
 }
 ```
+
+The full required structure is defined by `references/tracking_plan_schema.json`. Use it as the source of truth when generating or validating machine-readable plans.
 
 ## Step 6: Analyst Review
 
@@ -229,7 +252,7 @@ Before finalizing, review the plan as a web analyst:
 
 ## Step 7: QA And Approval Boundary
 
-Provide a lightweight validation plan:
+Provide a lightweight validation plan and, when producing a JSON/XLSX artifact, include one QA case per testable event:
 
 - DebugView checks
 - GTM Preview checks when GTM is in scope
@@ -237,5 +260,15 @@ Provide a lightweight validation plan:
 - expected parameter examples
 - funnel or key event validation cases
 - ecommerce purchase deduplication checks when relevant
+
+Each QA case should include:
+
+- stable `event_id` and `qa_id`
+- reproduction steps
+- expected dataLayer keys and values
+- expected GA4/network event name and important parameters
+- DebugView expectation
+- status placeholder: `Cannot test` in XLSX drafts or `not_started` in JSON drafts
+- evidence placeholder for future screenshots, request exports, or notes
 
 Stop after schema approval. Do not create GTM tags, dataLayer code, server-side tagging, or QA automation unless the user explicitly asks for the next phase.

@@ -4,3 +4,7 @@ Thumbs.db
 *.tmp
 *.bak
 ~$*.xlsx
+
+__pycache__/
+*.py[cod]
+.venv/

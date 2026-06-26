@@ -1,22 +1,42 @@
 from __future__ import annotations
 
+import json
 import re
+import subprocess
 import sys
+import tempfile
 import zipfile
 from pathlib import Path
 
+from jsonschema import Draft202012Validator
 from openpyxl import load_workbook
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skill"
+REQUIRED_REFERENCE_FILES = [
+    SKILL / "references" / "ga4_event_scenario_library.md",
+    SKILL / "references" / "ga4_event_scenario_library.json",
+    SKILL / "references" / "official_ga4_recommended_events.json",
+    SKILL / "references" / "tracking_plan_schema.json",
+    SKILL / "references" / "generic_tracking_plan_fixture.json",
+    SKILL / "references" / "scenario_ecommerce.md",
+    SKILL / "references" / "scenario_lead_generation.md",
+    SKILL / "references" / "scenario_search_listing.md",
+    SKILL / "references" / "scenario_account_support_content.md",
+    SKILL / "references" / "scenario_spa_routing.md",
+    SKILL / "references" / "data_quality_privacy.md",
+    SKILL / "references" / "qa_contract.md",
+]
 REQUIRED_SKILL_FILES = [
     SKILL / "SKILL.md",
     SKILL / "agents" / "openai.yaml",
     SKILL / "assets" / "ga4_tracking_plan_template.xlsx",
-    SKILL / "references" / "ga4_event_scenario_library.md",
-    SKILL / "references" / "ga4_event_scenario_library.json",
-    SKILL / "references" / "official_ga4_recommended_events.json",
+    ROOT / "scripts" / "create_tracking_plan_template.py",
+    ROOT / "scripts" / "create_event_scenario_library.py",
+    ROOT / "scripts" / "generate_tracking_plan_workbook.py",
+    ROOT / "scripts" / "validate_package.py",
+    *REQUIRED_REFERENCE_FILES,
 ]
 EXPECTED_TABS = [
     "00 Overview",
@@ -24,6 +44,7 @@ EXPECTED_TABS = [
     "02 Parameter Reference",
     "03 Event Matrix",
     "04 Screenshot Register",
+    "05 QA Cases",
 ]
 WORKBOOKS_TO_VALIDATE = [
     SKILL / "assets" / "ga4_tracking_plan_template.xlsx",
@@ -34,6 +55,18 @@ ALLOWED_PUBLIC_FILES = {
     "ga4_event_scenario_library.xlsx",
 }
 TEXT_SUFFIXES = {".md", ".py", ".yml", ".yaml", ".json", ".txt", ".gitignore", ".gitattributes"}
+BANNED_PROJECT_PATTERNS = [
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in [
+        r"\b" + "da" + "xon" + r"\b",
+        r"\b" + "lo" + "livier" + r"\b",
+        "gtm-" + "pr4" + "mq6j",
+        "work" + "space283",
+        "audit_" + "cleanup",
+        "first-day-" + "checklist",
+        "onboarding-" + "state",
+    ]
+]
 SECRET_PATTERNS = {
     "private_key": re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
     "openai_key": re.compile(r"sk-[A-Za-z0-9_-]{20,}"),
@@ -47,6 +80,13 @@ SECRET_PATTERNS = {
 
 def fail(message: str) -> None:
     raise AssertionError(message)
+
+
+def display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
 
 
 def read_text(path: Path) -> str:
@@ -85,11 +125,94 @@ def check_skill_resource_links() -> None:
         "assets/ga4_tracking_plan_template.xlsx",
         "references/ga4_event_scenario_library.md",
         "references/ga4_event_scenario_library.json",
+        "references/official_ga4_recommended_events.json",
+        "references/tracking_plan_schema.json",
+        "references/generic_tracking_plan_fixture.json",
+        "references/scenario_ecommerce.md",
+        "references/scenario_lead_generation.md",
+        "references/scenario_search_listing.md",
+        "references/scenario_account_support_content.md",
+        "references/scenario_spa_routing.md",
+        "references/data_quality_privacy.md",
+        "references/qa_contract.md",
     ]:
         if rel not in text:
             fail(f"SKILL.md does not mention bundled resource {rel}")
         if not (SKILL / rel).exists():
             fail(f"Bundled resource is missing: {rel}")
+
+
+def load_json(path: Path):
+    return json.loads(read_text(path))
+
+
+def check_tracking_plan_contract() -> None:
+    schema_path = SKILL / "references" / "tracking_plan_schema.json"
+    fixture_path = SKILL / "references" / "generic_tracking_plan_fixture.json"
+    schema = load_json(schema_path)
+    fixture = load_json(fixture_path)
+
+    Draft202012Validator.check_schema(schema)
+    validator = Draft202012Validator(schema)
+    errors = sorted(validator.iter_errors(fixture), key=lambda error: list(error.path))
+    if errors:
+        formatted = []
+        for error in errors[:8]:
+            path = ".".join(str(part) for part in error.path) or "<root>"
+            formatted.append(f"{path}: {error.message}")
+        fail("Generic fixture does not match tracking_plan_schema.json:\n" + "\n".join(formatted))
+
+    event_ids = [event["event_id"] for event in fixture["events"]]
+    if len(event_ids) != len(set(event_ids)):
+        fail("Generic fixture has duplicate event_id values")
+
+    event_qa_ids = {event["qa"]["qa_id"] for event in fixture["events"]}
+    case_qa_ids = {case["qa_id"] for case in fixture["qa_cases"]}
+    if event_qa_ids != case_qa_ids:
+        fail(f"QA cases must match event qa_id values. Event QA={sorted(event_qa_ids)} Case QA={sorted(case_qa_ids)}")
+
+    case_event_ids = {case["event_id"] for case in fixture["qa_cases"]}
+    if set(event_ids) != case_event_ids:
+        fail("Every event must have exactly one top-level QA case")
+
+    parameter_names = {parameter["parameter_name"] for parameter in fixture["parameters"]}
+    referenced_parameters = {parameter for event in fixture["events"] for parameter in event["parameters"]}
+    missing_parameters = sorted(referenced_parameters - parameter_names)
+    if missing_parameters:
+        fail(f"Fixture events reference parameters missing from parameter reference: {missing_parameters}")
+
+    for event in fixture["events"]:
+        if event["classification"] == "recommended_ecommerce":
+            event_parameters = set(event["parameters"])
+            for required in ["items", "items[].item_id", "items[].item_name"]:
+                if required not in event_parameters:
+                    fail(f"{event['event_id']} ecommerce event is missing {required}")
+            if not event["ga4_payload"].get("items"):
+                fail(f"{event['event_id']} ecommerce event has no GA4 items payload example")
+
+
+def check_generated_workbook() -> None:
+    fixture_path = SKILL / "references" / "generic_tracking_plan_fixture.json"
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output = Path(temp_dir) / "generic_tracking_plan.xlsx"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "generate_tracking_plan_workbook.py"),
+                str(fixture_path),
+                "--output",
+                str(output),
+            ],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            fail("Workbook generator failed:\n" + result.stdout + result.stderr)
+        if not output.exists():
+            fail("Workbook generator did not create the expected output file")
+        check_event_matrix(output)
 
 
 def event_blocks(ws):
@@ -129,36 +252,46 @@ def block_event_types(ws, start: int, end: int) -> list[str]:
 
 def check_event_matrix(workbook_path: Path) -> None:
     wb = load_workbook(workbook_path, read_only=True, data_only=True)
-    if wb.sheetnames != EXPECTED_TABS:
-        fail(f"{workbook_path.relative_to(ROOT)} has unexpected tabs: {wb.sheetnames}")
+    try:
+        if wb.sheetnames != EXPECTED_TABS:
+            fail(f"{display_path(workbook_path)} has unexpected tabs: {wb.sheetnames}")
 
-    ws = wb["03 Event Matrix"]
-    found_ecommerce_block = False
-    for start, end in event_blocks(ws):
-        block_name = str(ws.cell(start, 1).value or "")
-        types = block_event_types(ws, start, end)
-        is_ecommerce = "ecommerce" in types or "Ecommerce" in block_name or "Promotion" in block_name
-        if not is_ecommerce:
-            continue
+        ws = wb["03 Event Matrix"]
+        found_ecommerce_block = False
+        for start, end in event_blocks(ws):
+            block_name = str(ws.cell(start, 1).value or "")
+            types = block_event_types(ws, start, end)
+            is_ecommerce = any("ecommerce" in event_type.lower() for event_type in types) or "Ecommerce" in block_name or "Promotion" in block_name
+            if not is_ecommerce:
+                continue
 
-        found_ecommerce_block = True
-        rows = row_values(ws, start, end)
-        bad_rows = [row for row in rows if row.startswith("ecommerce.") or row.startswith("event_data.")]
-        if bad_rows:
-            fail(f"{workbook_path.relative_to(ROOT)} ecommerce block {block_name} has non-official rows: {bad_rows}")
-        for required in ["items", "items[].item_id", "items[].item_name"]:
-            if required not in rows:
-                fail(f"{workbook_path.relative_to(ROOT)} ecommerce block {block_name} is missing {required}")
-        event_names = []
-        for row in range(start, end + 1):
-            if ws.cell(row, 1).value == "event_name":
-                event_names = [str(value) for value in event_slot_values(ws, row)]
-                break
-        if any(name in {"purchase", "refund"} for name in event_names) and "transaction_id" not in rows:
-            fail(f"{workbook_path.relative_to(ROOT)} purchase/refund block {block_name} is missing transaction_id")
+            found_ecommerce_block = True
+            rows = row_values(ws, start, end)
+            bad_rows = [row for row in rows if row.startswith("ecommerce.") or row.startswith("event_data.")]
+            if bad_rows:
+                fail(f"{display_path(workbook_path)} ecommerce block {block_name} has non-official rows: {bad_rows}")
+            for required in ["items", "items[].item_id", "items[].item_name"]:
+                if required not in rows:
+                    fail(f"{display_path(workbook_path)} ecommerce block {block_name} is missing {required}")
+            event_names = []
+            for row in range(start, end + 1):
+                if ws.cell(row, 1).value == "event_name":
+                    event_names = [str(value) for value in event_slot_values(ws, row)]
+                    break
+            if any(name in {"purchase", "refund"} for name in event_names) and "transaction_id" not in rows:
+                fail(f"{display_path(workbook_path)} purchase/refund block {block_name} is missing transaction_id")
 
-    if not found_ecommerce_block:
-        fail(f"{workbook_path.relative_to(ROOT)} does not contain an ecommerce block")
+        allowed_statuses = {"OK", "KO", "Cannot test", None, ""}
+        for col in range(4, ws.max_column + 1, 2):
+            for row in range(6, ws.max_row + 1):
+                value = ws.cell(row, col).value
+                if value not in allowed_statuses:
+                    fail(f"{display_path(workbook_path)} has invalid test status {value!r} at {ws.cell(row, col).coordinate}")
+
+        if not found_ecommerce_block:
+            fail(f"{display_path(workbook_path)} does not contain an ecommerce block")
+    finally:
+        wb.close()
 
 
 def check_workbooks() -> None:
@@ -183,12 +316,25 @@ def check_public_files_are_generic() -> None:
     if unexpected:
         fail(f"files/ contains non-generic or unexpected public artifacts: {unexpected}")
 
+    all_path_findings = []
+    for path in ROOT.rglob("*"):
+        if ".git" in path.parts or path.name.startswith("~$"):
+            continue
+        rel = display_path(path)
+        if any(pattern.search(rel) for pattern in BANNED_PROJECT_PATTERNS):
+            all_path_findings.append(rel)
+    if all_path_findings:
+        fail("Project-specific or test-related paths found:\n" + "\n".join(sorted(all_path_findings)))
+
 
 def scan_text_for_secrets(path: Path, text: str) -> list[str]:
     findings = []
     for name, pattern in SECRET_PATTERNS.items():
         if pattern.search(text):
-            findings.append(f"{path.relative_to(ROOT)}: {name}")
+            findings.append(f"{display_path(path)}: {name}")
+    for pattern in BANNED_PROJECT_PATTERNS:
+        if pattern.search(text):
+            findings.append(f"{display_path(path)}: project_specific_reference:{pattern.pattern}")
     return findings
 
 
@@ -217,8 +363,10 @@ def main() -> int:
         check_required_files,
         check_skill_frontmatter,
         check_skill_resource_links,
+        check_tracking_plan_contract,
         check_public_files_are_generic,
         check_workbooks,
+        check_generated_workbook,
         check_confidential_patterns,
     ]
     for check in checks:

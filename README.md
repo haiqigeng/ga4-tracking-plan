@@ -12,7 +12,8 @@ Codex skill package for creating GA4 tracking plans from page or journey context
 - `skill/references/` - Machine-readable and Markdown event scenario references used by the skill
 - `scripts/create_tracking_plan_template.py` - Regenerates the default XLSX template
 - `scripts/create_event_scenario_library.py` - Regenerates GA4 scenario references from official documentation
-- `scripts/validate_package.py` - Validates skill structure, workbook tabs, ecommerce matrix rules, and common secret patterns
+- `scripts/generate_tracking_plan_workbook.py` - Converts a canonical JSON tracking plan into a human XLSX workbook
+- `scripts/validate_package.py` - Validates skill structure, JSON contract, workbook tabs, ecommerce matrix rules, generated workbook output, generic release surface, and common secret patterns
 
 ## Skill Focus
 
@@ -22,9 +23,25 @@ It is intentionally scoped to tracking-plan creation and review. GTM, dataLayer,
 
 The included event scenario library helps map common website scenarios to automatic, enhanced-measurement, recommended, ecommerce, and typical custom events with expected parameters and dataLayer patterns.
 
+The package also includes scenario-specific playbooks for ecommerce, lead generation, search/listing, account/support/content, SPA routing, data quality/privacy, and QA readiness. These keep the main skill concise while giving the agent targeted references for different tracking-plan situations.
+
 Tracking plans generated with this skill consolidate repeated same-name events whenever the same trigger logic and parameter structure can cover multiple components. Controlled analytics values should use lowercase ASCII `snake_case`, with accents removed, so French labels such as `Nouveautes` become `nouveautes`.
 
 Ecommerce events are handled as a stricter case: they should stay in ecommerce-only blocks and use the official GA4 ecommerce parameter names, including required item parameters from Google documentation. GTM/dataLayer wrapper paths such as `ecommerce.items` are implementation mapping details, not replacements for GA4 parameters like `items` and `items[].item_id`.
+
+## Canonical JSON Contract
+
+Reusable or QA-ready plans should follow `skill/references/tracking_plan_schema.json`. The schema includes the measurement brief, events, parameter dictionary, custom definitions, key events, not-tracked decisions, documentation sources checked, assumptions, and one QA case per testable event.
+
+`skill/references/generic_tracking_plan_fixture.json` is a generic example of that contract. It is intentionally based on `example.com` and placeholder values only.
+
+To generate an XLSX workbook from a JSON plan:
+
+```text
+python scripts/generate_tracking_plan_workbook.py skill/references/generic_tracking_plan_fixture.json --output generated_tracking_plan.xlsx
+```
+
+Generated client plans, screenshots, GTM previews, request exports, and test evidence should stay outside this generic package unless they are deliberately anonymized fixtures.
 
 ## Install Locally
 
@@ -39,6 +56,8 @@ The installed folder should contain:
 ```text
 SKILL.md
 agents/openai.yaml
+assets/ga4_tracking_plan_template.xlsx
+references/
 ```
 
 ## Example Prompt

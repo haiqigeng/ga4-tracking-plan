@@ -109,6 +109,7 @@ def build_overview(wb):
             ["02 Parameter Reference", "Human-readable variable dictionary", "Analysts, developers, QA", "Human-readable columns only", "", "", "", ""],
             ["03 Event Matrix", "Page, ecommerce, and interaction events", "Analysts, developers, media, QA", "Primary working sheet", "", "", "", ""],
             ["04 Screenshot Register", "Visual evidence and interaction context", "Analysts, developers, QA, stakeholders", "Paste screenshots or link external captures", "", "", "", ""],
+            ["05 QA Cases", "DebugView, GTM Preview, and network validation contract", "Analysts, developers, QA", "One row per testable event case", "", "", "", ""],
             [],
             ["Conventions", "", "", "", "", "", "", ""],
             ["Pattern / status", "Meaning", "Example", "Where used", "", "", "", ""],
@@ -124,9 +125,9 @@ def build_overview(wb):
             ["items[].field", "Field inside each object of an array", "items[].item_id", "Ecommerce item variables", "", "", "", ""],
         ],
     )
-    for row in [7, 11, 15, 23]:
+    for row in [7, 11, 15, 24]:
         header(ws, row, 8)
-    for row in [6, 10, 14, 22]:
+    for row in [6, 10, 14, 23]:
         section(ws, row, ws.cell(row, 1).value, 8)
     set_widths(ws, [24, 36, 28, 28, 34, 24, 18, 44])
     ws.freeze_panes = "A7"
@@ -377,6 +378,108 @@ def build_screenshot_register(wb):
     style_cells(ws)
 
 
+def build_qa_cases(wb):
+    ws = wb.create_sheet("05 QA Cases")
+    title(
+        ws,
+        "QA Cases",
+        "Validation contract for DebugView, GTM Preview, browser network requests, and release sign-off.",
+        11,
+    )
+    ws.append([
+        "QA ID",
+        "Journey",
+        "Event name",
+        "Event ID",
+        "Methods",
+        "Steps",
+        "Expected dataLayer",
+        "Expected network / GA4 payload",
+        "DebugView expectation",
+        "Status",
+        "Evidence / notes",
+    ])
+    header(ws, 3, 11)
+    rows = [
+        [
+            "QA-PAGE-001",
+            "Page and content discovery",
+            "page_view",
+            "EVT-PAGE-001",
+            "DebugView | GTM Preview | Network",
+            "Open the page or trigger the SPA route change once.",
+            "page_data is available before the event; previous page_data is flushed when needed.",
+            "GA4 event name page_view; page_location, page_title, and page_referrer are populated when available.",
+            "One page_view appears for the initial view or route change.",
+            "Cannot test",
+            "",
+        ],
+        [
+            "QA-CONTENT-001",
+            "Page and content discovery",
+            "select_content",
+            "EVT-CONTENT-001",
+            "GTM Preview | Network",
+            "Click each consolidated content component covered by the allowed values.",
+            "event_data.content_type, content_id, content_name, and cta_location match the clicked component.",
+            "GA4 event name select_content; controlled values are lowercase ASCII snake_case.",
+            "select_content appears with the selected content context.",
+            "Cannot test",
+            "",
+        ],
+        [
+            "QA-SEARCH-001",
+            "Search and lead journey",
+            "search",
+            "EVT-SEARCH-001",
+            "DebugView | GTM Preview | Network",
+            "Submit a privacy-safe search term.",
+            "event_data.search_term is populated after PII scrubbing.",
+            "GA4 event name search; search_term is present and contains no direct PII.",
+            "search appears with the submitted search_term.",
+            "Cannot test",
+            "",
+        ],
+        [
+            "QA-ECOM-001",
+            "Ecommerce journey",
+            "view_item_list / select_item / view_item / add_to_cart",
+            "EVT-ECOM-001",
+            "DebugView | GTM Preview | Network",
+            "View a product list, select an item, view detail, and add to cart when available.",
+            "ecommerce object is flushed before each ecommerce event; items array contains required item identifiers.",
+            "GA4 ecommerce event uses official parameters: currency/value when sent, items, items[].item_id or items[].item_name.",
+            "Each ecommerce event appears with a valid items array.",
+            "Cannot test",
+            "",
+        ],
+        [
+            "QA-PROMO-001",
+            "Promotion journey",
+            "view_promotion / select_promotion",
+            "EVT-PROMO-001",
+            "GTM Preview | Network",
+            "Expose a tracked promotion and click it.",
+            "promotion_id, promotion_name, creative_name, creative_slot, and items are populated when available.",
+            "GA4 event name view_promotion or select_promotion; official promotion parameters are present.",
+            "Promotion impression and click appear with matching promotion identifiers.",
+            "Cannot test",
+            "",
+        ],
+    ]
+    add_rows(ws, rows)
+    status_dv = DataValidation(type="list", formula1='"OK,KO,Cannot test"', allow_blank=True)
+    ws.add_data_validation(status_dv)
+    status_dv.add(f"J4:J{ws.max_row + 200}")
+    ws.conditional_formatting.add(f"J4:J{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"OK"'], fill=PatternFill("solid", fgColor=GREEN)))
+    ws.conditional_formatting.add(f"J4:J{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"KO"'], fill=PatternFill("solid", fgColor=RED)))
+    ws.conditional_formatting.add(f"J4:J{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"Cannot test"'], fill=PatternFill("solid", fgColor=YELLOW)))
+    set_widths(ws, [20, 28, 28, 22, 28, 52, 52, 56, 44, 16, 44])
+    ws.freeze_panes = "A4"
+    ws.auto_filter.ref = f"A3:K{ws.max_row}"
+    style_cells(ws)
+
+
 def main():
     OUT.parent.mkdir(parents=True, exist_ok=True)
     wb = Workbook()
@@ -386,6 +489,7 @@ def main():
     build_parameter_reference(wb)
     build_event_matrix(wb)
     build_screenshot_register(wb)
+    build_qa_cases(wb)
     for ws in wb.worksheets:
         for row in ws.iter_rows():
             for cell in row:
