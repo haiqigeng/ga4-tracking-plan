@@ -2,6 +2,15 @@
 
 Use this reference when reviewing an existing tracking plan example, translating a legacy implementation plan into GA4, or preparing a plan for future QA/recette usage.
 
+## Contents
+
+- [Review Order](#review-order)
+- [Lint Pass](#lint-pass)
+- [Comparison Rubric](#comparison-rubric)
+- [Template Policy](#template-policy)
+- [Human And Recette Split](#human-and-recette-split)
+- [Real-Example Lessons](#real-example-lessons)
+
 ## Review Order
 
 1. Treat official Google Analytics and Google Tag Manager documentation as the source of truth.

@@ -1,15 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/HQ-Guillaume/ga4-tracking-plan/schema/tracking_plan_schema.json",
-  "title": "GA4 tracking plan contract",
-  "description": "Canonical machine-readable structure for GA4 tracking plans produced by the skill. It is designed for human workbook generation and later QA automation.",
+  "title": "Analytics tracking plan contract",
+  "description": "Canonical machine-readable structure for tracking plans produced by the skill. GA4 remains the default platform, with optional platform mappings for Piano Analytics and later QA automation.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schema_version",
     "plan_id",
+    "analytics_platforms",
     "document",
     "measurement_brief",
+    "measurement_strategy",
     "events",
     "parameters",
     "custom_definitions",
@@ -28,6 +30,13 @@
       "type": "string",
       "pattern": "^[a-z][a-z0-9_\\-]{2,80}$"
     },
+    "analytics_platforms": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/analyticsPlatform"
+      },
+      "uniqueItems": true
+    },
     "document": {
       "$ref": "#/$defs/document"
     },
@@ -37,6 +46,9 @@
       "items": {
         "$ref": "#/$defs/measurementBrief"
       }
+    },
+    "measurement_strategy": {
+      "$ref": "#/$defs/measurementStrategy"
     },
     "events": {
       "type": "array",
@@ -210,6 +222,189 @@
         }
       }
     },
+    "measurementStrategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "detected_archetypes",
+        "page_roles",
+        "selected_event_families",
+        "excluded_event_families",
+        "custom_event_acceptance"
+      ],
+      "properties": {
+        "detected_archetypes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/detectedArchetype"
+          }
+        },
+        "page_roles": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/pageRoleStrategy"
+          }
+        },
+        "selected_event_families": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/selectedEventFamily"
+          }
+        },
+        "excluded_event_families": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/excludedEventFamily"
+          }
+        },
+        "custom_event_acceptance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/customEventAcceptance"
+          }
+        }
+      }
+    },
+    "detectedArchetype": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "archetype",
+        "confidence",
+        "evidence"
+      ],
+      "properties": {
+        "archetype": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "evidence": {
+          "$ref": "#/$defs/stringArray"
+        }
+      }
+    },
+    "pageRoleStrategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "journey_id",
+        "page_role",
+        "business_purpose",
+        "primary_success_signal"
+      ],
+      "properties": {
+        "journey_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "page_role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "business_purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "primary_success_signal": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "selectedEventFamily": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family_id",
+        "family_name",
+        "analytics_platform",
+        "events_or_actions",
+        "reason",
+        "official_sources_considered"
+      ],
+      "properties": {
+        "family_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_\\-]{2,80}$"
+        },
+        "family_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "analytics_platform": {
+          "$ref": "#/$defs/analyticsPlatform"
+        },
+        "events_or_actions": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "official_sources_considered": {
+          "$ref": "#/$defs/stringArray"
+        }
+      }
+    },
+    "excludedEventFamily": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family_name",
+        "reason"
+      ],
+      "properties": {
+        "family_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "customEventAcceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_name",
+        "official_alternatives_considered",
+        "business_reason",
+        "required_parameters",
+        "registration_notes"
+      ],
+      "properties": {
+        "event_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "official_alternatives_considered": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "business_reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required_parameters": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "registration_notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "event": {
       "type": "object",
       "additionalProperties": false,
@@ -218,16 +413,19 @@
         "journey_id",
         "event_name",
         "classification",
-        "official_ga4_match",
+        "measurement_role",
+        "business_event_family",
+        "primary_platform",
+        "official_match",
         "page_url_pattern",
         "page_type",
+        "page_or_component",
         "business_question",
         "trigger",
+        "data_dependencies",
         "key_event",
         "priority",
         "parameters",
-        "data_layer",
-        "ga4_payload",
         "privacy",
         "qa"
       ],
@@ -242,7 +440,7 @@
         },
         "event_name": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_]{1,39}$"
+          "pattern": "^[a-z][a-z0-9_.]{1,79}$"
         },
         "classification": {
           "enum": [
@@ -250,8 +448,26 @@
             "enhanced_measurement",
             "recommended",
             "recommended_ecommerce",
-            "custom"
+            "custom",
+            "piano_standard",
+            "piano_sales_insights",
+            "piano_av_insights",
+            "piano_custom"
           ]
+        },
+        "measurement_role": {
+          "$ref": "#/$defs/measurementRole"
+        },
+        "business_event_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "primary_platform": {
+          "$ref": "#/$defs/analyticsPlatform"
+        },
+        "official_match": {
+          "type": "string",
+          "minLength": 1
         },
         "official_ga4_match": {
           "type": "string",
@@ -265,6 +481,10 @@
           "type": "string",
           "minLength": 1
         },
+        "page_or_component": {
+          "type": "string",
+          "minLength": 1
+        },
         "business_question": {
           "type": "string",
           "minLength": 1
@@ -272,6 +492,9 @@
         "trigger": {
           "type": "string",
           "minLength": 1
+        },
+        "data_dependencies": {
+          "$ref": "#/$defs/stringArray"
         },
         "key_event": {
           "type": "boolean"
@@ -287,6 +510,18 @@
         },
         "ga4_payload": {
           "$ref": "#/$defs/ga4Payload"
+        },
+        "platform_mappings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/platformMapping"
+          }
+        },
+        "implementation_payloads": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/implementationPayload"
+          }
         },
         "privacy": {
           "$ref": "#/$defs/privacy"
@@ -350,6 +585,91 @@
               "$ref": "#/$defs/anyJsonValue"
             }
           }
+        }
+      }
+    },
+    "platformMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platform",
+        "event_name",
+        "classification",
+        "official_match",
+        "parameters_or_properties",
+        "implementation_notes",
+        "documentation_source"
+      ],
+      "properties": {
+        "platform": {
+          "$ref": "#/$defs/analyticsPlatform"
+        },
+        "event_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "classification": {
+          "type": "string",
+          "minLength": 1
+        },
+        "official_match": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameters_or_properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/anyJsonValue"
+          }
+        },
+        "items_or_products": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/anyJsonValue"
+            }
+          }
+        },
+        "implementation_notes": {
+          "type": "string"
+        },
+        "documentation_source": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "implementationPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platform",
+        "method",
+        "event_name",
+        "payload",
+        "notes"
+      ],
+      "properties": {
+        "platform": {
+          "$ref": "#/$defs/analyticsPlatform"
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/anyJsonValue"
+          }
+        },
+        "notes": {
+          "type": "string"
         }
       }
     },
@@ -435,6 +755,7 @@
         "classification",
         "required",
         "description",
+        "reporting_purpose",
         "value_rules",
         "example_value",
         "allowed_values",
@@ -476,6 +797,10 @@
           ]
         },
         "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reporting_purpose": {
           "type": "string",
           "minLength": 1
         },
@@ -546,7 +871,8 @@
           "enum": [
             "custom_dimension",
             "custom_metric",
-            "user_property"
+            "user_property",
+            "piano_data_model_property"
           ]
         },
         "reason": {
@@ -689,12 +1015,27 @@
         "could"
       ]
     },
+    "measurementRole": {
+      "enum": [
+        "macro_conversion",
+        "micro_conversion",
+        "diagnostic",
+        "context"
+      ]
+    },
     "qaStatus": {
       "enum": [
         "not_started",
         "OK",
         "KO",
         "Cannot test"
+      ]
+    },
+    "analyticsPlatform": {
+      "enum": [
+        "ga4",
+        "piano_analytics",
+        "other"
       ]
     },
     "parameterClassification": {
@@ -710,7 +1051,15 @@
         "data_layer_variable",
         "custom_javascript_variable",
         "dom_selector_variable",
-        "server_variable"
+        "server_variable",
+        "piano_page_property",
+        "piano_click_property",
+        "piano_product_property",
+        "piano_cart_property",
+        "piano_transaction_property",
+        "piano_av_property",
+        "piano_conversion_property",
+        "piano_custom_property"
       ]
     },
     "stringArray": {

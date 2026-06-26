@@ -1,0 +1,474 @@
+{
+  "schema_version": "1.0.0",
+  "plan_id": "generic_piano_content_page",
+  "analytics_platforms": [
+    "piano_analytics"
+  ],
+  "document": {
+    "title": "Generic Piano Analytics content page tracking plan",
+    "version": "v0.1",
+    "status": "draft",
+    "owner": "TBD",
+    "created_date": "2026-06-26",
+    "template_source": "canonical JSON fixture",
+    "notes": "Generic Piano-only fixture for validating platform-neutral tracking-plan fields without GA4 payload placeholders."
+  },
+  "measurement_brief": [
+    {
+      "journey_id": "content_page_engagement",
+      "journey_name": "Content page engagement",
+      "scope": "Single content page display and primary internal navigation click.",
+      "url_or_route": "https://example.com/article",
+      "page_type": "content_page",
+      "expected_user_actions": [
+        "view content page",
+        "click an internal navigation link"
+      ],
+      "business_goal": "Understand content page viewing and navigation to deeper content.",
+      "analysis_needs": [
+        "Measure content page display volume",
+        "Identify internal navigation interest"
+      ],
+      "success_signals": [
+        "page.display",
+        "click.navigation"
+      ],
+      "audience_or_segment_needs": [
+        "traffic source",
+        "device category"
+      ],
+      "data_available": [
+        "page name",
+        "page chapters",
+        "click name",
+        "click chapters"
+      ],
+      "implementation_context": [
+        "Piano Analytics JavaScript SDK"
+      ],
+      "constraints": [
+        "Do not send direct PII",
+        "Use Piano native event names and Data Model properties"
+      ],
+      "priority": "must",
+      "open_questions": [
+        "Confirm final page chapter taxonomy."
+      ]
+    }
+  ],
+  "measurement_strategy": {
+    "detected_archetypes": [
+      {
+        "archetype": "Publisher or content page",
+        "confidence": "high",
+        "evidence": [
+          "content page display scope",
+          "page chapter taxonomy",
+          "internal navigation click"
+        ]
+      }
+    ],
+    "page_roles": [
+      {
+        "journey_id": "content_page_engagement",
+        "page_role": "Content consumption page",
+        "business_purpose": "Measure content display and controlled internal navigation without introducing GA4-specific placeholders.",
+        "primary_success_signal": "Users display the page and continue to deeper content through internal navigation."
+      }
+    ],
+    "selected_event_families": [
+      {
+        "family_id": "piano_page_display",
+        "family_name": "Piano page display",
+        "analytics_platform": "piano_analytics",
+        "events_or_actions": [
+          "page.display"
+        ],
+        "reason": "Piano provides a native standard event for page and virtual-page display.",
+        "official_sources_considered": [
+          "Piano standard events page.display"
+        ]
+      },
+      {
+        "family_id": "piano_navigation_click",
+        "family_name": "Piano navigation click",
+        "analytics_platform": "piano_analytics",
+        "events_or_actions": [
+          "click.navigation"
+        ],
+        "reason": "Internal navigation clicks should use the Piano standard navigation-click event and controlled click taxonomy.",
+        "official_sources_considered": [
+          "Piano standard events click.navigation"
+        ]
+      }
+    ],
+    "excluded_event_families": [
+      {
+        "family_name": "GA4 page_view or select_content placeholders",
+        "reason": "This fixture is Piano-only; GA4 fields are excluded unless GA4 is explicitly in scope as a separate platform."
+      },
+      {
+        "family_name": "Generic click.action for internal navigation",
+        "reason": "Piano click.navigation is more precise for internal navigation than a generic action click."
+      }
+    ],
+    "custom_event_acceptance": []
+  },
+  "events": [
+    {
+      "event_id": "EVT-PIANO-PAGE-DISPLAY",
+      "journey_id": "content_page_engagement",
+      "event_name": "page.display",
+      "classification": "piano_standard",
+      "measurement_role": "context",
+      "business_event_family": "piano_page_display",
+      "primary_platform": "piano_analytics",
+      "official_match": "Piano standard page display event",
+      "page_url_pattern": "https://example.com/article",
+      "page_type": "content_page",
+      "page_or_component": "Article page body",
+      "business_question": "How many users display the content page and in which content section?",
+      "trigger": "Content page is displayed or virtual page route is rendered.",
+      "data_dependencies": [
+        "Piano SDK availability",
+        "page property",
+        "page chapter taxonomy"
+      ],
+      "key_event": false,
+      "priority": "must",
+      "parameters": [
+        "page",
+        "page_chapter1",
+        "page_chapter2"
+      ],
+      "platform_mappings": [
+        {
+          "platform": "piano_analytics",
+          "event_name": "page.display",
+          "classification": "piano_standard",
+          "official_match": "Piano standard page display event",
+          "parameters_or_properties": {
+            "page": "generic_article",
+            "page_chapter1": "content",
+            "page_chapter2": "article"
+          },
+          "items_or_products": [],
+          "implementation_notes": "Send with the Piano Analytics JavaScript SDK when the page is displayed.",
+          "documentation_source": "https://developers.piano.io/analytics/data-collection/how-to-send-events/standard-events/"
+        }
+      ],
+      "implementation_payloads": [
+        {
+          "platform": "piano_analytics",
+          "method": "pa.sendEvent",
+          "event_name": "page.display",
+          "payload": {
+            "page": "generic_article",
+            "page_chapter1": "content",
+            "page_chapter2": "article"
+          },
+          "notes": "Canonical Piano SDK payload for a page display event."
+        }
+      ],
+      "privacy": {
+        "pii_risk": "low",
+        "consent_dependency": "analytics consent according to client privacy mode",
+        "cardinality_risk": "low",
+        "notes": "Use controlled page names and chapter taxonomy; do not include raw user identifiers or sensitive query parameters."
+      },
+      "qa": {
+        "qa_id": "QA-PIANO-PAGE-DISPLAY",
+        "methods": [
+          "Network",
+          "Piano Debug"
+        ],
+        "steps": [
+          "Open the generic content page once."
+        ],
+        "expected_data_layer": [
+          "Not applicable when the Piano SDK is implemented directly; if GTM is used as a bridge, verify the matching trigger context."
+        ],
+        "expected_network": [
+          "Piano collection request contains event name page.display.",
+          "Properties page, page_chapter1, and page_chapter2 are populated."
+        ],
+        "debugview_expectation": "page.display appears once with the expected page taxonomy.",
+        "status": "not_started"
+      },
+      "implementation_notes": "Do not translate this event to GA4 page_view unless GA4 is also in scope as a separate platform mapping."
+    },
+    {
+      "event_id": "EVT-PIANO-CLICK-NAVIGATION",
+      "journey_id": "content_page_engagement",
+      "event_name": "click.navigation",
+      "classification": "piano_standard",
+      "measurement_role": "micro_conversion",
+      "business_event_family": "piano_navigation_click",
+      "primary_platform": "piano_analytics",
+      "official_match": "Piano standard navigation click event",
+      "page_url_pattern": "https://example.com/article",
+      "page_type": "content_page",
+      "page_or_component": "Article page internal navigation link",
+      "business_question": "Which internal navigation clicks move users from the content page to deeper content?",
+      "trigger": "User clicks a tracked internal navigation link.",
+      "data_dependencies": [
+        "Piano SDK availability",
+        "click label",
+        "click chapter taxonomy",
+        "internal destination context"
+      ],
+      "key_event": false,
+      "priority": "should",
+      "parameters": [
+        "click",
+        "click_chapter1",
+        "click_chapter2"
+      ],
+      "platform_mappings": [
+        {
+          "platform": "piano_analytics",
+          "event_name": "click.navigation",
+          "classification": "piano_standard",
+          "official_match": "Piano standard navigation click event",
+          "parameters_or_properties": {
+            "click": "related_article",
+            "click_chapter1": "content",
+            "click_chapter2": "article_navigation"
+          },
+          "items_or_products": [],
+          "implementation_notes": "Use a controlled click taxonomy and avoid raw link text when it changes frequently.",
+          "documentation_source": "https://developers.piano.io/analytics/data-collection/how-to-send-events/standard-events/"
+        }
+      ],
+      "implementation_payloads": [
+        {
+          "platform": "piano_analytics",
+          "method": "pa.sendEvent",
+          "event_name": "click.navigation",
+          "payload": {
+            "click": "related_article",
+            "click_chapter1": "content",
+            "click_chapter2": "article_navigation"
+          },
+          "notes": "Canonical Piano SDK payload for an internal navigation click."
+        }
+      ],
+      "privacy": {
+        "pii_risk": "low",
+        "consent_dependency": "analytics consent according to client privacy mode",
+        "cardinality_risk": "low",
+        "notes": "Use controlled click names and chapters; do not send personal identifiers."
+      },
+      "qa": {
+        "qa_id": "QA-PIANO-CLICK-NAVIGATION",
+        "methods": [
+          "Network",
+          "Piano Debug"
+        ],
+        "steps": [
+          "Click a tracked related article or internal navigation link."
+        ],
+        "expected_data_layer": [
+          "Not applicable when the Piano SDK is implemented directly; if GTM is used as a bridge, verify the matching trigger context."
+        ],
+        "expected_network": [
+          "Piano collection request contains event name click.navigation.",
+          "Properties click, click_chapter1, and click_chapter2 are populated."
+        ],
+        "debugview_expectation": "click.navigation appears after the internal navigation click.",
+        "status": "not_started"
+      },
+      "implementation_notes": "Use click.action instead if the interaction performs an action without navigating."
+    }
+  ],
+  "parameters": [
+    {
+      "parameter_name": "page",
+      "display_name": "Page",
+      "scope": "event",
+      "type": "string",
+      "classification": "piano_page_property",
+      "required": "optional",
+      "description": "Piano page name property.",
+      "reporting_purpose": "Supports Piano page display reporting with a stable page name.",
+      "value_rules": "Use a controlled page taxonomy.",
+      "example_value": "generic_article",
+      "allowed_values": [],
+      "source": "CMS page metadata",
+      "register_custom_definition": false,
+      "cardinality_risk": "medium",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    },
+    {
+      "parameter_name": "page_chapter1",
+      "display_name": "Page chapter 1",
+      "scope": "event",
+      "type": "string",
+      "classification": "piano_page_property",
+      "required": "optional",
+      "description": "Top-level Piano page chapter.",
+      "reporting_purpose": "Segments Piano page and click reporting by top-level site section.",
+      "value_rules": "Use controlled lowercase ASCII snake_case values.",
+      "example_value": "content",
+      "allowed_values": [
+        "content",
+        "commerce",
+        "support"
+      ],
+      "source": "CMS page metadata",
+      "register_custom_definition": false,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    },
+    {
+      "parameter_name": "page_chapter2",
+      "display_name": "Page chapter 2",
+      "scope": "event",
+      "type": "string",
+      "classification": "piano_page_property",
+      "required": "optional",
+      "description": "Second-level Piano page chapter.",
+      "reporting_purpose": "Segments Piano page and click reporting by second-level site section.",
+      "value_rules": "Use controlled lowercase ASCII snake_case values.",
+      "example_value": "article",
+      "allowed_values": [],
+      "source": "CMS page metadata",
+      "register_custom_definition": false,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    },
+    {
+      "parameter_name": "click",
+      "display_name": "Click",
+      "scope": "event",
+      "type": "string",
+      "classification": "piano_click_property",
+      "required": "optional",
+      "description": "Piano click name property.",
+      "reporting_purpose": "Provides the readable Piano click label for navigation analysis.",
+      "value_rules": "Use stable controlled click names.",
+      "example_value": "related_article",
+      "allowed_values": [],
+      "source": "component metadata",
+      "register_custom_definition": false,
+      "cardinality_risk": "medium",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    },
+    {
+      "parameter_name": "click_chapter1",
+      "display_name": "Click chapter 1",
+      "scope": "event",
+      "type": "string",
+      "classification": "piano_click_property",
+      "required": "optional",
+      "description": "Top-level Piano click chapter.",
+      "reporting_purpose": "Segments Piano click reporting by top-level navigation area.",
+      "value_rules": "Use controlled lowercase ASCII snake_case values.",
+      "example_value": "content",
+      "allowed_values": [
+        "content",
+        "commerce",
+        "support"
+      ],
+      "source": "component metadata",
+      "register_custom_definition": false,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    },
+    {
+      "parameter_name": "click_chapter2",
+      "display_name": "Click chapter 2",
+      "scope": "event",
+      "type": "string",
+      "classification": "piano_click_property",
+      "required": "optional",
+      "description": "Second-level Piano click chapter.",
+      "reporting_purpose": "Segments Piano click reporting by destination or content family.",
+      "value_rules": "Use controlled lowercase ASCII snake_case values.",
+      "example_value": "article_navigation",
+      "allowed_values": [],
+      "source": "component metadata",
+      "register_custom_definition": false,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    }
+  ],
+  "custom_definitions": [],
+  "key_events": [],
+  "not_tracked": [
+    {
+      "interaction": "Raw article title as a high-cardinality navigation label",
+      "reason": "A controlled click taxonomy is easier to maintain and safer for reporting."
+    }
+  ],
+  "assumptions": [
+    "Piano Analytics JavaScript SDK is the implementation method.",
+    "No GA4 stream is in scope for this generic fixture."
+  ],
+  "documentation_sources_checked": [
+    {
+      "name": "Piano Analytics standard events",
+      "url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/standard-events/",
+      "source_type": "official",
+      "checked_for": "page.display and click.navigation event names and properties"
+    },
+    {
+      "name": "Piano Analytics SDK event sending",
+      "url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/send-events-via-sdks/",
+      "source_type": "official",
+      "checked_for": "Piano SDK sendEvent implementation pattern"
+    }
+  ],
+  "qa_cases": [
+    {
+      "qa_id": "QA-PIANO-PAGE-DISPLAY",
+      "event_id": "EVT-PIANO-PAGE-DISPLAY",
+      "event_name": "page.display",
+      "methods": [
+        "Network",
+        "Piano Debug"
+      ],
+      "steps": [
+        "Open the generic content page once."
+      ],
+      "expected_data_layer": [
+        "Not applicable when the Piano SDK is implemented directly; if GTM is used as a bridge, verify the matching trigger context."
+      ],
+      "expected_network": [
+        "Piano collection request contains event name page.display.",
+        "Properties page, page_chapter1, and page_chapter2 are populated."
+      ],
+      "debugview_expectation": "page.display appears once with the expected page taxonomy.",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "qa_id": "QA-PIANO-CLICK-NAVIGATION",
+      "event_id": "EVT-PIANO-CLICK-NAVIGATION",
+      "event_name": "click.navigation",
+      "methods": [
+        "Network",
+        "Piano Debug"
+      ],
+      "steps": [
+        "Click a tracked related article or internal navigation link."
+      ],
+      "expected_data_layer": [
+        "Not applicable when the Piano SDK is implemented directly; if GTM is used as a bridge, verify the matching trigger context."
+      ],
+      "expected_network": [
+        "Piano collection request contains event name click.navigation.",
+        "Properties click, click_chapter1, and click_chapter2 are populated."
+      ],
+      "debugview_expectation": "click.navigation appears after the internal navigation click.",
+      "status": "not_started",
+      "evidence": ""
+    }
+  ]
+}

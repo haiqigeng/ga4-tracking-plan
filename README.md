@@ -2,16 +2,15 @@
 
 [![Validate skill](https://github.com/HQ-Guillaume/ga4-tracking-plan/actions/workflows/validate-skill.yml/badge.svg)](https://github.com/HQ-Guillaume/ga4-tracking-plan/actions/workflows/validate-skill.yml)
 
-Codex skill package for creating GA4 tracking plans from page or journey context.
+Codex skill package for creating GA4-first tracking plans from page or journey context, with Piano Analytics support when explicitly requested.
 
 ## Contents
 
 - `skill/` - Codex skill definition and UI metadata
 - `skill/scripts/` - Runtime scripts bundled with the installed skill
-- `files/ga4_tracking_plan_template_v2_1.xlsx` - Human-ready tracking plan template
-- `files/ga4_event_scenario_library.xlsx` - GA4 event and scenario reference library
 - `skill/references/` - Machine-readable and Markdown event scenario references used by the skill
-- `scripts/create_tracking_plan_template.py` - Regenerates the default XLSX template
+- `skill/assets/ga4_tracking_plan_template.xlsx` - Human-ready default tracking plan template
+- `scripts/create_tracking_plan_template.py` - Regenerates the default XLSX template in `skill/assets/`
 - `scripts/create_event_scenario_library.py` - Regenerates GA4 scenario references from official documentation
 - `scripts/generate_tracking_plan_workbook.py` - Repo wrapper for the bundled JSON-to-XLSX generator
 - `scripts/validate_tracking_plan.py` - Repo wrapper for the bundled JSON tracking-plan validator
@@ -20,13 +19,13 @@ Codex skill package for creating GA4 tracking plans from page or journey context
 
 ## Skill Focus
 
-The skill helps design GA4 tracking schemas that start from a measurement brief, verify official GA4 recommended and ecommerce events, classify native versus custom events and parameters, and produce implementation-ready tracking plans.
+The skill helps design tracking schemas that start from a measurement brief, verify official platform events, classify native versus custom events and parameters/properties, and produce implementation-ready tracking plans. GA4 remains the default and strictest supported output path; Piano Analytics is supported through dedicated platform mapping guidance when requested. XLSX output is treated as the primary human-facing deliverable and should remain readable for analysts, developers, media teams, QA, and stakeholders.
 
 It is intentionally scoped to tracking-plan creation and review. GTM, dataLayer, and server-side implementation are separate follow-up phases.
 
-The included event scenario library helps map common website scenarios to automatic, enhanced-measurement, recommended, ecommerce, and typical custom events with expected parameters and dataLayer patterns.
+The included GA4 event scenario library helps map common website scenarios to automatic, enhanced-measurement, recommended, ecommerce, and typical custom events with expected parameters and dataLayer patterns.
 
-The package also includes scenario-specific playbooks for ecommerce, lead generation, search/listing, account/support/content, SPA routing, data quality/privacy, official-first review, example comparison, ecommerce parameter policy, and QA readiness. These keep the main skill concise while giving the agent targeted references for different tracking-plan situations.
+The package also includes scenario-specific playbooks for ecommerce, lead generation, search/listing, account/support/content, SPA routing, business-model analysis, website archetype inference, data quality/privacy, official-first review, example comparison, ecommerce parameter policy, Piano Analytics mappings, a structured Piano official-event lookup, mainstream analytics tool policy, and QA readiness. These keep the main skill concise while giving the agent targeted references for different tracking-plan situations.
 
 Tracking plans generated with this skill consolidate repeated same-name events whenever the same trigger logic and parameter structure can cover multiple components. Controlled analytics values should use lowercase ASCII `snake_case`, with accents removed, so French labels such as `Nouveautes` become `nouveautes`.
 
@@ -34,9 +33,9 @@ Ecommerce events are handled as a stricter case: they should stay in ecommerce-o
 
 ## Canonical JSON Contract
 
-Reusable or QA-ready plans should follow `skill/references/tracking_plan_schema.json`. The schema includes the measurement brief, events, parameter dictionary, custom definitions, key events, not-tracked decisions, documentation sources checked, assumptions, and one QA case per testable event.
+Reusable or QA-ready plans should follow `skill/references/tracking_plan_schema.json`. The schema includes the measurement brief, measurement strategy, event business families, event measurement roles, page/component context, event data dependencies, parameter reporting purposes, custom definitions, key events, not-tracked decisions, documentation sources checked, assumptions, and one QA case per testable event. It also allows optional platform mappings so a business event can carry GA4 and Piano-specific event/property expectations without blending their schemas.
 
-`skill/references/generic_tracking_plan_fixture.json` is a generic example of that contract. It is intentionally based on `example.com` and placeholder values only.
+`skill/references/generic_tracking_plan_fixture.json` is a generic GA4-first example of that contract. `skill/references/generic_piano_tracking_plan_fixture.json` is a generic Piano-only content-page example that proves platform-neutral plans do not need fake GA4 payload fields. `skill/references/generic_piano_ecommerce_tracking_plan_fixture.json` is a generic Piano Sales Insights ecommerce example. These fixtures use `example.com` and placeholder values only.
 
 To generate an XLSX workbook from a JSON plan:
 
@@ -44,12 +43,14 @@ To generate an XLSX workbook from a JSON plan:
 python scripts/generate_tracking_plan_workbook.py skill/references/generic_tracking_plan_fixture.json --output generated_tracking_plan.xlsx
 ```
 
-To validate a JSON plan and export a long-format CSV:
+To validate a JSON plan and export a long-format CSV. The CSV includes GA4 rows and optional platform-mapping rows when the JSON contains Piano or cross-platform mappings:
 
 ```text
 python scripts/validate_tracking_plan.py skill/references/generic_tracking_plan_fixture.json
 python scripts/export_tracking_plan_csv.py skill/references/generic_tracking_plan_fixture.json --output generated_tracking_plan.csv
 ```
+
+The validator checks schema shape, measurement strategy, event-family coverage, measurement roles, page/component context, event data dependencies, measurement-brief and journey alignment, parameter reporting purposes and value rules, not-tracked decision quality, required platform and official/custom rationale, business-question quality, GA4 official event classification, required GA4 recommended-event parameters, GA4 naming and reserved prefixes, ecommerce parameter scope, Piano mandatory properties, official documentation source coverage, custom-event justification, QA linkage, expected network event-name assertions, PII-looking field names, and platform mappings.
 
 Generated client plans, screenshots, GTM previews, request exports, and test evidence should stay outside this generic package unless they are deliberately anonymized fixtures.
 
@@ -79,7 +80,7 @@ Use $ga4-tracking-plan to create a GA4 tracking schema for these pages and journ
 
 ## Release Asset
 
-The latest release includes only generic skill assets: the tracking-plan template and event scenario library. Site-specific tracking plans, tests, client artifacts, and confidential files should not be committed or attached to releases.
+The release bundle should be built from `skill/` plus `requirements.txt`. Release-only files should be generated in a temporary build directory, not committed to the repo. Site-specific tracking plans, tests, client artifacts, and confidential files should not be committed or attached to releases.
 
 ## Validate Locally
 

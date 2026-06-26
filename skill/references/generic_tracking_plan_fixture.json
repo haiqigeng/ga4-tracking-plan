@@ -1,6 +1,9 @@
 {
   "schema_version": "1.0.0",
   "plan_id": "generic_ecommerce_homepage",
+  "analytics_platforms": [
+    "ga4"
+  ],
   "document": {
     "title": "Generic GA4 ecommerce homepage tracking plan",
     "version": "v0.1",
@@ -69,17 +72,143 @@
       ]
     }
   ],
+  "measurement_strategy": {
+    "detected_archetypes": [
+      {
+        "archetype": "Retail ecommerce homepage",
+        "confidence": "medium",
+        "evidence": [
+          "homepage discovery scope",
+          "promotion metadata available",
+          "search and navigation interactions",
+          "account access entry point"
+        ]
+      }
+    ],
+    "page_roles": [
+      {
+        "journey_id": "homepage_discovery",
+        "page_role": "Homepage discovery surface",
+        "business_purpose": "Introduce merchandising, search, navigation, and account-access paths before product or checkout journeys.",
+        "primary_success_signal": "Users continue through promotion, search, content/navigation, or account-access intent."
+      }
+    ],
+    "selected_event_families": [
+      {
+        "family_id": "homepage_context",
+        "family_name": "Homepage context",
+        "analytics_platform": "ga4",
+        "events_or_actions": [
+          "page_view"
+        ],
+        "reason": "The page view frames all downstream homepage interactions and supports acquisition and landing-page reporting.",
+        "official_sources_considered": [
+          "GA4 automatic page_view"
+        ]
+      },
+      {
+        "family_id": "ecommerce_promotion_engagement",
+        "family_name": "Ecommerce promotion engagement",
+        "analytics_platform": "ga4",
+        "events_or_actions": [
+          "view_promotion",
+          "select_promotion"
+        ],
+        "reason": "Homepage promotions are merchandising objects and should use GA4 recommended ecommerce promotion events when promotion metadata is available.",
+        "official_sources_considered": [
+          "GA4 ecommerce view_promotion",
+          "GA4 ecommerce select_promotion"
+        ]
+      },
+      {
+        "family_id": "site_search",
+        "family_name": "Site search",
+        "analytics_platform": "ga4",
+        "events_or_actions": [
+          "search"
+        ],
+        "reason": "Search submission expresses product or content demand and maps directly to the GA4 recommended search event.",
+        "official_sources_considered": [
+          "GA4 recommended search"
+        ]
+      },
+      {
+        "family_id": "content_navigation_selection",
+        "family_name": "Content and navigation selection",
+        "analytics_platform": "ga4",
+        "events_or_actions": [
+          "select_content"
+        ],
+        "reason": "Homepage modules and navigation links need one consolidated official event with controlled content parameters.",
+        "official_sources_considered": [
+          "GA4 recommended select_content"
+        ]
+      },
+      {
+        "family_id": "account_access_intent",
+        "family_name": "Account access intent",
+        "analytics_platform": "ga4",
+        "events_or_actions": [
+          "account_access_intent"
+        ],
+        "reason": "A pre-login account entry click is useful demand signal, while GA4 login should only fire after successful authentication.",
+        "official_sources_considered": [
+          "GA4 recommended login",
+          "GA4 recommended sign_up",
+          "GA4 recommended select_content"
+        ]
+      }
+    ],
+    "excluded_event_families": [
+      {
+        "family_name": "Cart, checkout, and purchase",
+        "reason": "The fixture covers the homepage only; cart, checkout, transaction, and refund events need their own journeys and data."
+      },
+      {
+        "family_name": "One event per visual link or banner",
+        "reason": "Repeated homepage interactions are consolidated into official promotion or content-selection events with controlled values."
+      }
+    ],
+    "custom_event_acceptance": [
+      {
+        "event_name": "account_access_intent",
+        "official_alternatives_considered": [
+          "login",
+          "sign_up",
+          "select_content"
+        ],
+        "business_reason": "Measure account demand before authentication success without misusing the official login or sign_up events.",
+        "required_parameters": [
+          "cta_location",
+          "cta_text",
+          "login_status"
+        ],
+        "registration_notes": "Register cta_location and cta_text only if account-entry performance is needed in GA4 reports or audiences."
+      }
+    ]
+  },
   "events": [
     {
       "event_id": "EVT-HOME-PAGE-VIEW",
       "journey_id": "homepage_discovery",
       "event_name": "page_view",
       "classification": "automatic",
+      "measurement_role": "context",
+      "business_event_family": "homepage_context",
+      "primary_platform": "ga4",
+      "official_match": "GA4 automatic page_view",
       "official_ga4_match": "page_view",
       "page_url_pattern": "https://example.com/",
       "page_type": "homepage",
+      "page_or_component": "Homepage document body",
       "business_question": "How many users view the homepage and from which acquisition contexts?",
       "trigger": "Homepage load or SPA route change to the homepage.",
+      "data_dependencies": [
+        "browser current URL",
+        "document title",
+        "document referrer when available",
+        "page template from CMS or dataLayer"
+      ],
       "key_event": false,
       "priority": "must",
       "parameters": [
@@ -113,6 +242,21 @@
         },
         "items": []
       },
+      "platform_mappings": [
+        {
+          "platform": "piano_analytics",
+          "event_name": "page.display",
+          "classification": "piano_standard",
+          "official_match": "Piano standard page display event",
+          "parameters_or_properties": {
+            "page": "homepage",
+            "page_chapter1": "ecommerce"
+          },
+          "items_or_products": [],
+          "implementation_notes": "Use only when Piano Analytics is in scope; keep GA4 page_view and Piano page.display as separate platform mappings.",
+          "documentation_source": "https://developers.piano.io/analytics/data-collection/how-to-send-events/standard-events/"
+        }
+      ],
       "privacy": {
         "pii_risk": "low",
         "consent_dependency": "analytics_storage",
@@ -148,11 +292,22 @@
       "journey_id": "homepage_discovery",
       "event_name": "view_promotion",
       "classification": "recommended_ecommerce",
+      "measurement_role": "diagnostic",
+      "business_event_family": "ecommerce_promotion_engagement",
+      "primary_platform": "ga4",
+      "official_match": "GA4 recommended ecommerce view_promotion",
       "official_ga4_match": "view_promotion",
       "page_url_pattern": "https://example.com/",
       "page_type": "homepage",
+      "page_or_component": "Homepage merchandising promotion module",
       "business_question": "Which homepage promotions are exposed to users?",
       "trigger": "Promotion module is visible according to the agreed impression threshold.",
+      "data_dependencies": [
+        "promotion ID from CMS or merchandising system",
+        "promotion name and creative metadata",
+        "promotion slot/placement",
+        "promotion item ID or item name when available"
+      ],
       "key_event": false,
       "priority": "should",
       "parameters": [
@@ -201,6 +356,23 @@
           }
         ]
       },
+      "platform_mappings": [
+        {
+          "platform": "piano_analytics",
+          "event_name": "self_promotion.impression",
+          "classification": "piano_standard",
+          "official_match": "Piano onsite self-promotion impression event",
+          "parameters_or_properties": {
+            "onsitead_type": "self_promotion",
+            "onsitead_campaign": "%promotion_id%",
+            "onsitead_creation": "%creative_name%",
+            "onsitead_general_placement": "%creative_slot%"
+          },
+          "items_or_products": [],
+          "implementation_notes": "Use Piano self-promotion only for promotional placements, not ordinary navigation cards.",
+          "documentation_source": "https://developers.piano.io/analytics/data-collection/how-to-send-events/standard-events/"
+        }
+      ],
       "privacy": {
         "pii_risk": "low",
         "consent_dependency": "analytics_storage",
@@ -234,11 +406,22 @@
       "journey_id": "homepage_discovery",
       "event_name": "select_promotion",
       "classification": "recommended_ecommerce",
+      "measurement_role": "micro_conversion",
+      "business_event_family": "ecommerce_promotion_engagement",
+      "primary_platform": "ga4",
+      "official_match": "GA4 recommended ecommerce select_promotion",
       "official_ga4_match": "select_promotion",
       "page_url_pattern": "https://example.com/",
       "page_type": "homepage",
+      "page_or_component": "Homepage merchandising promotion link or card",
       "business_question": "Which exposed promotions drive clicks?",
       "trigger": "User clicks a tracked homepage promotion.",
+      "data_dependencies": [
+        "clicked promotion ID from CMS or data attributes",
+        "promotion name and creative metadata",
+        "promotion slot/placement",
+        "promotion item ID or item name when available"
+      ],
       "key_event": false,
       "priority": "should",
       "parameters": [
@@ -320,11 +503,20 @@
       "journey_id": "homepage_discovery",
       "event_name": "search",
       "classification": "recommended",
+      "measurement_role": "micro_conversion",
+      "business_event_family": "site_search",
+      "primary_platform": "ga4",
+      "official_match": "GA4 recommended search event",
       "official_ga4_match": "search",
       "page_url_pattern": "https://example.com/",
       "page_type": "homepage",
+      "page_or_component": "Homepage search form",
       "business_question": "What do users search for from the homepage?",
       "trigger": "User submits the site search form.",
+      "data_dependencies": [
+        "submitted search term after PII scrubbing",
+        "homepage page template context"
+      ],
       "key_event": false,
       "priority": "must",
       "parameters": [
@@ -356,7 +548,7 @@
         "pii_risk": "medium",
         "consent_dependency": "analytics_storage",
         "cardinality_risk": "high",
-        "notes": "Search terms can contain PII or high-cardinality data. Scrub email, phone, order IDs, and sensitive values before sending."
+        "notes": "Search terms can contain PII or high-cardinality data. Scrub email, phone, order IDs, and sensitive values before sending. Do not register raw search_term as a custom dimension unless a governed reporting need is approved."
       },
       "qa": {
         "qa_id": "QA-HOME-SEARCH",
@@ -386,11 +578,22 @@
       "journey_id": "homepage_discovery",
       "event_name": "select_content",
       "classification": "recommended",
+      "measurement_role": "micro_conversion",
+      "business_event_family": "content_navigation_selection",
+      "primary_platform": "ga4",
+      "official_match": "GA4 recommended select_content event",
       "official_ga4_match": "select_content",
       "page_url_pattern": "https://example.com/",
       "page_type": "homepage",
+      "page_or_component": "Homepage navigation, editorial, or service module",
       "business_question": "Which homepage modules or navigation paths drive user interest?",
       "trigger": "User clicks a consolidated navigation or content module.",
+      "data_dependencies": [
+        "content type taxonomy",
+        "stable content ID or slug",
+        "normalized content name",
+        "CTA location and destination URL"
+      ],
       "key_event": false,
       "priority": "should",
       "parameters": [
@@ -461,11 +664,21 @@
       "journey_id": "homepage_discovery",
       "event_name": "account_access_intent",
       "classification": "custom",
+      "measurement_role": "micro_conversion",
+      "business_event_family": "account_access_intent",
+      "primary_platform": "ga4",
+      "official_match": "custom GA4 event justified by account entry intent before login",
       "official_ga4_match": "no official GA4 event fits account entry intent before login",
       "page_url_pattern": "https://example.com/",
       "page_type": "homepage",
+      "page_or_component": "Homepage account access entry point",
       "business_question": "How often do users try to access the account area from the homepage?",
       "trigger": "User clicks the account access entry point before the login result is known.",
+      "data_dependencies": [
+        "account entry point location",
+        "normalized CTA text",
+        "approved login status value when available"
+      ],
       "key_event": false,
       "priority": "could",
       "parameters": [
@@ -537,6 +750,7 @@
       "classification": "ga4_auto_collected_parameter",
       "required": "optional",
       "description": "Current page URL.",
+      "reporting_purpose": "Segments traffic and QA by the viewed URL after sensitive query parameters are removed.",
       "value_rules": "Use the current URL after removing sensitive query parameters.",
       "example_value": "https://example.com/",
       "allowed_values": [],
@@ -554,6 +768,7 @@
       "classification": "ga4_auto_collected_parameter",
       "required": "optional",
       "description": "Browser document title.",
+      "reporting_purpose": "Supports page-level reporting and DebugView validation with a readable page label.",
       "value_rules": "Use the page title generated by the CMS or browser.",
       "example_value": "Homepage",
       "allowed_values": [],
@@ -571,6 +786,7 @@
       "classification": "ga4_auto_collected_parameter",
       "required": "optional",
       "description": "Previous page URL or external referrer when available.",
+      "reporting_purpose": "Supports navigation and acquisition context analysis for page views.",
       "value_rules": "Use browser referrer after removing sensitive query parameters when possible.",
       "example_value": "https://www.google.com/",
       "allowed_values": [],
@@ -588,6 +804,7 @@
       "classification": "data_layer_variable",
       "required": "optional",
       "description": "Implementation variable used to map page template context to GA4.",
+      "reporting_purpose": "Segments homepage behavior by page template for journey analysis.",
       "value_rules": "Use controlled lowercase ASCII snake_case values.",
       "example_value": "homepage",
       "allowed_values": [
@@ -612,6 +829,7 @@
       "classification": "ga4_ecommerce_parameter",
       "required": "conditional",
       "description": "Official GA4 promotion identifier.",
+      "reporting_purpose": "Joins promotion exposure and click performance using a stable merchandising identifier.",
       "value_rules": "Use a stable campaign or merchandising ID shared by impression and click.",
       "example_value": "home_hero_summer_2026",
       "allowed_values": [],
@@ -629,6 +847,7 @@
       "classification": "ga4_ecommerce_parameter",
       "required": "conditional",
       "description": "Official GA4 promotion name.",
+      "reporting_purpose": "Supports readable promotion performance reporting and merchandising review.",
       "value_rules": "Use normalized controlled values with accents removed.",
       "example_value": "summer_sale",
       "allowed_values": [],
@@ -646,6 +865,7 @@
       "classification": "ga4_ecommerce_parameter",
       "required": "optional",
       "description": "Official GA4 promotion creative name.",
+      "reporting_purpose": "Compares promotion creative variants in exposure and click analysis.",
       "value_rules": "Use stable creative naming.",
       "example_value": "banner_blue",
       "allowed_values": [],
@@ -663,6 +883,7 @@
       "classification": "ga4_ecommerce_parameter",
       "required": "optional",
       "description": "Official GA4 promotion creative placement.",
+      "reporting_purpose": "Compares promotion placement performance across homepage areas.",
       "value_rules": "Use section and position.",
       "example_value": "homepage_hero_1",
       "allowed_values": [],
@@ -680,6 +901,7 @@
       "classification": "ga4_ecommerce_parameter",
       "required": "conditional",
       "description": "Official GA4 ecommerce items array.",
+      "reporting_purpose": "Carries the ecommerce item collection required for product and promotion analysis.",
       "value_rules": "Include at least one item object when ecommerce promotion or item context is available.",
       "example_value": "[{item_id:'sku_123',item_name:'summer_dress'}]",
       "allowed_values": [],
@@ -697,6 +919,7 @@
       "classification": "ga4_ecommerce_item_parameter",
       "required": "conditional",
       "description": "Official GA4 item identifier.",
+      "reporting_purpose": "Identifies products or offers consistently across ecommerce and promotion events.",
       "value_rules": "One of items[].item_id or items[].item_name is required when items is sent.",
       "example_value": "sku_123",
       "allowed_values": [],
@@ -714,6 +937,7 @@
       "classification": "ga4_ecommerce_item_parameter",
       "required": "conditional",
       "description": "Official GA4 item name.",
+      "reporting_purpose": "Provides readable product or offer labels for ecommerce validation and reporting.",
       "value_rules": "One of items[].item_id or items[].item_name is required when items is sent.",
       "example_value": "summer_dress",
       "allowed_values": [],
@@ -731,6 +955,7 @@
       "classification": "ga4_recommended_parameter",
       "required": "required",
       "description": "Official GA4 search parameter.",
+      "reporting_purpose": "Analyzes onsite search demand after PII scrubbing and supports search journey optimization.",
       "value_rules": "Scrub direct PII and sensitive terms before sending.",
       "example_value": "summer_dress",
       "allowed_values": [],
@@ -748,6 +973,7 @@
       "classification": "ga4_recommended_parameter",
       "required": "optional",
       "description": "Official GA4 parameter for select_content.",
+      "reporting_purpose": "Segments consolidated content selections by component or content family.",
       "value_rules": "Use controlled lowercase ASCII snake_case values.",
       "example_value": "category_navigation",
       "allowed_values": [
@@ -769,6 +995,7 @@
       "classification": "ga4_recommended_parameter",
       "required": "optional",
       "description": "Official GA4 parameter for select_content.",
+      "reporting_purpose": "Identifies selected content with a stable low-cardinality ID for module performance reporting.",
       "value_rules": "Use stable IDs or slugs.",
       "example_value": "nav_women",
       "allowed_values": [],
@@ -786,6 +1013,7 @@
       "classification": "ga4_recommended_parameter",
       "required": "optional",
       "description": "Readable selected content name.",
+      "reporting_purpose": "Provides readable selected-content labels for analyst review while managing cardinality.",
       "value_rules": "Use normalized lowercase ASCII snake_case values when controlled.",
       "example_value": "women_category",
       "allowed_values": [],
@@ -803,6 +1031,7 @@
       "classification": "custom_event_parameter",
       "required": "optional",
       "description": "Location of a clicked CTA or module.",
+      "reporting_purpose": "Compares CTA performance by page area or component location.",
       "value_rules": "Use controlled lowercase ASCII snake_case values.",
       "example_value": "header",
       "allowed_values": [
@@ -826,6 +1055,7 @@
       "classification": "custom_event_parameter",
       "required": "optional",
       "description": "Destination URL for a selected link or module.",
+      "reporting_purpose": "Validates navigation destination and supports outbound or internal path analysis after URL cleaning.",
       "value_rules": "Remove sensitive query parameters before sending.",
       "example_value": "https://example.com/category/women",
       "allowed_values": [],
@@ -843,6 +1073,7 @@
       "classification": "custom_event_parameter",
       "required": "optional",
       "description": "Normalized visible CTA text.",
+      "reporting_purpose": "Supports account-access intent analysis by comparing CTA wording without collecting personal data.",
       "value_rules": "Use lowercase ASCII snake_case controlled values and remove accents.",
       "example_value": "my_account",
       "allowed_values": [],
@@ -860,6 +1091,7 @@
       "classification": "custom_event_parameter",
       "required": "optional",
       "description": "Known anonymous login state.",
+      "reporting_purpose": "Segments account-access intent by approved login state.",
       "value_rules": "Use logged | not_logged | unknown.",
       "example_value": "not_logged",
       "allowed_values": [
@@ -884,12 +1116,36 @@
       "priority": "should"
     },
     {
+      "parameter_name": "content_id",
+      "display_name": "Content ID",
+      "scope": "event",
+      "registration_type": "custom_dimension",
+      "reason": "Compare consolidated select_content events by stable component or navigation identifier.",
+      "priority": "should"
+    },
+    {
+      "parameter_name": "content_name",
+      "display_name": "Content name",
+      "scope": "event",
+      "registration_type": "custom_dimension",
+      "reason": "Provide a readable breakdown for controlled content/module selections.",
+      "priority": "could"
+    },
+    {
       "parameter_name": "cta_location",
       "display_name": "CTA location",
       "scope": "event",
       "registration_type": "custom_dimension",
       "reason": "Compare interaction performance by page area.",
       "priority": "should"
+    },
+    {
+      "parameter_name": "cta_text",
+      "display_name": "CTA text",
+      "scope": "event",
+      "registration_type": "custom_dimension",
+      "reason": "Compare account-intent and CTA interactions by controlled normalized label.",
+      "priority": "could"
     },
     {
       "parameter_name": "login_status",

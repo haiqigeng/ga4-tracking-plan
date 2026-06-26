@@ -20,6 +20,8 @@ Use this reference during every tracking-plan review, regardless of scenario.
 ## Human Plan Review
 
 - Every event must answer a business or diagnostic question.
+- A business question should describe the analysis need or decision, not the implementation action. Reject weak wording such as "track click", "track page view", or "which link was clicked?" unless it is rewritten with a business purpose.
+- Every machine-readable event must include `primary_platform` and `official_match`; custom events must explain why the official platform events are insufficient.
 - Macro conversions must be separated from micro conversions and diagnostic events.
 - Ecommerce events must not be mixed with interaction-only parameters unless those custom item/event parameters are intentionally documented.
 - Optional parameters should be included only when they improve analysis or QA.
@@ -31,4 +33,3 @@ Use this reference during every tracking-plan review, regardless of scenario.
 - Use the canonical JSON contract for repeatable generation, QA automation, and future conversion to other formats.
 - Never commit client-specific plans, screenshots, test outputs, URLs, or credentials into the generic skill repository.
 - Keep examples generic with `example.com`, placeholder IDs, and non-sensitive sample values.
-

@@ -1,0 +1,917 @@
+{
+  "schema_version": "1.0.0",
+  "plan_id": "generic_piano_ecommerce_sales_insights",
+  "analytics_platforms": [
+    "piano_analytics"
+  ],
+  "document": {
+    "title": "Generic Piano Analytics ecommerce tracking plan",
+    "version": "v0.1",
+    "status": "draft",
+    "owner": "TBD",
+    "created_date": "2026-06-26",
+    "template_source": "canonical JSON fixture",
+    "notes": "Generic Piano Sales Insights fixture for validating ecommerce event bundles without GA4 payload placeholders."
+  },
+  "measurement_brief": [
+    {
+      "journey_id": "ecommerce_purchase_journey",
+      "journey_name": "Ecommerce add-to-cart and purchase",
+      "scope": "Generic product add-to-cart, new cart creation, purchase confirmation, and purchased-product events.",
+      "url_or_route": "https://example.com/product/* and https://example.com/checkout/confirmation",
+      "page_type": "ecommerce",
+      "expected_user_actions": [
+        "add a product to cart",
+        "create a cart",
+        "complete checkout",
+        "display purchased products"
+      ],
+      "business_goal": "Measure ecommerce funnel actions and product revenue attribution with Piano Sales Insights.",
+      "analysis_needs": [
+        "Understand which products are added to cart",
+        "Measure cart creation and checkout completion",
+        "Tie purchased products to the transaction"
+      ],
+      "success_signals": [
+        "product.add_to_cart",
+        "cart.creation",
+        "transaction.confirmation",
+        "product.purchased"
+      ],
+      "audience_or_segment_needs": [
+        "traffic source",
+        "device category"
+      ],
+      "data_available": [
+        "product metadata",
+        "cart summary",
+        "transaction summary",
+        "payment mode"
+      ],
+      "implementation_context": [
+        "Piano Analytics JavaScript SDK",
+        "Piano Sales Insights"
+      ],
+      "constraints": [
+        "Do not send direct PII",
+        "Use Piano native Sales Insights event and property names",
+        "Keep cart and transaction identifiers technical and non-personal"
+      ],
+      "priority": "must",
+      "open_questions": [
+        "Confirm whether cart.creation is emitted only when the add-to-cart action creates a new cart.",
+        "Confirm the final product and cart property availability."
+      ]
+    }
+  ],
+  "measurement_strategy": {
+    "detected_archetypes": [
+      {
+        "archetype": "Retail ecommerce with Piano Sales Insights",
+        "confidence": "high",
+        "evidence": [
+          "product add-to-cart action",
+          "cart creation context",
+          "transaction confirmation",
+          "purchased product details"
+        ]
+      }
+    ],
+    "page_roles": [
+      {
+        "journey_id": "ecommerce_purchase_journey",
+        "page_role": "Product and purchase funnel",
+        "business_purpose": "Measure add-to-cart, cart creation, transaction confirmation, and purchased products with Piano-native Sales Insights events.",
+        "primary_success_signal": "A completed transaction.confirmation event linked to product.purchased rows."
+      }
+    ],
+    "selected_event_families": [
+      {
+        "family_id": "piano_product_add_to_cart",
+        "family_name": "Piano product add-to-cart",
+        "analytics_platform": "piano_analytics",
+        "events_or_actions": [
+          "product.add_to_cart"
+        ],
+        "reason": "Piano Sales Insights provides a native product add-to-cart event with product and cart properties.",
+        "official_sources_considered": [
+          "Piano Sales Insights product.add_to_cart"
+        ]
+      },
+      {
+        "family_id": "piano_cart_creation",
+        "family_name": "Piano cart creation",
+        "analytics_platform": "piano_analytics",
+        "events_or_actions": [
+          "cart.creation"
+        ],
+        "reason": "Cart creation should be captured separately when the add-to-cart action creates a new cart.",
+        "official_sources_considered": [
+          "Piano Sales Insights cart.creation"
+        ]
+      },
+      {
+        "family_id": "piano_transaction_confirmation",
+        "family_name": "Piano transaction confirmation",
+        "analytics_platform": "piano_analytics",
+        "events_or_actions": [
+          "transaction.confirmation"
+        ],
+        "reason": "Piano Sales Insights uses transaction.confirmation for completed transaction context.",
+        "official_sources_considered": [
+          "Piano Sales Insights transaction.confirmation"
+        ]
+      },
+      {
+        "family_id": "piano_product_purchased",
+        "family_name": "Piano purchased product details",
+        "analytics_platform": "piano_analytics",
+        "events_or_actions": [
+          "product.purchased"
+        ],
+        "reason": "Purchased products are sent as product-level Sales Insights events linked to the transaction.",
+        "official_sources_considered": [
+          "Piano Sales Insights product.purchased"
+        ]
+      }
+    ],
+    "excluded_event_families": [
+      {
+        "family_name": "GA4 ecommerce payload placeholders",
+        "reason": "This fixture is Piano-only; GA4 ecommerce parameters are not mixed into Piano Sales Insights payloads."
+      },
+      {
+        "family_name": "Custom purchase-like events",
+        "reason": "Piano native Sales Insights transaction and product events cover the ecommerce scenario."
+      }
+    ],
+    "custom_event_acceptance": []
+  },
+  "events": [
+    {
+      "event_id": "EVT-PIANO-PRODUCT-ADD-TO-CART",
+      "journey_id": "ecommerce_purchase_journey",
+      "event_name": "product.add_to_cart",
+      "classification": "piano_sales_insights",
+      "measurement_role": "micro_conversion",
+      "business_event_family": "piano_product_add_to_cart",
+      "primary_platform": "piano_analytics",
+      "official_match": "Piano Sales Insights product add-to-cart event",
+      "page_url_pattern": "https://example.com/product/*",
+      "page_type": "product_page",
+      "page_or_component": "Product detail add-to-cart button",
+      "business_question": "Which products are added to cart and with which product context?",
+      "trigger": "User confirms an add-to-cart action for a product.",
+      "data_dependencies": [
+        "Piano SDK availability",
+        "product ID",
+        "product label",
+        "variant and price",
+        "quantity added"
+      ],
+      "key_event": false,
+      "priority": "must",
+      "parameters": [
+        "product_id",
+        "cart_id",
+        "product",
+        "product_variant",
+        "product_pricetaxincluded",
+        "product_quantity",
+        "product_cartcreation"
+      ],
+      "platform_mappings": [
+        {
+          "platform": "piano_analytics",
+          "event_name": "product.add_to_cart",
+          "classification": "piano_sales_insights",
+          "official_match": "Piano Sales Insights product add-to-cart event",
+          "parameters_or_properties": {
+            "product_id": "SKU_001",
+            "cart_id": "CART_001",
+            "product": "generic_product",
+            "product_variant": "standard",
+            "product_pricetaxincluded": 49.9,
+            "product_quantity": 1,
+            "product_cartcreation": true
+          },
+          "items_or_products": [],
+          "implementation_notes": "When this action creates a new cart, emit cart.creation as a separate event in the same user action sequence.",
+          "documentation_source": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/"
+        }
+      ],
+      "implementation_payloads": [
+        {
+          "platform": "piano_analytics",
+          "method": "pa.sendEvent",
+          "event_name": "product.add_to_cart",
+          "payload": {
+            "product_id": "SKU_001",
+            "cart_id": "CART_001",
+            "product": "generic_product",
+            "product_variant": "standard",
+            "product_pricetaxincluded": 49.9,
+            "product_quantity": 1,
+            "product_cartcreation": true
+          },
+          "notes": "Canonical Piano SDK payload for an add-to-cart action."
+        }
+      ],
+      "privacy": {
+        "pii_risk": "low",
+        "consent_dependency": "analytics consent according to client privacy mode",
+        "cardinality_risk": "medium",
+        "notes": "Use product and cart identifiers that are technical commerce IDs, not personal identifiers."
+      },
+      "qa": {
+        "qa_id": "QA-PIANO-PRODUCT-ADD-TO-CART",
+        "methods": [
+          "Network",
+          "Piano Debug"
+        ],
+        "steps": [
+          "Open a generic product page.",
+          "Add one product to cart."
+        ],
+        "expected_data_layer": [
+          "Not applicable when the Piano SDK is implemented directly; if GTM is used as a bridge, verify the same product properties are available before the SDK call."
+        ],
+        "expected_network": [
+          "Piano collection request contains event name product.add_to_cart.",
+          "Properties product_id, cart_id, and product_quantity are populated."
+        ],
+        "debugview_expectation": "product.add_to_cart appears once after the add-to-cart action.",
+        "status": "not_started"
+      },
+      "implementation_notes": "Do not replace this Sales Insights event with a generic click event when product data is available."
+    },
+    {
+      "event_id": "EVT-PIANO-CART-CREATION",
+      "journey_id": "ecommerce_purchase_journey",
+      "event_name": "cart.creation",
+      "classification": "piano_sales_insights",
+      "measurement_role": "micro_conversion",
+      "business_event_family": "piano_cart_creation",
+      "primary_platform": "piano_analytics",
+      "official_match": "Piano Sales Insights cart creation event",
+      "page_url_pattern": "https://example.com/product/*",
+      "page_type": "product_page",
+      "page_or_component": "Product detail add-to-cart flow creating a cart",
+      "business_question": "How often does add-to-cart create a new cart and what is the initial cart composition?",
+      "trigger": "A cart is created, often immediately after the first add-to-cart action.",
+      "data_dependencies": [
+        "Piano SDK availability",
+        "cart ID",
+        "product ID",
+        "cart creation flag",
+        "campaign context when available"
+      ],
+      "key_event": false,
+      "priority": "must",
+      "parameters": [
+        "cart_id",
+        "cart_currency",
+        "cart_turnovertaxincluded",
+        "cart_quantity",
+        "cart_nbdistinctproduct"
+      ],
+      "platform_mappings": [
+        {
+          "platform": "piano_analytics",
+          "event_name": "cart.creation",
+          "classification": "piano_sales_insights",
+          "official_match": "Piano Sales Insights cart creation event",
+          "parameters_or_properties": {
+            "cart_id": "CART_001",
+            "cart_currency": "EUR",
+            "cart_turnovertaxincluded": 49.9,
+            "cart_quantity": 1,
+            "cart_nbdistinctproduct": 1
+          },
+          "items_or_products": [],
+          "implementation_notes": "Emit only when a new cart is created, not on every cart update.",
+          "documentation_source": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/"
+        }
+      ],
+      "implementation_payloads": [
+        {
+          "platform": "piano_analytics",
+          "method": "pa.sendEvent",
+          "event_name": "cart.creation",
+          "payload": {
+            "cart_id": "CART_001",
+            "cart_currency": "EUR",
+            "cart_turnovertaxincluded": 49.9,
+            "cart_quantity": 1,
+            "cart_nbdistinctproduct": 1
+          },
+          "notes": "Canonical Piano SDK payload for cart creation."
+        }
+      ],
+      "privacy": {
+        "pii_risk": "low",
+        "consent_dependency": "analytics consent according to client privacy mode",
+        "cardinality_risk": "medium",
+        "notes": "Cart IDs can be high-cardinality; keep them technical and avoid personal data."
+      },
+      "qa": {
+        "qa_id": "QA-PIANO-CART-CREATION",
+        "methods": [
+          "Network",
+          "Piano Debug"
+        ],
+        "steps": [
+          "Start from an empty cart.",
+          "Add one product to cart."
+        ],
+        "expected_data_layer": [
+          "Not applicable when the Piano SDK is implemented directly; if GTM is used as a bridge, verify cart summary properties before the SDK call."
+        ],
+        "expected_network": [
+          "Piano collection request contains event name cart.creation.",
+          "Property cart_id is populated and cart_quantity equals the initial cart quantity."
+        ],
+        "debugview_expectation": "cart.creation appears once when the first cart is created.",
+        "status": "not_started"
+      },
+      "implementation_notes": "Pair with product.add_to_cart only when the cart is newly created."
+    },
+    {
+      "event_id": "EVT-PIANO-TRANSACTION-CONFIRMATION",
+      "journey_id": "ecommerce_purchase_journey",
+      "event_name": "transaction.confirmation",
+      "classification": "piano_sales_insights",
+      "measurement_role": "macro_conversion",
+      "business_event_family": "piano_transaction_confirmation",
+      "primary_platform": "piano_analytics",
+      "official_match": "Piano Sales Insights transaction confirmation event",
+      "page_url_pattern": "https://example.com/checkout/confirmation",
+      "page_type": "purchase_confirmation",
+      "page_or_component": "Checkout confirmation page transaction summary",
+      "business_question": "How many transactions are confirmed and what is the order value?",
+      "trigger": "Purchase confirmation is displayed after a successful transaction.",
+      "data_dependencies": [
+        "Piano SDK availability",
+        "transaction ID",
+        "cart ID",
+        "transaction amount",
+        "transaction currency code",
+        "cart quantity"
+      ],
+      "key_event": true,
+      "priority": "must",
+      "parameters": [
+        "transaction_id",
+        "cart_id",
+        "cart_currency",
+        "cart_turnovertaxincluded",
+        "cart_quantity",
+        "cart_nbdistinctproduct",
+        "payment_mode"
+      ],
+      "platform_mappings": [
+        {
+          "platform": "piano_analytics",
+          "event_name": "transaction.confirmation",
+          "classification": "piano_sales_insights",
+          "official_match": "Piano Sales Insights transaction confirmation event",
+          "parameters_or_properties": {
+            "transaction_id": "TRX_001",
+            "cart_id": "CART_001",
+            "cart_currency": "EUR",
+            "cart_turnovertaxincluded": 49.9,
+            "cart_quantity": 1,
+            "cart_nbdistinctproduct": 1,
+            "payment_mode": "card"
+          },
+          "items_or_products": [],
+          "implementation_notes": "Emit once on purchase confirmation; pair with one product.purchased event per purchased product line.",
+          "documentation_source": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/"
+        }
+      ],
+      "implementation_payloads": [
+        {
+          "platform": "piano_analytics",
+          "method": "pa.sendEvent",
+          "event_name": "transaction.confirmation",
+          "payload": {
+            "transaction_id": "TRX_001",
+            "cart_id": "CART_001",
+            "cart_currency": "EUR",
+            "cart_turnovertaxincluded": 49.9,
+            "cart_quantity": 1,
+            "cart_nbdistinctproduct": 1,
+            "payment_mode": "card"
+          },
+          "notes": "Canonical Piano SDK payload for a transaction confirmation."
+        }
+      ],
+      "privacy": {
+        "pii_risk": "low",
+        "consent_dependency": "analytics consent according to client privacy mode",
+        "cardinality_risk": "medium",
+        "notes": "Transaction IDs are high-cardinality technical commerce IDs; do not include personal or billing data."
+      },
+      "qa": {
+        "qa_id": "QA-PIANO-TRANSACTION-CONFIRMATION",
+        "methods": [
+          "Network",
+          "Piano Debug"
+        ],
+        "steps": [
+          "Complete a generic checkout journey.",
+          "Display the purchase confirmation page once."
+        ],
+        "expected_data_layer": [
+          "Not applicable when the Piano SDK is implemented directly; if GTM is used as a bridge, verify transaction summary properties before the SDK call."
+        ],
+        "expected_network": [
+          "Piano collection request contains event name transaction.confirmation.",
+          "Property transaction_id is populated and event fires once per confirmed transaction."
+        ],
+        "debugview_expectation": "transaction.confirmation appears once on the confirmation page.",
+        "status": "not_started"
+      },
+      "implementation_notes": "Keep this as the transaction-level confirmation event; product-level purchased details belong in product.purchased."
+    },
+    {
+      "event_id": "EVT-PIANO-PRODUCT-PURCHASED",
+      "journey_id": "ecommerce_purchase_journey",
+      "event_name": "product.purchased",
+      "classification": "piano_sales_insights",
+      "measurement_role": "diagnostic",
+      "business_event_family": "piano_product_purchased",
+      "primary_platform": "piano_analytics",
+      "official_match": "Piano Sales Insights purchased product event",
+      "page_url_pattern": "https://example.com/checkout/confirmation",
+      "page_type": "purchase_confirmation",
+      "page_or_component": "Checkout confirmation page purchased product list",
+      "business_question": "Which products are purchased within each transaction?",
+      "trigger": "Purchase confirmation is displayed and purchased product lines are available.",
+      "data_dependencies": [
+        "Piano SDK availability",
+        "transaction ID",
+        "product ID",
+        "product label",
+        "variant, price, and quantity"
+      ],
+      "key_event": false,
+      "priority": "must",
+      "parameters": [
+        "product_id",
+        "transaction_id",
+        "cart_id",
+        "product",
+        "product_variant",
+        "product_pricetaxincluded",
+        "product_quantity"
+      ],
+      "platform_mappings": [
+        {
+          "platform": "piano_analytics",
+          "event_name": "product.purchased",
+          "classification": "piano_sales_insights",
+          "official_match": "Piano Sales Insights purchased product event",
+          "parameters_or_properties": {
+            "product_id": "SKU_001",
+            "transaction_id": "TRX_001",
+            "cart_id": "CART_001",
+            "product": "generic_product",
+            "product_variant": "standard",
+            "product_pricetaxincluded": 49.9,
+            "product_quantity": 1
+          },
+          "items_or_products": [],
+          "implementation_notes": "Emit for purchased product lines so transaction-level and product-level analysis remain separate.",
+          "documentation_source": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/"
+        }
+      ],
+      "implementation_payloads": [
+        {
+          "platform": "piano_analytics",
+          "method": "pa.sendEvent",
+          "event_name": "product.purchased",
+          "payload": {
+            "product_id": "SKU_001",
+            "transaction_id": "TRX_001",
+            "cart_id": "CART_001",
+            "product": "generic_product",
+            "product_variant": "standard",
+            "product_pricetaxincluded": 49.9,
+            "product_quantity": 1
+          },
+          "notes": "Canonical Piano SDK payload for a purchased product line."
+        }
+      ],
+      "privacy": {
+        "pii_risk": "low",
+        "consent_dependency": "analytics consent according to client privacy mode",
+        "cardinality_risk": "medium",
+        "notes": "Use controlled product taxonomy and technical IDs only."
+      },
+      "qa": {
+        "qa_id": "QA-PIANO-PRODUCT-PURCHASED",
+        "methods": [
+          "Network",
+          "Piano Debug"
+        ],
+        "steps": [
+          "Complete a generic checkout journey with one product.",
+          "Display the purchase confirmation page once."
+        ],
+        "expected_data_layer": [
+          "Not applicable when the Piano SDK is implemented directly; if GTM is used as a bridge, verify purchased product properties before the SDK call."
+        ],
+        "expected_network": [
+          "Piano collection request contains event name product.purchased.",
+          "Properties product_id and transaction_id are populated for the purchased product line."
+        ],
+        "debugview_expectation": "product.purchased appears with the transaction_id that matches transaction.confirmation.",
+        "status": "not_started"
+      },
+      "implementation_notes": "For multiple products, repeat this event per product line or follow the client's agreed Piano Sales Insights batching pattern."
+    }
+  ],
+  "parameters": [
+    {
+      "parameter_name": "product_id",
+      "display_name": "Product ID",
+      "scope": "event",
+      "type": "string",
+      "classification": "piano_product_property",
+      "required": "required",
+      "description": "Piano Sales Insights product identifier.",
+      "reporting_purpose": "Identifies products consistently across Piano Sales Insights ecommerce events.",
+      "value_rules": "Use the stable product SKU or product catalog identifier.",
+      "example_value": "SKU_001",
+      "allowed_values": [],
+      "source": "product catalog",
+      "register_custom_definition": false,
+      "cardinality_risk": "medium",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    },
+    {
+      "parameter_name": "cart_id",
+      "display_name": "Cart ID",
+      "scope": "event",
+      "type": "string",
+      "classification": "piano_cart_property",
+      "required": "conditional",
+      "description": "Piano Sales Insights cart identifier.",
+      "reporting_purpose": "Connects Piano cart lifecycle events to the same cart instance.",
+      "value_rules": "Use a technical cart identifier that contains no personal data.",
+      "example_value": "CART_001",
+      "allowed_values": [],
+      "source": "cart system",
+      "register_custom_definition": false,
+      "cardinality_risk": "medium",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    },
+    {
+      "parameter_name": "transaction_id",
+      "display_name": "Transaction ID",
+      "scope": "event",
+      "type": "string",
+      "classification": "piano_transaction_property",
+      "required": "required",
+      "description": "Piano Sales Insights transaction identifier for confirmation and purchased-product events.",
+      "reporting_purpose": "Connects Piano transaction and product purchase events and supports deduplication.",
+      "value_rules": "Use a technical transaction identifier that contains no personal data.",
+      "example_value": "TRX_001",
+      "allowed_values": [],
+      "source": "order system",
+      "register_custom_definition": false,
+      "cardinality_risk": "medium",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    },
+    {
+      "parameter_name": "product",
+      "display_name": "Product name",
+      "scope": "event",
+      "type": "string",
+      "classification": "piano_product_property",
+      "required": "optional",
+      "description": "Piano Sales Insights product name property.",
+      "reporting_purpose": "Provides readable Piano product labels for ecommerce reporting.",
+      "value_rules": "Use a controlled product label or catalog product name; avoid personal or free-text values.",
+      "example_value": "generic_product",
+      "allowed_values": [],
+      "source": "product catalog",
+      "register_custom_definition": false,
+      "cardinality_risk": "medium",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    },
+    {
+      "parameter_name": "product_variant",
+      "display_name": "Product variant",
+      "scope": "event",
+      "type": "string",
+      "classification": "piano_product_property",
+      "required": "optional",
+      "description": "Piano Sales Insights product variant property.",
+      "reporting_purpose": "Segments Piano product performance by variant or option.",
+      "value_rules": "Use lowercase ASCII snake_case controlled values when possible.",
+      "example_value": "standard",
+      "allowed_values": [
+        "standard",
+        "premium"
+      ],
+      "source": "product catalog",
+      "register_custom_definition": false,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    },
+    {
+      "parameter_name": "product_pricetaxincluded",
+      "display_name": "Product price tax included",
+      "scope": "event",
+      "type": "number",
+      "classification": "piano_product_property",
+      "required": "optional",
+      "description": "Piano Sales Insights product unit price including tax.",
+      "reporting_purpose": "Supports Piano revenue and product price analysis using tax-included price.",
+      "value_rules": "Use a decimal number in the cart currency.",
+      "example_value": "49.9",
+      "allowed_values": [],
+      "source": "product catalog or cart system",
+      "register_custom_definition": false,
+      "cardinality_risk": "medium",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    },
+    {
+      "parameter_name": "product_quantity",
+      "display_name": "Product quantity",
+      "scope": "event",
+      "type": "integer",
+      "classification": "piano_product_property",
+      "required": "optional",
+      "description": "Piano Sales Insights product quantity property.",
+      "reporting_purpose": "Supports cart and purchase quantity analysis in Piano ecommerce reporting.",
+      "value_rules": "Use a positive integer.",
+      "example_value": "1",
+      "allowed_values": [],
+      "source": "cart system",
+      "register_custom_definition": false,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    },
+    {
+      "parameter_name": "product_cartcreation",
+      "display_name": "Product cart creation flag",
+      "scope": "event",
+      "type": "boolean",
+      "classification": "piano_product_property",
+      "required": "optional",
+      "description": "Flag indicating whether the add-to-cart action created a new cart.",
+      "reporting_purpose": "Identifies whether a product action created a new cart in Piano Sales Insights.",
+      "value_rules": "Use true only when a new cart is created by the action.",
+      "example_value": "true",
+      "allowed_values": [
+        "true",
+        "false"
+      ],
+      "source": "cart system",
+      "register_custom_definition": false,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    },
+    {
+      "parameter_name": "cart_currency",
+      "display_name": "Cart currency",
+      "scope": "event",
+      "type": "string",
+      "classification": "piano_cart_property",
+      "required": "optional",
+      "description": "Currency used for cart and transaction monetary values.",
+      "reporting_purpose": "Supports Piano Analytics reporting with the platform-native property model.",
+      "value_rules": "Use ISO 4217 currency codes.",
+      "example_value": "EUR",
+      "allowed_values": [
+        "EUR",
+        "USD",
+        "GBP"
+      ],
+      "source": "cart system",
+      "register_custom_definition": false,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    },
+    {
+      "parameter_name": "cart_turnovertaxincluded",
+      "display_name": "Cart turnover tax included",
+      "scope": "event",
+      "type": "number",
+      "classification": "piano_cart_property",
+      "required": "optional",
+      "description": "Cart or transaction value including tax.",
+      "reporting_purpose": "Supports Piano Analytics reporting with the platform-native property model.",
+      "value_rules": "Use a decimal number in the cart currency.",
+      "example_value": "49.9",
+      "allowed_values": [],
+      "source": "cart system",
+      "register_custom_definition": false,
+      "cardinality_risk": "medium",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    },
+    {
+      "parameter_name": "cart_quantity",
+      "display_name": "Cart quantity",
+      "scope": "event",
+      "type": "integer",
+      "classification": "piano_cart_property",
+      "required": "optional",
+      "description": "Total quantity of products in the cart.",
+      "reporting_purpose": "Supports Piano cart-size analysis across checkout progression.",
+      "value_rules": "Use a non-negative integer.",
+      "example_value": "1",
+      "allowed_values": [],
+      "source": "cart system",
+      "register_custom_definition": false,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    },
+    {
+      "parameter_name": "cart_nbdistinctproduct",
+      "display_name": "Cart distinct product count",
+      "scope": "event",
+      "type": "integer",
+      "classification": "piano_cart_property",
+      "required": "optional",
+      "description": "Number of distinct products in the cart.",
+      "reporting_purpose": "Supports Piano Analytics reporting with the platform-native property model.",
+      "value_rules": "Use a non-negative integer.",
+      "example_value": "1",
+      "allowed_values": [],
+      "source": "cart system",
+      "register_custom_definition": false,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    },
+    {
+      "parameter_name": "payment_mode",
+      "display_name": "Payment mode",
+      "scope": "event",
+      "type": "string",
+      "classification": "piano_transaction_property",
+      "required": "optional",
+      "description": "Payment method category for the transaction.",
+      "reporting_purpose": "Supports Piano Analytics reporting with the platform-native property model.",
+      "value_rules": "Use controlled lowercase ASCII snake_case categories.",
+      "example_value": "card",
+      "allowed_values": [
+        "card",
+        "paypal",
+        "bank_transfer",
+        "other"
+      ],
+      "source": "payment system",
+      "register_custom_definition": false,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "analytics consent"
+    }
+  ],
+  "custom_definitions": [],
+  "key_events": [
+    {
+      "event_name": "transaction.confirmation",
+      "reason": "Primary ecommerce conversion in Piano Sales Insights.",
+      "conditions": "Mark as conversion according to the Piano workspace measurement strategy when appropriate."
+    }
+  ],
+  "not_tracked": [
+    {
+      "interaction": "Generic add-to-cart click without product properties",
+      "reason": "A Sales Insights product.add_to_cart event is more useful and official when product properties are available."
+    },
+    {
+      "interaction": "Raw payment error text",
+      "reason": "Free-text error messages can contain sensitive information and are not required for the generic ecommerce fixture."
+    }
+  ],
+  "assumptions": [
+    "Piano Analytics JavaScript SDK is the implementation method.",
+    "Piano Sales Insights is enabled for ecommerce reporting.",
+    "No GA4 stream is in scope for this generic fixture."
+  ],
+  "documentation_sources_checked": [
+    {
+      "name": "Piano Analytics Sales Insights",
+      "url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+      "source_type": "official",
+      "checked_for": "product.add_to_cart, cart.creation, transaction.confirmation, product.purchased, and required Sales Insights properties"
+    },
+    {
+      "name": "Piano Analytics SDK event sending",
+      "url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/send-events-via-sdks/",
+      "source_type": "official",
+      "checked_for": "Piano SDK sendEvent implementation pattern"
+    }
+  ],
+  "qa_cases": [
+    {
+      "qa_id": "QA-PIANO-PRODUCT-ADD-TO-CART",
+      "event_id": "EVT-PIANO-PRODUCT-ADD-TO-CART",
+      "event_name": "product.add_to_cart",
+      "methods": [
+        "Network",
+        "Piano Debug"
+      ],
+      "steps": [
+        "Open a generic product page.",
+        "Add one product to cart."
+      ],
+      "expected_data_layer": [
+        "Not applicable when the Piano SDK is implemented directly; if GTM is used as a bridge, verify product properties before the SDK call."
+      ],
+      "expected_network": [
+        "Piano collection request contains event name product.add_to_cart.",
+        "Properties product_id, cart_id, and product_quantity are populated."
+      ],
+      "debugview_expectation": "product.add_to_cart appears once after the add-to-cart action.",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "qa_id": "QA-PIANO-CART-CREATION",
+      "event_id": "EVT-PIANO-CART-CREATION",
+      "event_name": "cart.creation",
+      "methods": [
+        "Network",
+        "Piano Debug"
+      ],
+      "steps": [
+        "Start from an empty cart.",
+        "Add one product to cart."
+      ],
+      "expected_data_layer": [
+        "Not applicable when the Piano SDK is implemented directly; if GTM is used as a bridge, verify cart summary properties before the SDK call."
+      ],
+      "expected_network": [
+        "Piano collection request contains event name cart.creation.",
+        "Property cart_id is populated and cart_quantity equals the initial cart quantity."
+      ],
+      "debugview_expectation": "cart.creation appears once when the first cart is created.",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "qa_id": "QA-PIANO-TRANSACTION-CONFIRMATION",
+      "event_id": "EVT-PIANO-TRANSACTION-CONFIRMATION",
+      "event_name": "transaction.confirmation",
+      "methods": [
+        "Network",
+        "Piano Debug"
+      ],
+      "steps": [
+        "Complete a generic checkout journey.",
+        "Display the purchase confirmation page once."
+      ],
+      "expected_data_layer": [
+        "Not applicable when the Piano SDK is implemented directly; if GTM is used as a bridge, verify transaction summary properties before the SDK call."
+      ],
+      "expected_network": [
+        "Piano collection request contains event name transaction.confirmation.",
+        "Property transaction_id is populated and event fires once per confirmed transaction."
+      ],
+      "debugview_expectation": "transaction.confirmation appears once on the confirmation page.",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "qa_id": "QA-PIANO-PRODUCT-PURCHASED",
+      "event_id": "EVT-PIANO-PRODUCT-PURCHASED",
+      "event_name": "product.purchased",
+      "methods": [
+        "Network",
+        "Piano Debug"
+      ],
+      "steps": [
+        "Complete a generic checkout journey with one product.",
+        "Display the purchase confirmation page once."
+      ],
+      "expected_data_layer": [
+        "Not applicable when the Piano SDK is implemented directly; if GTM is used as a bridge, verify purchased product properties before the SDK call."
+      ],
+      "expected_network": [
+        "Piano collection request contains event name product.purchased.",
+        "Properties product_id and transaction_id are populated for the purchased product line."
+      ],
+      "debugview_expectation": "product.purchased appears with the transaction_id that matches transaction.confirmation.",
+      "status": "not_started",
+      "evidence": ""
+    }
+  ]
+}

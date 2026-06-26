@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -18,8 +19,15 @@ REQUIRED_REFERENCE_FILES = [
     SKILL / "references" / "ga4_event_scenario_library.md",
     SKILL / "references" / "ga4_event_scenario_library.json",
     SKILL / "references" / "official_ga4_recommended_events.json",
+    SKILL / "references" / "mainstream_analytics_tool_policy.md",
+    SKILL / "references" / "business_scenario_analysis.md",
+    SKILL / "references" / "website_archetype_decision_matrix.md",
+    SKILL / "references" / "piano_analytics_reference.md",
+    SKILL / "references" / "piano_official_events.json",
     SKILL / "references" / "tracking_plan_schema.json",
     SKILL / "references" / "generic_tracking_plan_fixture.json",
+    SKILL / "references" / "generic_piano_tracking_plan_fixture.json",
+    SKILL / "references" / "generic_piano_ecommerce_tracking_plan_fixture.json",
     SKILL / "references" / "scenario_ecommerce.md",
     SKILL / "references" / "scenario_lead_generation.md",
     SKILL / "references" / "scenario_search_listing.md",
@@ -60,12 +68,7 @@ EXPECTED_TABS = [
 ]
 WORKBOOKS_TO_VALIDATE = [
     SKILL / "assets" / "ga4_tracking_plan_template.xlsx",
-    ROOT / "files" / "ga4_tracking_plan_template_v2_1.xlsx",
 ]
-ALLOWED_PUBLIC_FILES = {
-    "ga4_tracking_plan_template_v2_1.xlsx",
-    "ga4_event_scenario_library.xlsx",
-}
 TEXT_SUFFIXES = {".md", ".py", ".yml", ".yaml", ".json", ".txt", ".gitignore", ".gitattributes"}
 BANNED_PROJECT_PATTERNS = [
     re.compile(pattern, re.IGNORECASE)
@@ -138,8 +141,15 @@ def check_skill_resource_links() -> None:
         "references/ga4_event_scenario_library.md",
         "references/ga4_event_scenario_library.json",
         "references/official_ga4_recommended_events.json",
+        "references/mainstream_analytics_tool_policy.md",
+        "references/business_scenario_analysis.md",
+        "references/website_archetype_decision_matrix.md",
+        "references/piano_analytics_reference.md",
+        "references/piano_official_events.json",
         "references/tracking_plan_schema.json",
         "references/generic_tracking_plan_fixture.json",
+        "references/generic_piano_tracking_plan_fixture.json",
+        "references/generic_piano_ecommerce_tracking_plan_fixture.json",
         "references/scenario_ecommerce.md",
         "references/scenario_lead_generation.md",
         "references/scenario_search_listing.md",
@@ -161,25 +171,164 @@ def check_skill_resource_links() -> None:
             fail(f"Bundled resource is missing: {rel}")
 
 
+def check_reference_navigation() -> None:
+    for path in (SKILL / "references").glob("*.md"):
+        text = read_text(path)
+        line_count = len(text.splitlines())
+        if line_count > 100 and "## Contents" not in text and "## Table of Contents" not in text:
+            fail(f"{display_path(path)} has {line_count} lines and should include a Contents section for scalable reference navigation")
+
+
 def load_json(path: Path):
     return json.loads(read_text(path))
+
+
+def check_mainstream_analytics_references() -> None:
+    piano_text = read_text(SKILL / "references" / "piano_analytics_reference.md")
+    for expected in [
+        "page.display",
+        "click.action",
+        "click.navigation",
+        "click.download",
+        "click.exit",
+        "product.display",
+        "product.add_to_cart",
+        "cart.creation",
+        "transaction.confirmation",
+        "product.purchased",
+        "av.play",
+        "av.start",
+        "goal_type",
+    ]:
+        if expected not in piano_text:
+            fail(f"Piano Analytics reference is missing {expected}")
+
+    piano_catalog = load_json(SKILL / "references" / "piano_official_events.json")
+    events = {
+        event.get("event")
+        for family in piano_catalog.get("event_families", [])
+        for event in family.get("events", [])
+        if isinstance(event, dict)
+    }
+    for expected in [
+        "page.display",
+        "click.action",
+        "click.navigation",
+        "click.download",
+        "click.exit",
+        "publisher.impression",
+        "self_promotion.click",
+        "internal_search_result.display",
+        "product.display",
+        "product.add_to_cart",
+        "cart.creation",
+        "cart.payment",
+        "transaction.confirmation",
+        "product.purchased",
+        "av.play",
+        "av.heartbeat",
+        "av.ad.click",
+    ]:
+        if expected not in events:
+            fail(f"Piano official events catalog is missing {expected}")
+    scenarios = json.dumps(piano_catalog.get("scenario_mappings", []))
+    for expected in ["purchase_confirmation", "add_to_cart", "video_playback"]:
+        if expected not in scenarios:
+            fail(f"Piano official events catalog is missing scenario mapping {expected}")
+
+    policy_text = read_text(SKILL / "references" / "mainstream_analytics_tool_policy.md")
+    for expected in ["business action", "platform mappings", "GA4", "Piano Analytics"]:
+        if expected not in policy_text:
+            fail(f"Mainstream analytics policy is missing {expected}")
+
+    business_text = read_text(SKILL / "references" / "business_scenario_analysis.md")
+    for expected in ["macro conversions", "micro conversions", "Diagnostic events", "Custom Event Design Checklist", "Event Consolidation", "Approval Readiness"]:
+        if expected not in business_text:
+            fail(f"Business scenario analysis reference is missing {expected}")
+
+    archetype_text = read_text(SKILL / "references" / "website_archetype_decision_matrix.md")
+    for expected in [
+        "Retail ecommerce",
+        "Product catalog without online checkout",
+        "Lead generation",
+        "SaaS",
+        "Publisher",
+        "Support",
+        "Marketplace",
+        "Locator",
+        "Media player",
+        "Regulated finance",
+        "Custom Event Acceptance Gate",
+        "Hybrid Composition Rules",
+    ]:
+        if expected not in archetype_text:
+            fail(f"Website archetype decision matrix is missing {expected}")
+
+    schema = load_json(SKILL / "references" / "tracking_plan_schema.json")
+    schema_text = json.dumps(schema)
+    for expected in ["official_match", "primary_platform", "measurementRole", "measurement_strategy", "business_event_family", "page_or_component", "data_dependencies", "reporting_purpose", "platform_mappings", "implementation_payloads", "piano_analytics", "piano_custom_property", "piano_data_model_property"]:
+        if expected not in schema_text:
+            fail(f"Tracking plan schema is missing cross-platform support for {expected}")
 
 
 def check_tracking_plan_contract() -> None:
     schema_path = SKILL / "references" / "tracking_plan_schema.json"
     fixture_path = SKILL / "references" / "generic_tracking_plan_fixture.json"
+    piano_fixture_path = SKILL / "references" / "generic_piano_tracking_plan_fixture.json"
+    piano_ecommerce_fixture_path = SKILL / "references" / "generic_piano_ecommerce_tracking_plan_fixture.json"
     schema = load_json(schema_path)
     fixture = load_json(fixture_path)
+    piano_fixture = load_json(piano_fixture_path)
+    piano_ecommerce_fixture = load_json(piano_ecommerce_fixture_path)
 
     Draft202012Validator.check_schema(schema)
     validator = Draft202012Validator(schema)
-    errors = sorted(validator.iter_errors(fixture), key=lambda error: list(error.path))
-    if errors:
-        formatted = []
-        for error in errors[:8]:
-            path = ".".join(str(part) for part in error.path) or "<root>"
-            formatted.append(f"{path}: {error.message}")
-        fail("Generic fixture does not match tracking_plan_schema.json:\n" + "\n".join(formatted))
+    for label, candidate in [
+        ("Generic fixture", fixture),
+        ("Generic Piano fixture", piano_fixture),
+        ("Generic Piano ecommerce fixture", piano_ecommerce_fixture),
+    ]:
+        errors = sorted(validator.iter_errors(candidate), key=lambda error: list(error.path))
+        if errors:
+            formatted = []
+            for error in errors[:8]:
+                path = ".".join(str(part) for part in error.path) or "<root>"
+                formatted.append(f"{path}: {error.message}")
+            fail(f"{label} does not match tracking_plan_schema.json:\n" + "\n".join(formatted))
+        roles = {event.get("measurement_role") for event in candidate["events"]}
+        if not roles <= {"macro_conversion", "micro_conversion", "diagnostic", "context"}:
+            fail(f"{label} has invalid measurement_role values: {sorted(roles)}")
+        if not roles:
+            fail(f"{label} does not define measurement roles")
+        if not all(event.get("page_or_component") for event in candidate["events"]):
+            fail(f"{label} has events without page_or_component")
+        if not all(event.get("data_dependencies") for event in candidate["events"]):
+            fail(f"{label} has events without data_dependencies")
+        strategy = candidate.get("measurement_strategy", {})
+        family_ids = {
+            family.get("family_id")
+            for family in strategy.get("selected_event_families", [])
+            if isinstance(family, dict)
+        }
+        if not family_ids:
+            fail(f"{label} has no selected event families in measurement_strategy")
+        unknown_families = sorted(
+            {
+                event.get("business_event_family")
+                for event in candidate["events"]
+                if event.get("business_event_family") not in family_ids
+            }
+        )
+        if unknown_families:
+            fail(f"{label} has events with unknown business_event_family values: {unknown_families}")
+        custom_events = {event["event_name"] for event in candidate["events"] if event.get("classification") in {"custom", "piano_custom"}}
+        accepted_custom_events = {
+            item.get("event_name")
+            for item in strategy.get("custom_event_acceptance", [])
+            if isinstance(item, dict)
+        }
+        if custom_events - accepted_custom_events:
+            fail(f"{label} has custom events without strategy acceptance entries: {sorted(custom_events - accepted_custom_events)}")
 
     event_ids = [event["event_id"] for event in fixture["events"]]
     if len(event_ids) != len(set(event_ids)):
@@ -199,8 +348,20 @@ def check_tracking_plan_contract() -> None:
     missing_parameters = sorted(referenced_parameters - parameter_names)
     if missing_parameters:
         fail(f"Fixture events reference parameters missing from parameter reference: {missing_parameters}")
+    for label, candidate in [
+        ("Generic fixture", fixture),
+        ("Generic Piano fixture", piano_fixture),
+        ("Generic Piano ecommerce fixture", piano_ecommerce_fixture),
+    ]:
+        for parameter in candidate["parameters"]:
+            if not parameter.get("reporting_purpose"):
+                fail(f"{label} parameter {parameter.get('parameter_name')} is missing reporting_purpose")
 
     for event in fixture["events"]:
+        if event.get("platform_mappings"):
+            for mapping in event["platform_mappings"]:
+                if mapping.get("platform") == "piano_analytics" and "developers.piano.io" not in mapping.get("documentation_source", ""):
+                    fail(f"{event['event_id']} Piano mapping must cite official Piano documentation")
         if event["classification"] == "recommended_ecommerce":
             event_parameters = set(event["parameters"])
             for required in ["items", "items[].item_id", "items[].item_name"]:
@@ -209,11 +370,41 @@ def check_tracking_plan_contract() -> None:
             if not event["ga4_payload"].get("items"):
                 fail(f"{event['event_id']} ecommerce event has no GA4 items payload example")
 
+    if not any(
+        mapping.get("platform") == "piano_analytics"
+        for event in fixture["events"]
+        for mapping in event.get("platform_mappings", [])
+    ):
+        fail("Generic fixture should include at least one Piano Analytics platform mapping")
+
+    if piano_fixture.get("analytics_platforms") != ["piano_analytics"]:
+        fail("Generic Piano fixture should be Piano-only")
+    if piano_ecommerce_fixture.get("analytics_platforms") != ["piano_analytics"]:
+        fail("Generic Piano ecommerce fixture should be Piano-only")
+    for fixture_label, piano_only_fixture in [
+        ("Piano fixture", piano_fixture),
+        ("Piano ecommerce fixture", piano_ecommerce_fixture),
+    ]:
+        for event in piano_only_fixture["events"]:
+            if "ga4_payload" in event or "data_layer" in event or "official_ga4_match" in event:
+                fail(f"{event['event_id']} in {fixture_label} should not require GA4-specific fields")
+            if not event.get("implementation_payloads"):
+                fail(f"{event['event_id']} in {fixture_label} is missing implementation_payloads")
+            if event.get("primary_platform") != "piano_analytics":
+                fail(f"{event['event_id']} in {fixture_label} should use primary_platform=piano_analytics")
+    ecommerce_event_names = {event["event_name"] for event in piano_ecommerce_fixture["events"]}
+    for expected in ["product.add_to_cart", "cart.creation", "transaction.confirmation", "product.purchased"]:
+        if expected not in ecommerce_event_names:
+            fail(f"Generic Piano ecommerce fixture is missing {expected}")
+
 
 def run_command(command: list[str], label: str) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
     result = subprocess.run(
         command,
         cwd=ROOT,
+        env=env,
         text=True,
         capture_output=True,
         check=False,
@@ -224,19 +415,336 @@ def run_command(command: list[str], label: str) -> subprocess.CompletedProcess[s
 
 
 def check_tracking_plan_validator() -> None:
-    fixture_path = SKILL / "references" / "generic_tracking_plan_fixture.json"
-    run_command(
+    for fixture_path in [
+        SKILL / "references" / "generic_tracking_plan_fixture.json",
+        SKILL / "references" / "generic_piano_tracking_plan_fixture.json",
+        SKILL / "references" / "generic_piano_ecommerce_tracking_plan_fixture.json",
+    ]:
+        run_command(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "validate_tracking_plan.py"),
+                str(fixture_path),
+            ],
+            f"Tracking plan validator for {display_path(fixture_path)}",
+        )
+
+
+def validator_output_for(plan_data: dict, path: Path) -> subprocess.CompletedProcess[str]:
+    path.write_text(json.dumps(plan_data, indent=2, ensure_ascii=False), encoding="utf-8")
+    env = os.environ.copy()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    return subprocess.run(
         [
             sys.executable,
             str(ROOT / "scripts" / "validate_tracking_plan.py"),
-            str(fixture_path),
+            str(path),
         ],
-        "Tracking plan validator",
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
     )
+
+
+def expect_validator_error(base_fixture: dict, temp_dir: Path, label: str, mutate, expected_code: str) -> None:
+    candidate = json.loads(json.dumps(base_fixture))
+    mutate(candidate)
+    result = validator_output_for(candidate, temp_dir / f"{label}.json")
+    combined = result.stdout + result.stderr
+    if result.returncode == 0:
+        fail(f"Validator unexpectedly accepted invalid fixture {label}")
+    if expected_code not in combined:
+        fail(f"Validator output for {label} did not include {expected_code}:\n{combined}")
+
+
+def check_tracking_plan_negative_lints() -> None:
+    fixture = load_json(SKILL / "references" / "generic_tracking_plan_fixture.json")
+    piano_ecommerce_fixture = load_json(SKILL / "references" / "generic_piano_ecommerce_tracking_plan_fixture.json")
+    with tempfile.TemporaryDirectory() as temp_dir_name:
+        temp_dir = Path(temp_dir_name)
+
+        def reserved_prefix(candidate: dict) -> None:
+            event = candidate["events"][0]
+            event["event_name"] = "ga_bad_event"
+            event["classification"] = "custom"
+            event["official_match"] = "invalid custom event using reserved GA4 prefix"
+            event["official_ga4_match"] = "invalid custom event using reserved GA4 prefix"
+            event["data_layer"]["event_key"] = "ga_bad_event"
+            event["data_layer"]["push"]["event"] = "ga_bad_event"
+            event["ga4_payload"]["event_name"] = "ga_bad_event"
+
+        expect_validator_error(fixture, temp_dir, "reserved_prefix", reserved_prefix, "GA4_RESERVED_PREFIX")
+
+        def unknown_recommended(candidate: dict) -> None:
+            event = candidate["events"][3]
+            event["event_name"] = "search_submit"
+            event["official_match"] = "incorrectly classified as official recommended"
+            event["official_ga4_match"] = "incorrectly classified as official recommended"
+            event["data_layer"]["event_key"] = "search_submit"
+            event["data_layer"]["push"]["event"] = "search_submit"
+            event["ga4_payload"]["event_name"] = "search_submit"
+
+        expect_validator_error(fixture, temp_dir, "unknown_recommended", unknown_recommended, "GA4_RECOMMENDED_EVENT_UNKNOWN")
+
+        def missing_recommended_required_parameter(candidate: dict) -> None:
+            event = candidate["events"][3]
+            event["parameters"] = [parameter for parameter in event["parameters"] if parameter != "search_term"]
+            event["data_layer"]["push"]["event_data"].pop("search_term", None)
+            event["ga4_payload"]["parameters"].pop("search_term", None)
+
+        expect_validator_error(
+            fixture,
+            temp_dir,
+            "missing_recommended_required_parameter",
+            missing_recommended_required_parameter,
+            "GA4_RECOMMENDED_PARAMETER_MISSING",
+        )
+
+        def official_marked_custom(candidate: dict) -> None:
+            event = candidate["events"][3]
+            event["classification"] = "custom"
+            event["official_match"] = "incorrectly marked custom"
+            event["official_ga4_match"] = "incorrectly marked custom"
+
+        expect_validator_error(fixture, temp_dir, "official_marked_custom", official_marked_custom, "GA4_OFFICIAL_EVENT_MARKED_CUSTOM")
+
+        def missing_event_platform(candidate: dict) -> None:
+            candidate["events"][0].pop("primary_platform", None)
+
+        expect_validator_error(fixture, temp_dir, "missing_event_platform", missing_event_platform, "SCHEMA_VALIDATION")
+
+        def missing_measurement_role(candidate: dict) -> None:
+            candidate["events"][0].pop("measurement_role", None)
+
+        expect_validator_error(fixture, temp_dir, "missing_measurement_role", missing_measurement_role, "SCHEMA_VALIDATION")
+
+        def missing_measurement_strategy(candidate: dict) -> None:
+            candidate.pop("measurement_strategy", None)
+
+        expect_validator_error(fixture, temp_dir, "missing_measurement_strategy", missing_measurement_strategy, "SCHEMA_VALIDATION")
+
+        def unknown_business_event_family(candidate: dict) -> None:
+            candidate["events"][0]["business_event_family"] = "missing_family"
+
+        expect_validator_error(fixture, temp_dir, "unknown_business_event_family", unknown_business_event_family, "EVENT_FAMILY_UNKNOWN")
+
+        def missing_custom_event_acceptance(candidate: dict) -> None:
+            candidate["measurement_strategy"]["custom_event_acceptance"] = []
+
+        expect_validator_error(fixture, temp_dir, "missing_custom_event_acceptance", missing_custom_event_acceptance, "CUSTOM_EVENT_ACCEPTANCE_MISSING")
+
+        def missing_page_or_component(candidate: dict) -> None:
+            candidate["events"][0].pop("page_or_component", None)
+
+        expect_validator_error(fixture, temp_dir, "missing_page_or_component", missing_page_or_component, "SCHEMA_VALIDATION")
+
+        def weak_page_or_component(candidate: dict) -> None:
+            candidate["events"][0]["page_or_component"] = "button"
+
+        expect_validator_error(fixture, temp_dir, "weak_page_or_component", weak_page_or_component, "EVENT_COMPONENT_CONTEXT_WEAK")
+
+        def missing_data_dependencies(candidate: dict) -> None:
+            candidate["events"][0]["data_dependencies"] = []
+
+        expect_validator_error(fixture, temp_dir, "missing_data_dependencies", missing_data_dependencies, "EVENT_DATA_DEPENDENCIES_MISSING")
+
+        def weak_data_dependency(candidate: dict) -> None:
+            candidate["events"][0]["data_dependencies"] = ["data"]
+
+        expect_validator_error(fixture, temp_dir, "weak_data_dependency", weak_data_dependency, "EVENT_DATA_DEPENDENCY_WEAK")
+
+        def diagnostic_key_event(candidate: dict) -> None:
+            event = candidate["events"][0]
+            event["measurement_role"] = "diagnostic"
+            event["key_event"] = True
+            candidate["key_events"] = [
+                {
+                    "event_name": event["event_name"],
+                    "reason": "Invalid diagnostic key event fixture.",
+                    "conditions": "Invalid test case."
+                }
+            ]
+
+        expect_validator_error(fixture, temp_dir, "diagnostic_key_event", diagnostic_key_event, "KEY_EVENT_ROLE_INVALID")
+
+        def unknown_event_journey(candidate: dict) -> None:
+            candidate["events"][0]["journey_id"] = "missing_journey"
+
+        expect_validator_error(fixture, temp_dir, "unknown_event_journey", unknown_event_journey, "EVENT_JOURNEY_UNKNOWN")
+
+        def empty_declared_journey(candidate: dict) -> None:
+            candidate["measurement_brief"].append(
+                {
+                    **candidate["measurement_brief"][0],
+                    "journey_id": "orphan_journey",
+                    "journey_name": "Orphan journey",
+                    "success_signals": ["orphan_event"],
+                }
+            )
+
+        expect_validator_error(fixture, temp_dir, "empty_declared_journey", empty_declared_journey, "JOURNEY_HAS_NO_EVENTS")
+
+        def uncovered_success_signal(candidate: dict) -> None:
+            candidate["measurement_brief"][0]["success_signals"].append("missing_conversion_signal")
+
+        expect_validator_error(fixture, temp_dir, "uncovered_success_signal", uncovered_success_signal, "SUCCESS_SIGNAL_NOT_COVERED")
+
+        def weak_not_tracked_reason(candidate: dict) -> None:
+            candidate["not_tracked"][0]["reason"] = "not needed"
+
+        expect_validator_error(fixture, temp_dir, "weak_not_tracked_reason", weak_not_tracked_reason, "NOT_TRACKED_REASON_WEAK")
+
+        def weak_custom_rationale(candidate: dict) -> None:
+            event = next(event for event in candidate["events"] if event["classification"] == "custom")
+            event["official_match"] = "track a link click"
+            event["official_ga4_match"] = "track a link click"
+            event["business_question"] = "Which link was clicked?"
+            event["trigger"] = "User clicks a link."
+            event["implementation_notes"] = ""
+
+        expect_validator_error(fixture, temp_dir, "weak_custom_rationale", weak_custom_rationale, "CUSTOM_EVENT_RATIONALE_MISSING")
+
+        def low_signal_custom_name(candidate: dict) -> None:
+            event = next(event for event in candidate["events"] if event["classification"] == "custom")
+            event["event_name"] = "button_click"
+            event["data_layer"]["event_key"] = "button_click"
+            event["data_layer"]["push"]["event"] = "button_click"
+            event["ga4_payload"]["event_name"] = "button_click"
+
+        expect_validator_error(fixture, temp_dir, "low_signal_custom_name", low_signal_custom_name, "LOW_SIGNAL_CUSTOM_EVENT_NAME")
+
+        def missing_qa_network_event_name(candidate: dict) -> None:
+            candidate["events"][0]["qa"]["expected_network"] = ["GA4 request contains page metadata."]
+
+        expect_validator_error(fixture, temp_dir, "missing_qa_network_event_name", missing_qa_network_event_name, "QA_EXPECTED_NETWORK_EVENT_NAME_MISSING")
+
+        def weak_business_question(candidate: dict) -> None:
+            candidate["events"][0]["business_question"] = "Track page view."
+
+        expect_validator_error(fixture, temp_dir, "weak_business_question", weak_business_question, "EVENT_BUSINESS_QUESTION_WEAK")
+
+        def missing_top_level_qa_network_event_name(candidate: dict) -> None:
+            candidate["qa_cases"][0]["expected_network"] = ["GA4 request contains page metadata."]
+
+        expect_validator_error(
+            fixture,
+            temp_dir,
+            "missing_top_level_qa_network_event_name",
+            missing_top_level_qa_network_event_name,
+            "QA_EXPECTED_NETWORK_EVENT_NAME_MISSING",
+        )
+
+        def missing_ga4_official_source(candidate: dict) -> None:
+            candidate["documentation_sources_checked"] = [
+                source
+                for source in candidate["documentation_sources_checked"]
+                if "google.com/analytics" not in source.get("url", "")
+            ]
+
+        expect_validator_error(fixture, temp_dir, "missing_ga4_official_source", missing_ga4_official_source, "GA4_OFFICIAL_SOURCE_MISSING")
+
+        def missing_custom_definition(candidate: dict) -> None:
+            candidate["custom_definitions"] = [
+                definition
+                for definition in candidate["custom_definitions"]
+                if definition.get("parameter_name") != "cta_location"
+            ]
+
+        expect_validator_error(fixture, temp_dir, "missing_custom_definition", missing_custom_definition, "CUSTOM_DEFINITION_MISSING")
+
+        def weak_custom_parameter_reporting_purpose(candidate: dict) -> None:
+            parameter = next(parameter for parameter in candidate["parameters"] if parameter["parameter_name"] == "cta_location")
+            parameter["reporting_purpose"] = "tracking"
+
+        expect_validator_error(
+            fixture,
+            temp_dir,
+            "weak_custom_parameter_reporting_purpose",
+            weak_custom_parameter_reporting_purpose,
+            "PARAMETER_REPORTING_PURPOSE_WEAK",
+        )
+
+        def weak_custom_parameter_value_rules(candidate: dict) -> None:
+            parameter = next(parameter for parameter in candidate["parameters"] if parameter["parameter_name"] == "cta_location")
+            parameter["value_rules"] = "string"
+
+        expect_validator_error(
+            fixture,
+            temp_dir,
+            "weak_custom_parameter_value_rules",
+            weak_custom_parameter_value_rules,
+            "CUSTOM_PARAMETER_VALUE_RULES_WEAK",
+        )
+
+        def missing_piano_product_purchased_property(candidate: dict) -> None:
+            event = next(event for event in candidate["events"] if event["event_name"] == "product.purchased")
+            event["parameters"] = [parameter for parameter in event["parameters"] if parameter != "transaction_id"]
+            for mapping in event["platform_mappings"]:
+                mapping["parameters_or_properties"].pop("transaction_id", None)
+            for payload in event["implementation_payloads"]:
+                payload["payload"].pop("transaction_id", None)
+
+        expect_validator_error(
+            piano_ecommerce_fixture,
+            temp_dir,
+            "missing_piano_product_purchased_property",
+            missing_piano_product_purchased_property,
+            "PIANO_MANDATORY_PROPERTY_MISSING",
+        )
+
+        def unknown_piano_sales_insights_event(candidate: dict) -> None:
+            event = candidate["events"][0]
+            event["event_name"] = "product.fake_event"
+            for mapping in event["platform_mappings"]:
+                mapping["event_name"] = "product.fake_event"
+            for payload in event["implementation_payloads"]:
+                payload["event_name"] = "product.fake_event"
+
+        expect_validator_error(
+            piano_ecommerce_fixture,
+            temp_dir,
+            "unknown_piano_sales_insights_event",
+            unknown_piano_sales_insights_event,
+            "PIANO_OFFICIAL_EVENT_UNKNOWN",
+        )
+
+        def missing_piano_official_source(candidate: dict) -> None:
+            candidate["documentation_sources_checked"] = [
+                source
+                for source in candidate["documentation_sources_checked"]
+                if "piano.io" not in source.get("url", "")
+            ]
+
+        expect_validator_error(
+            piano_ecommerce_fixture,
+            temp_dir,
+            "missing_piano_official_source",
+            missing_piano_official_source,
+            "PIANO_OFFICIAL_SOURCE_MISSING",
+        )
+
+        def piano_native_marked_custom(candidate: dict) -> None:
+            event = candidate["events"][0]
+            event["classification"] = "piano_custom"
+            event["official_match"] = "incorrectly marked custom"
+            for mapping in event["platform_mappings"]:
+                mapping["classification"] = "piano_custom"
+
+        expect_validator_error(
+            piano_ecommerce_fixture,
+            temp_dir,
+            "piano_native_marked_custom",
+            piano_native_marked_custom,
+            "PIANO_NATIVE_EVENT_MARKED_CUSTOM",
+        )
 
 
 def check_generated_workbook() -> None:
     fixture_path = SKILL / "references" / "generic_tracking_plan_fixture.json"
+    piano_fixture_path = SKILL / "references" / "generic_piano_tracking_plan_fixture.json"
+    piano_ecommerce_fixture_path = SKILL / "references" / "generic_piano_ecommerce_tracking_plan_fixture.json"
     with tempfile.TemporaryDirectory() as temp_dir:
         output = Path(temp_dir) / "generic_tracking_plan.xlsx"
         run_command(
@@ -253,9 +761,59 @@ def check_generated_workbook() -> None:
             fail("Workbook generator did not create the expected output file")
         check_event_matrix(output)
 
+        piano_output = Path(temp_dir) / "generic_piano_tracking_plan.xlsx"
+        run_command(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "generate_tracking_plan_workbook.py"),
+                str(piano_fixture_path),
+                "--output",
+                str(piano_output),
+            ],
+            "Workbook generator for Piano fixture",
+        )
+        if not piano_output.exists():
+            fail("Workbook generator did not create the expected Piano output file")
+        wb = load_workbook(piano_output, read_only=True, data_only=True)
+        try:
+            if wb.sheetnames != EXPECTED_TABS:
+                fail(f"{display_path(piano_output)} has unexpected tabs: {wb.sheetnames}")
+            ws = wb["03 Event Matrix"]
+            if "page.display" not in {cell.value for row in ws.iter_rows() for cell in row}:
+                fail("Piano generated workbook does not include page.display in the event matrix")
+        finally:
+            wb.close()
+
+        piano_ecommerce_output = Path(temp_dir) / "generic_piano_ecommerce_tracking_plan.xlsx"
+        run_command(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "generate_tracking_plan_workbook.py"),
+                str(piano_ecommerce_fixture_path),
+                "--output",
+                str(piano_ecommerce_output),
+            ],
+            "Workbook generator for Piano ecommerce fixture",
+        )
+        if not piano_ecommerce_output.exists():
+            fail("Workbook generator did not create the expected Piano ecommerce output file")
+        wb = load_workbook(piano_ecommerce_output, read_only=True, data_only=True)
+        try:
+            if wb.sheetnames != EXPECTED_TABS:
+                fail(f"{display_path(piano_ecommerce_output)} has unexpected tabs: {wb.sheetnames}")
+            ws = wb["03 Event Matrix"]
+            matrix_values = {cell.value for row in ws.iter_rows() for cell in row}
+            for expected in ["product.add_to_cart", "transaction.confirmation", "product.purchased"]:
+                if expected not in matrix_values:
+                    fail(f"Piano ecommerce generated workbook does not include {expected} in the event matrix")
+        finally:
+            wb.close()
+
 
 def check_csv_export() -> None:
     fixture_path = SKILL / "references" / "generic_tracking_plan_fixture.json"
+    piano_fixture_path = SKILL / "references" / "generic_piano_tracking_plan_fixture.json"
+    piano_ecommerce_fixture_path = SKILL / "references" / "generic_piano_ecommerce_tracking_plan_fixture.json"
     with tempfile.TemporaryDirectory() as temp_dir:
         output = Path(temp_dir) / "generic_tracking_plan.csv"
         run_command(
@@ -271,9 +829,41 @@ def check_csv_export() -> None:
         if not output.exists() or output.stat().st_size == 0:
             fail("CSV exporter did not create a non-empty output file")
         header = output.read_text(encoding="utf-8-sig").splitlines()[0]
-        for expected in ["event_id", "event_name", "parameter", "scope_rule"]:
+        for expected in ["event_id", "event_name", "measurement_role", "business_event_family", "page_or_component", "data_dependencies", "official_match", "parameter", "reporting_purpose", "scope_rule", "analytics_platform", "platform_event_name"]:
             if expected not in header:
                 fail(f"CSV exporter output is missing header {expected}")
+
+        piano_output = Path(temp_dir) / "generic_piano_tracking_plan.csv"
+        run_command(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "export_tracking_plan_csv.py"),
+                str(piano_fixture_path),
+                "--output",
+                str(piano_output),
+            ],
+            "CSV exporter for Piano fixture",
+        )
+        piano_text = piano_output.read_text(encoding="utf-8-sig")
+        for expected in ["piano_analytics", "page.display", "click.navigation"]:
+            if expected not in piano_text:
+                fail(f"CSV exporter Piano output is missing {expected}")
+
+        piano_ecommerce_output = Path(temp_dir) / "generic_piano_ecommerce_tracking_plan.csv"
+        run_command(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "export_tracking_plan_csv.py"),
+                str(piano_ecommerce_fixture_path),
+                "--output",
+                str(piano_ecommerce_output),
+            ],
+            "CSV exporter for Piano ecommerce fixture",
+        )
+        piano_ecommerce_text = piano_ecommerce_output.read_text(encoding="utf-8-sig")
+        for expected in ["piano_analytics", "product.add_to_cart", "transaction.confirmation", "product.purchased"]:
+            if expected not in piano_ecommerce_text:
+                fail(f"CSV exporter Piano ecommerce output is missing {expected}")
 
 
 def event_blocks(ws):
@@ -318,6 +908,24 @@ def check_event_matrix(workbook_path: Path) -> None:
             fail(f"{display_path(workbook_path)} has unexpected tabs: {wb.sheetnames}")
 
         ws = wb["03 Event Matrix"]
+        header_values = [ws.cell(5, col).value for col in range(1, ws.max_column + 1)]
+        if header_values[:2] != ["Variable / parameter", "Type"]:
+            fail(f"{display_path(workbook_path)} Event Matrix must start with human-readable variable and type columns")
+        for value_col in range(3, ws.max_column + 1, 2):
+            status_col = value_col + 1
+            if status_col > ws.max_column:
+                break
+            if ws.cell(5, value_col).value != "Value / rule" or ws.cell(5, status_col).value != "Test status":
+                fail(f"{display_path(workbook_path)} Event Matrix must keep each Test status column directly after its Value / rule column")
+        matrix_labels = {str(row[0].value) for row in ws.iter_rows() if row and row[0].value}
+        for expected_label in ["measurement_role", "business_event_family", "page_or_component", "data_dependencies"]:
+            if expected_label not in matrix_labels:
+                fail(f"{display_path(workbook_path)} Event Matrix is missing {expected_label} row")
+        overview = wb["00 Overview"]
+        overview_values = {cell.value for row in overview.iter_rows() for cell in row}
+        for expected in ["Measurement Strategy", "Family ID", "Event Inventory"]:
+            if expected not in overview_values:
+                fail(f"{display_path(workbook_path)} Overview is missing {expected}")
         found_ecommerce_block = False
         for start, end in event_blocks(ws):
             block_name = str(ws.cell(start, 1).value or "")
@@ -363,19 +971,10 @@ def check_workbooks() -> None:
         check_event_matrix(workbook_path)
 
 
-def check_public_files_are_generic() -> None:
+def check_no_release_only_files_folder() -> None:
     files_dir = ROOT / "files"
-    if not files_dir.exists():
-        fail("files/ is missing")
-    unexpected = sorted(
-        path.name
-        for path in files_dir.iterdir()
-        if path.is_file()
-        and not path.name.startswith("~$")
-        and path.name not in ALLOWED_PUBLIC_FILES
-    )
-    if unexpected:
-        fail(f"files/ contains non-generic or unexpected public artifacts: {unexpected}")
+    if files_dir.exists():
+        fail("files/ is a release-only artifact folder and must not be kept in the repo")
 
     all_path_findings = []
     for path in ROOT.rglob("*"):
@@ -424,9 +1023,12 @@ def main() -> int:
         check_required_files,
         check_skill_frontmatter,
         check_skill_resource_links,
+        check_reference_navigation,
+        check_mainstream_analytics_references,
         check_tracking_plan_contract,
         check_tracking_plan_validator,
-        check_public_files_are_generic,
+        check_tracking_plan_negative_lints,
+        check_no_release_only_files_folder,
         check_workbooks,
         check_generated_workbook,
         check_csv_export,

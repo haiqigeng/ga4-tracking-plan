@@ -7,7 +7,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
 
-OUT = Path(__file__).resolve().parents[1] / "files" / "ga4_tracking_plan_template_v2_1.xlsx"
+OUT = Path(__file__).resolve().parents[1] / "skill" / "assets" / "ga4_tracking_plan_template.xlsx"
 
 NAVY = "1F4E78"
 BLUE = "D9EAF7"
@@ -111,6 +111,16 @@ def build_overview(wb):
             ["04 Screenshot Register", "Visual evidence and interaction context", "Analysts, developers, QA, stakeholders", "Paste screenshots or link external captures", "", "", "", ""],
             ["05 QA Cases", "DebugView, GTM Preview, and network validation contract", "Analysts, developers, QA", "One row per testable event case", "", "", "", ""],
             [],
+            ["Measurement Strategy", "", "", "", "", "", "", ""],
+            ["Archetype / page role", "Business purpose", "Selected event families", "Excluded event families", "Custom event acceptance", "Evidence / assumptions", "Priority", "Notes"],
+            ["TBD", "TBD", "page_context | ecommerce_promotion | site_search | content_selection", "cart_checkout_purchase when out of scope | one_event_per_link", "Custom events require official alternatives, business reason, required parameters, and QA feasibility.", "TBD", "must", ""],
+            ["Family ID", "Family name", "Platform", "Events / actions", "Reason", "Official sources considered", "Status", "Notes"],
+            ["page_context", "Page context", "ga4", "page_view", "Frames the journey and supports landing-page analysis.", "GA4 automatic page_view", "Draft", ""],
+            [],
+            ["Event Inventory", "", "", "", "", "", "", ""],
+            ["Event ID", "Event name", "Classification", "Measurement role", "Family ID", "Journey", "Page / component", "QA ID"],
+            ["EVT-EXAMPLE", "page_view", "automatic", "context", "page_context", "TBD", "TBD", "QA-EXAMPLE"],
+            [],
             ["Conventions", "", "", "", "", "", "", ""],
             ["Pattern / status", "Meaning", "Example", "Where used", "", "", "", ""],
             ["OK", "Implemented and validated", "OK", "Test status columns", "", "", "", ""],
@@ -125,10 +135,29 @@ def build_overview(wb):
             ["items[].field", "Field inside each object of an array", "items[].item_id", "Ecommerce item variables", "", "", "", ""],
         ],
     )
-    for row in [7, 11, 15, 24]:
-        header(ws, row, 8)
-    for row in [6, 10, 14, 23]:
-        section(ws, row, ws.cell(row, 1).value, 8)
+    section_labels = {
+        "Analytics Information",
+        "Version History",
+        "Workbook Sheets",
+        "Measurement Strategy",
+        "Event Inventory",
+        "Conventions",
+    }
+    header_labels = {
+        "Account name",
+        "Version",
+        "Sheet",
+        "Archetype / page role",
+        "Family ID",
+        "Event ID",
+        "Pattern / status",
+    }
+    for row in range(1, ws.max_row + 1):
+        label = ws.cell(row, 1).value
+        if label in section_labels:
+            section(ws, row, str(label), 8)
+        if label in header_labels:
+            header(ws, row, 8)
     set_widths(ws, [24, 36, 28, 28, 34, 24, 18, 44])
     ws.freeze_panes = "A7"
     style_cells(ws)
@@ -169,11 +198,27 @@ def build_gtm_protocol(wb):
     style_cells(ws)
 
 
+def default_reporting_purpose(variable_name, display_name):
+    name = str(variable_name)
+    label = str(display_name).lower()
+    if name.startswith("items[]") or name in {"items", "currency", "value", "transaction_id"}:
+        return "Supports ecommerce performance, revenue, product, merchandising, or transaction analysis."
+    if name.startswith("page_data") or label.startswith("page"):
+        return "Segments events by page context and supports traffic or journey analysis."
+    if name.startswith("user_data"):
+        return "Segments behavior by approved non-PII audience or user context."
+    if name.startswith("event_data"):
+        return "Explains the interaction context and supports funnel or engagement analysis."
+    if name in {"promotion_id", "promotion_name", "creative_name", "creative_slot"}:
+        return "Supports promotion exposure, click, and merchandising performance analysis."
+    return "Supports analysis, QA, and reporting for the related event definition."
+
+
 def build_parameter_reference(wb):
     ws = wb.create_sheet("02 Parameter Reference")
-    title(ws, "Parameter Reference", "Human-readable dictionary for variables/parameters used in the tracking plan.", 7)
-    ws.append(["Variable name", "Display name", "Type", "Description", "Value rules", "Example values", "Comments"])
-    header(ws, 3, 7)
+    title(ws, "Parameter Reference", "Human-readable dictionary for variables/parameters used in the tracking plan.", 8)
+    ws.append(["Variable name", "Display name", "Type", "Description", "Reporting purpose", "Value rules", "Example values", "Comments"])
+    header(ws, 3, 8)
     rows = [
         ["event", "Event name", "string", "GA4 event name sent in the dataLayer push.", "Use official GA4 names when possible; otherwise use clear snake_case custom names.", "page_view, search, view_item, begin_quote", ""],
         ["user_data", "User data object", "object", "Object containing user context when allowed.", "Never include direct personal data.", "{login_status:'logged'}", ""],
@@ -239,10 +284,14 @@ def build_parameter_reference(wb):
         ["creative_name", "Creative name", "string", "Official GA4 ecommerce promotion parameter.", "Use stable campaign naming.", "banner_blue", "Event scope; item-level also exists for promotion events."],
         ["creative_slot", "Creative slot", "string", "Official GA4 ecommerce promotion parameter.", "Use section + position.", "homepage_hero_1", "Event scope; item-level also exists for promotion events."],
     ]
+    rows = [
+        row[:4] + [default_reporting_purpose(row[0], row[1])] + row[4:]
+        for row in rows
+    ]
     add_rows(ws, rows)
-    set_widths(ws, [32, 28, 18, 56, 54, 34, 44])
+    set_widths(ws, [32, 28, 18, 50, 52, 54, 34, 44])
     ws.freeze_panes = "A4"
-    ws.auto_filter.ref = f"A3:G{ws.max_row}"
+    ws.auto_filter.ref = f"A3:H{ws.max_row}"
     style_cells(ws)
 
 
@@ -251,6 +300,10 @@ def event_blocks():
         ["J-001 - Page and content discovery", "", "Page view", "", "Scroll", "", "Content selection", "", "", "", "", ""],
         ["event_name", "string", "page_view", "", "scroll", "", "select_content", "", "", "", "", ""],
         ["event_type", "string", "page", "", "interaction", "", "interaction", "", "", "", "", ""],
+        ["measurement_role", "string", "context", "", "diagnostic", "", "micro_conversion", "", "", "", "", ""],
+        ["business_event_family", "string", "page_context", "", "page_engagement", "", "content_navigation_selection", "", "", "", "", ""],
+        ["page_or_component", "string", "Page body", "", "Page scroll depth", "", "Content card or navigation link", "", "", "", "", ""],
+        ["data_dependencies", "array", "browser URL | document title | page template", "", "scroll threshold and current URL", "", "content taxonomy | content ID | destination URL", "", "", "", "", ""],
         ["trigger", "string", "Page load or SPA route change", "", "User reaches configured scroll threshold", "", "User selects a content/card/link element", "", "", "", "", ""],
         ["business_question", "string", "Which pages are viewed?", "", "How deeply do users engage with the page?", "", "Which content modules drive interest?", "", "", "", "", ""],
         ["screenshot_id", "string", "SCR-PAGE-001", "", "SCR-SCROLL-001", "", "SCR-CONTENT-001", "", "", "", "", ""],
@@ -264,6 +317,10 @@ def event_blocks():
         ["J-002 - Search and lead journey", "", "Site search", "", "Quote/form start", "", "Lead generated", "", "", "", "", ""],
         ["event_name", "string", "search", "", "begin_quote", "", "generate_lead", "", "", "", "", ""],
         ["event_type", "string", "interaction", "", "interaction", "", "interaction", "", "", "", "", ""],
+        ["measurement_role", "string", "micro_conversion", "", "micro_conversion", "", "macro_conversion", "", "", "", "", ""],
+        ["business_event_family", "string", "site_search", "", "lead_funnel_start", "", "lead_conversion", "", "", "", "", ""],
+        ["page_or_component", "string", "Search form", "", "Quote CTA or form entry", "", "Lead confirmation page", "", "", "", "", ""],
+        ["data_dependencies", "array", "scrubbed search term | page context", "", "CTA location | form name", "", "form name | submission status | lead value when available", "", "", "", "", ""],
         ["trigger", "string", "User submits a search query", "", "User starts quote or lead form journey", "", "Lead/form successfully submitted", "", "", "", "", ""],
         ["business_question", "string", "What do users search for?", "", "Which entry points start lead journeys?", "", "Which starts become leads?", "", "", "", "", ""],
         ["screenshot_id", "string", "SCR-SEARCH-001", "", "SCR-LEAD-START-001", "", "SCR-LEAD-SUCCESS-001", "", "", "", "", ""],
@@ -276,6 +333,10 @@ def event_blocks():
         ["J-003 - Ecommerce journey", "", "View item list", "", "Select item", "", "View item", "", "Add to cart", "", "Purchase", ""],
         ["event_name", "string", "view_item_list", "", "select_item", "", "view_item", "", "add_to_cart", "", "purchase", ""],
         ["event_type", "string", "ecommerce", "", "ecommerce", "", "ecommerce", "", "ecommerce", "", "ecommerce", ""],
+        ["measurement_role", "string", "diagnostic", "", "micro_conversion", "", "diagnostic", "", "micro_conversion", "", "macro_conversion", ""],
+        ["business_event_family", "string", "ecommerce_product_list", "", "ecommerce_product_selection", "", "ecommerce_product_detail", "", "ecommerce_cart", "", "ecommerce_purchase", ""],
+        ["page_or_component", "string", "Product listing grid", "", "Product listing card", "", "Product detail page", "", "Add-to-cart button", "", "Order confirmation page", ""],
+        ["data_dependencies", "array", "list ID/name | visible items", "", "clicked item | source list", "", "product ID/name | price | category", "", "product ID/name | price | quantity", "", "transaction ID | value | currency | purchased items", ""],
         ["trigger", "string", "Product list displayed", "", "Product clicked from list", "", "Product detail viewed", "", "Product added to cart", "", "Order confirmation displayed", ""],
         ["business_question", "string", "Which lists are seen?", "", "Which products are selected?", "", "Which products are viewed?", "", "Which products enter cart?", "", "What revenue is generated?", ""],
         ["screenshot_id", "string", "SCR-LIST-001", "", "SCR-SELECT-ITEM-001", "", "SCR-VIEW-ITEM-001", "", "SCR-ADD-CART-001", "", "SCR-PURCHASE-001", ""],
@@ -292,6 +353,10 @@ def event_blocks():
         ["J-004 - Promotion journey", "", "Promotion impression", "", "Promotion click", "", "", "", "", "", "", ""],
         ["event_name", "string", "view_promotion", "", "select_promotion", "", "", "", "", "", "", ""],
         ["event_type", "string", "ecommerce", "", "ecommerce", "", "", "", "", "", "", ""],
+        ["measurement_role", "string", "diagnostic", "", "micro_conversion", "", "", "", "", "", "", ""],
+        ["business_event_family", "string", "ecommerce_promotion_engagement", "", "ecommerce_promotion_engagement", "", "", "", "", "", "", ""],
+        ["page_or_component", "string", "Promotion placement", "", "Promotion click target", "", "", "", "", "", "", ""],
+        ["data_dependencies", "array", "promotion metadata | placement | items", "", "clicked promotion metadata | placement | items", "", "", "", "", "", "", ""],
         ["trigger", "string", "Promotion visible at agreed threshold", "", "User clicks promotion", "", "", "", "", "", "", ""],
         ["business_question", "string", "Which promotions are exposed?", "", "Which promotions drive clicks?", "", "", "", "", "", "", ""],
         ["screenshot_id", "string", "SCR-PROMO-VIEW-001", "", "SCR-PROMO-CLICK-001", "", "", "", "", "", "", ""],

@@ -11,7 +11,7 @@ Each testable event should have:
 - `methods`: `DebugView`, `GTM Preview`, `Network`, or another agreed method.
 - `steps`: concise reproduction steps.
 - `expected_data_layer`: expected keys and values at the trigger point.
-- `expected_network`: GA4 request expectations such as event name and key parameters.
+- `expected_network`: platform request expectations that explicitly mention the event name and key parameters/properties.
 - `debugview_expectation`: what the analyst should see in GA4 DebugView.
 - `status`: `OK`, `KO`, `Cannot test`, or `not_started` in JSON drafts.
 - `evidence`: screenshot path, video path, request export, or notes when tests are executed.
@@ -28,6 +28,6 @@ Each testable event should have:
 ## Future Testing Skill Expectations
 
 - The tracking plan should provide enough information to identify a page or journey, reproduce the event, inspect the dataLayer, and verify GA4 network payloads.
-- Expected network checks should reference the event name and important parameters, not only screenshots.
+- Expected network checks must reference the event name and important parameters/properties, not only screenshots.
 - Ecommerce QA should verify official ecommerce fields and the `items` array.
 - Test evidence should stay outside the generic skill repository unless it is a generic fixture.

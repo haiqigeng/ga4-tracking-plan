@@ -11,6 +11,15 @@ Decision order:
 5. Keep custom events stable, low-noise, and tied to a business question.
 6. Consolidate repeated same-name events when possible and normalize controlled values to lowercase ASCII snake_case with accents removed.
 
+## Contents
+
+- [Standard Web Events](#standard-web-events)
+- [Official Recommended Events](#official-recommended-events)
+- [Scenario Playbooks](#scenario-playbooks)
+- [Typical Custom Events](#typical-custom-events)
+- [DataLayer Patterns](#datalayer-patterns)
+- [Sources](#sources)
+
 ## Standard Web Events
 
 | Event | Group | Scenario | Parameters | Implementation note |

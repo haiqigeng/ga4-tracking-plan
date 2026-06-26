@@ -4,18 +4,12 @@ from urllib.request import Request, urlopen
 import html
 import re
 
-from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-from openpyxl.utils import get_column_letter
-
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_REFS = ROOT / "skill" / "references"
-FILES = ROOT / "files"
 OFFICIAL_JSON = SKILL_REFS / "official_ga4_recommended_events.json"
 LIBRARY_JSON = SKILL_REFS / "ga4_event_scenario_library.json"
 LIBRARY_MD = SKILL_REFS / "ga4_event_scenario_library.md"
-LIBRARY_XLSX = FILES / "ga4_event_scenario_library.xlsx"
 
 SOURCES = [
     {
@@ -519,7 +513,6 @@ DATALAYER_PATTERNS = [
 
 def build_library():
     SKILL_REFS.mkdir(parents=True, exist_ok=True)
-    FILES.mkdir(parents=True, exist_ok=True)
     try:
         recommended = fetch_recommended_events()
     except Exception:
@@ -539,10 +532,8 @@ def build_library():
     }
     LIBRARY_JSON.write_text(json.dumps(library, indent=2, ensure_ascii=False), encoding="utf-8")
     LIBRARY_MD.write_text(render_markdown(library), encoding="utf-8")
-    render_workbook(library)
     print(LIBRARY_JSON)
     print(LIBRARY_MD)
-    print(LIBRARY_XLSX)
 
 
 def render_markdown(library):
@@ -559,6 +550,15 @@ def render_markdown(library):
         "4. Use custom events only when the interaction is business-specific and no official event fits.",
         "5. Keep custom events stable, low-noise, and tied to a business question.",
         "6. Consolidate repeated same-name events when possible and normalize controlled values to lowercase ASCII snake_case with accents removed.",
+        "",
+        "## Contents",
+        "",
+        "- [Standard Web Events](#standard-web-events)",
+        "- [Official Recommended Events](#official-recommended-events)",
+        "- [Scenario Playbooks](#scenario-playbooks)",
+        "- [Typical Custom Events](#typical-custom-events)",
+        "- [DataLayer Patterns](#datalayer-patterns)",
+        "- [Sources](#sources)",
         "",
         "## Standard Web Events",
         "",
@@ -607,89 +607,6 @@ def render_markdown(library):
     for source in library["sources"]:
         lines.append(f"| {source['name']} | {source['type']} | {source['url']} | {source['used_for']} |")
     return "\n".join(lines)
-
-
-def render_workbook(library):
-    wb = Workbook()
-    wb.remove(wb.active)
-    navy = "1F4E78"
-    white = "FFFFFF"
-    blue = "D9EAF7"
-    thin = Side(style="thin", color="D9E2F3")
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
-    wrap = Alignment(wrap_text=True, vertical="top")
-
-    def sheet(name, headers, rows, widths):
-        ws = wb.create_sheet(name)
-        ws.append(headers)
-        for cell in ws[1]:
-            cell.fill = PatternFill("solid", fgColor=navy)
-            cell.font = Font(color=white, bold=True)
-            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-            cell.border = border
-        for row in rows:
-            ws.append(row)
-        for row in ws.iter_rows(min_row=2):
-            for cell in row:
-                cell.alignment = wrap
-                cell.border = border
-        ws.freeze_panes = "A2"
-        ws.auto_filter.ref = ws.dimensions
-        ws.sheet_view.showGridLines = False
-        for i, width in enumerate(widths, 1):
-            ws.column_dimensions[get_column_letter(i)].width = width
-        return ws
-
-    sheet(
-        "Standard Events",
-        ["Event", "Group", "Scenario", "Trigger", "Parameters", "Implementation"],
-        [[e["event"], e["group"], e["scenario"], e["trigger"], e["parameters"], e["implementation"]] for e in library["standard_events"]],
-        [26, 28, 34, 54, 54, 54],
-    )
-    recommended_rows = []
-    for event in library["official_recommended_events"]:
-        recommended_rows.append(
-            [
-                event["event"],
-                event["group"],
-                event["description"],
-                ", ".join(p["name"] for p in event["parameters"]),
-                "\n".join(f"{p['name']} ({p['type']}, required: {p['required']}): {p['example']}" for p in event["parameters"]),
-            ]
-        )
-    sheet("Recommended Events", ["Event", "Official group", "Use", "Parameters", "Parameter detail"], recommended_rows, [28, 28, 62, 52, 70])
-    sheet(
-        "Scenario Playbooks",
-        ["Scenario", "Website examples", "Official events", "Typical custom events", "Primary parameters", "Notes"],
-        [
-            [s["scenario"], s["website_examples"], s["official_events"], s["typical_custom_events"], s["primary_parameters"], s["notes"]]
-            for s in library["scenario_playbooks"]
-        ],
-        [34, 42, 62, 48, 54, 62],
-    )
-    sheet(
-        "Custom Event Patterns",
-        ["Event", "Scenario", "Use when", "Prefer official if", "Parameters"],
-        [[e["event"], e["scenario"], e["use_when"], e["prefer_official_if"], e["parameters"]] for e in library["typical_custom_events"]],
-        [30, 42, 56, 62, 54],
-    )
-    sheet(
-        "DataLayer Patterns",
-        ["Name", "Use for", "Format", "GTM mapping"],
-        [[p["name"], p["use_for"], p["format"], p["gtm_mapping"]] for p in library["datalayer_patterns"]],
-        [34, 46, 72, 62],
-    )
-    sheet("Sources", ["Source", "Type", "URL", "Used for"], [[s["name"], s["type"], s["url"], s["used_for"]] for s in library["sources"]], [42, 24, 78, 70])
-    for ws in wb.worksheets:
-        for row in ws.iter_rows():
-            for cell in row:
-                if isinstance(cell.value, str) and len(cell.value) > 100:
-                    ws.row_dimensions[cell.row].height = max(ws.row_dimensions[cell.row].height or 15, 45)
-        ws.sheet_properties.pageSetUpPr.fitToPage = True
-        ws.page_setup.fitToWidth = 1
-        ws.page_setup.fitToHeight = 0
-    wb.save(LIBRARY_XLSX)
-    load_workbook(LIBRARY_XLSX, read_only=True, data_only=True)
 
 
 if __name__ == "__main__":

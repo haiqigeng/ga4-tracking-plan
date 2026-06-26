@@ -64,7 +64,7 @@ def matrix_status_columns() -> list[int]:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate a human GA4 tracking-plan workbook from the canonical JSON contract.")
+    parser = argparse.ArgumentParser(description="Generate a human analytics tracking-plan workbook from the canonical JSON contract.")
     parser.add_argument("plan", type=Path, help="Path to a JSON tracking plan using tracking_plan_schema.json.")
     parser.add_argument("--output", "-o", type=Path, required=True, help="Output XLSX path.")
     return parser.parse_args()
@@ -144,9 +144,35 @@ def event_family(event: dict[str, Any]) -> str:
     return ecommerce_event_family(event)
 
 
+def official_match(event: dict[str, Any]) -> str:
+    return str(event.get("official_match") or event.get("official_ga4_match") or event.get("event_name") or "")
+
+
+def transport_event_name(event: dict[str, Any]) -> str:
+    data_layer = event.get("data_layer", {})
+    if isinstance(data_layer, dict) and data_layer.get("event_key"):
+        return str(data_layer["event_key"])
+    ga4_payload = event.get("ga4_payload", {})
+    if isinstance(ga4_payload, dict) and ga4_payload.get("event_name"):
+        return str(ga4_payload["event_name"])
+    payloads = event.get("implementation_payloads", [])
+    if isinstance(payloads, list):
+        for payload in payloads:
+            if isinstance(payload, dict) and payload.get("event_name"):
+                return str(payload["event_name"])
+    mappings = event.get("platform_mappings", [])
+    if isinstance(mappings, list):
+        for mapping in mappings:
+            if isinstance(mapping, dict) and mapping.get("event_name"):
+                return str(mapping["event_name"])
+    return str(event.get("event_name", ""))
+
+
 def event_type_for_matrix(event: dict[str, Any]) -> str:
     if event.get("classification") == "recommended_ecommerce":
         return "ecommerce"
+    if str(event.get("classification", "")).startswith("piano_"):
+        return "platform"
     if event.get("event_name") == "page_view":
         return "page"
     return "interaction"
@@ -235,6 +261,26 @@ def parameter_value(event: dict[str, Any], parameter: str) -> str:
             break
     if current is not None:
         return compact_json(current)
+
+    for mapping in event.get("platform_mappings", []):
+        if not isinstance(mapping, dict):
+            continue
+        props = mapping.get("parameters_or_properties", {})
+        if isinstance(props, dict) and parameter in props:
+            return compact_json(props[parameter])
+        products = mapping.get("items_or_products", [])
+        if parameter.startswith("items_or_products[].") and isinstance(products, list):
+            key = parameter.split(".", 1)[1]
+            values = [item.get(key) for item in products if isinstance(item, dict) and item.get(key) not in (None, "")]
+            if values:
+                return join_values(values)
+
+    for payload in event.get("implementation_payloads", []):
+        if not isinstance(payload, dict):
+            continue
+        payload_data = payload.get("payload", {})
+        if isinstance(payload_data, dict) and parameter in payload_data:
+            return compact_json(payload_data[parameter])
     return "-"
 
 
@@ -252,32 +298,114 @@ def apply_workbook_settings(wb: Workbook) -> None:
 
 def build_overview(wb: Workbook, plan: dict[str, Any]) -> None:
     doc = plan["document"]
+    strategy = plan["measurement_strategy"]
     ws = wb.create_sheet("00 Overview")
-    title(ws, doc["title"], "Generated from the canonical GA4 tracking-plan JSON contract.", 8)
+    title(ws, doc["title"], "Generated from the canonical analytics tracking-plan JSON contract.", 11)
     rows = [
         ["Document", doc["title"], "Plan ID", plan["plan_id"], "Owner", doc["owner"], "Status", doc["status"]],
         ["Version", doc["version"], "Created date", doc["created_date"], "Template source", doc["template_source"], "Schema", plan["schema_version"]],
         ["Notes", doc.get("notes", ""), "", "", "", "", "", ""],
+        ["Analytics platforms", join_values(plan.get("analytics_platforms", ["ga4"])), "", "", "", "", "", ""],
         [],
         ["Workbook Navigation", "", "", "", "", "", "", ""],
         ["Sheet", "Use for", "Primary audience", "Notes", "", "", "", ""],
         ["00 Overview", "Workbook navigation, event inventory, brief, assumptions, and official sources.", "Analyst, product owner", "Start here.", "", "", "", ""],
         ["01 GTM Protocol", "Shared dataLayer, GTM, naming, and ecommerce implementation conventions.", "Developer, analyst", "Not a tag-build document.", "", "", "", ""],
-        ["02 Parameter Reference", "Custom definition registration list and parameter dictionary.", "Analyst, GA4 admin", "Use for GA4 custom dimensions and value rules.", "", "", "", ""],
+        ["02 Parameter Reference", "Custom definition/Data Model registration list and parameter/property dictionary.", "Analyst, analytics admin", "Use for GA4 custom dimensions, Piano Data Model properties, and value rules.", "", "", "", ""],
         ["03 Event Matrix", "Journey-based event definitions and official parameter rows.", "Analyst, developer", "Ecommerce families are split into compatible blocks.", "", "", "", ""],
         ["04 Screenshot Register", "Placeholder register for screenshots and visual QA evidence.", "QA, analyst", "Evidence only; keep tracking rules in matrix and QA sheets.", "", "", "", ""],
         ["05 QA Cases", "Recette-ready test cases, expected dataLayer, expected GA4 payload, and status.", "QA, recette agent", "Use during implementation validation.", "", "", "", ""],
         [],
-        ["Event Inventory", "", "", "", "", "", "", ""],
-        ["Event ID", "Event name", "Classification", "Journey", "Priority", "Key event", "Trigger summary", "QA ID"],
+        ["Measurement Strategy", "", "", "", "", "", "", ""],
+        ["Archetype", "Confidence", "Evidence", "", "", "", "", ""],
     ]
+    for archetype in strategy["detected_archetypes"]:
+        rows.append([
+            archetype["archetype"],
+            archetype["confidence"],
+            join_values(archetype["evidence"]),
+            "",
+            "",
+            "",
+            "",
+            "",
+        ])
+    rows.extend([
+        [],
+        ["Journey", "Page role", "Business purpose", "Primary success signal", "", "", "", ""],
+    ])
     journey_names = {brief["journey_id"]: brief["journey_name"] for brief in plan["measurement_brief"]}
+    for page_role in strategy["page_roles"]:
+        rows.append([
+            journey_names.get(page_role["journey_id"], page_role["journey_id"]),
+            page_role["page_role"],
+            page_role["business_purpose"],
+            page_role["primary_success_signal"],
+            "",
+            "",
+            "",
+            "",
+        ])
+    rows.extend([
+        [],
+        ["Family ID", "Family name", "Platform", "Events / actions", "Reason", "Official sources considered", "", ""],
+    ])
+    for family in strategy["selected_event_families"]:
+        rows.append([
+            family["family_id"],
+            family["family_name"],
+            family["analytics_platform"],
+            join_values(family["events_or_actions"]),
+            family["reason"],
+            join_values(family["official_sources_considered"]),
+            "",
+            "",
+        ])
+    rows.extend([
+        [],
+        ["Excluded family", "Reason", "", "", "", "", "", ""],
+    ])
+    for excluded in strategy.get("excluded_event_families", []):
+        rows.append([
+            excluded["family_name"],
+            excluded["reason"],
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+        ])
+    if strategy.get("custom_event_acceptance"):
+        rows.extend([
+            [],
+            ["Custom event", "Official alternatives considered", "Business reason", "Required parameters", "Registration notes", "", "", ""],
+        ])
+        for custom in strategy["custom_event_acceptance"]:
+            rows.append([
+                custom["event_name"],
+                join_values(custom["official_alternatives_considered"]),
+                custom["business_reason"],
+                join_values(custom["required_parameters"]),
+                custom["registration_notes"],
+                "",
+                "",
+                "",
+            ])
+    rows.extend([
+        [],
+        ["Event Inventory", "", "", "", "", "", "", ""],
+        ["Event ID", "Event name", "Classification", "Measurement role", "Family", "Journey", "Page / component", "Priority", "Key event", "Trigger summary", "QA ID"],
+    ])
     for event in plan["events"]:
         rows.append([
             event["event_id"],
             event["event_name"],
             event["classification"],
+            event["measurement_role"],
+            event["business_event_family"],
             journey_names.get(event["journey_id"], event["journey_id"]),
+            event["page_or_component"],
             event["priority"],
             "yes" if event["key_event"] else "no",
             event["trigger"],
@@ -329,20 +457,20 @@ def build_overview(wb: Workbook, plan: dict[str, Any]) -> None:
 
     for row in range(1, ws.max_row + 1):
         label = ws.cell(row, 1).value
-        if label in {"Workbook Navigation", "Event Inventory", "Measurement Brief", "Version History", "Assumptions", "Not Tracked / Avoided", "Documentation Sources Checked"}:
-            section(ws, row, str(label), 8)
-        if label in {"Sheet", "Event ID", "Journey", "Assumption", "Interaction", "Name"} or (label == "Version" and ws.cell(row, 2).value == "Date"):
-            header(ws, row, 8)
+        if label in {"Workbook Navigation", "Measurement Strategy", "Event Inventory", "Measurement Brief", "Version History", "Assumptions", "Not Tracked / Avoided", "Documentation Sources Checked"}:
+            section(ws, row, str(label), 11)
+        if label in {"Sheet", "Archetype", "Journey", "Family ID", "Excluded family", "Custom event", "Event ID", "Assumption", "Interaction", "Name"} or (label == "Version" and ws.cell(row, 2).value == "Date"):
+            header(ws, row, 11)
         if label in wb.sheetnames:
             set_internal_link(ws.cell(row, 1), str(label))
-    set_widths(ws, [26, 38, 32, 22, 42, 46, 18, 42])
+    set_widths(ws, [26, 30, 24, 20, 28, 30, 34, 16, 16, 44, 30])
     ws.freeze_panes = "A9"
     style_cells(ws)
 
 
 def build_gtm_protocol(wb: Workbook) -> None:
     ws = wb.create_sheet("01 GTM Protocol")
-    title(ws, "Google Tag Manager Implementation Protocol", "Shared implementation contract for dataLayer, GTM, GA4, and QA.", 5)
+    title(ws, "Analytics Implementation Protocol", "Shared implementation contract for dataLayer, GTM, GA4, Piano SDK, and QA.", 5)
     rows = [
         ["Section", "Topic", "Protocol / instruction", "Code / example", "Notes"],
         ["1.A", "dataLayer push", "Use dataLayer.push for event and context values. Do not overwrite the dataLayer object after GTM loads.", "window.dataLayer = window.dataLayer || [];\ndataLayer.push({ event: \"event_name\" });", "The Event Matrix lists the exact values."],
@@ -352,6 +480,7 @@ def build_gtm_protocol(wb: Workbook) -> None:
         ["1.E", "Ecommerce scope", "Prefer event-level list and promotion parameters when all items share the same value. Item-level values override event-level values.", "event-level item_list_name used\nitems[].item_list_name omitted", "The Event Matrix marks inherited item rows as event_level_used."],
         ["1.F", "Matrix availability values", "Use explicit placeholders so optional official parameters are not silently omitted.", "not_available\nnot_applicable\nevent_level_used\nsend_default_quantity", "These are planning values, not QA test statuses."],
         ["1.G", "Testing records", "Record test status as OK, KO, or Cannot test.", "OK / KO / Cannot test", "The QA Cases sheet provides the validation contract."],
+        ["1.H", "Piano Analytics mappings", "When Piano Analytics is in scope, keep Piano event names and properties separate from GA4 parameters.", "pa.sendEvent(\"page.display\", { page: \"homepage\" });", "Do not send GA4 ecommerce item names as Piano properties unless Piano documentation defines the same property."],
     ]
     for row in rows:
         ws.append(row)
@@ -409,12 +538,10 @@ def build_parameter_reference(wb: Workbook, plan: dict[str, Any]) -> None:
         "Display name",
         "Scope",
         "Type",
-        "Classification",
-        "Requirement",
         "Description",
+        "Reporting purpose",
         "Value rules",
         "Example values",
-        "Source",
         "Comments",
     ]
     ws.append(headers)
@@ -432,17 +559,15 @@ def build_parameter_reference(wb: Workbook, plan: dict[str, Any]) -> None:
             param["display_name"],
             param["scope"],
             param["type"],
-            param["classification"],
-            param["required"],
             param["description"],
+            param["reporting_purpose"],
             param["value_rules"],
             param["example_value"],
-            param["source"],
             "; ".join(comments),
         ])
-    set_widths(ws, [32, 28, 18, 18, 32, 18, 50, 52, 34, 32, 42])
+    set_widths(ws, [32, 28, 18, 18, 52, 52, 52, 34, 42])
     ws.freeze_panes = f"A{dictionary_header_row + 1}"
-    ws.auto_filter.ref = f"A{dictionary_header_row}:K{ws.max_row}"
+    ws.auto_filter.ref = f"A{dictionary_header_row}:I{ws.max_row}"
     style_cells(ws)
 
 
@@ -485,11 +610,16 @@ def build_event_matrix(wb: Workbook, plan: dict[str, Any]) -> None:
                 ("event_name", "string", lambda event: event["event_name"]),
                 ("event_type", "string", event_type_for_matrix),
                 ("classification", "string", lambda event: event["classification"]),
-                ("official_ga4_match", "string", lambda event: event["official_ga4_match"]),
+                ("measurement_role", "string", lambda event: event["measurement_role"]),
+                ("business_event_family", "string", lambda event: event["business_event_family"]),
+                ("official_match", "string", official_match),
+                ("primary_platform", "string", lambda event: event.get("primary_platform") or "ga4"),
+                ("page_or_component", "string", lambda event: event["page_or_component"]),
                 ("trigger", "string", lambda event: event["trigger"]),
+                ("data_dependencies", "array", lambda event: join_values(event.get("data_dependencies", []))),
                 ("business_question", "string", lambda event: event["business_question"]),
                 ("key_event", "boolean", lambda event: str(event["key_event"]).lower()),
-                ("event", "string", lambda event: event["data_layer"].get("event_key", event["event_name"])),
+                ("event", "string", transport_event_name),
             ]
             for variable, value_type, resolver in standard_rows:
                 matrix_row = [variable, value_type]
@@ -542,7 +672,7 @@ def build_screenshot_register(wb: Workbook, plan: dict[str, Any]) -> None:
             event["event_name"],
             capture_type,
             event["page_url_pattern"],
-            event["trigger"],
+            f"{event['page_or_component']} - {event['trigger']}",
             "",
             "Paste screenshot here",
             f"QA case: {event['qa']['qa_id']}",
@@ -568,7 +698,7 @@ def build_qa_cases(wb: Workbook, plan: dict[str, Any]) -> None:
         "Methods",
         "Steps",
         "Expected dataLayer",
-        "Expected network / GA4 payload",
+        "Expected network / platform payload",
         "DebugView expectation",
         "Status",
         "Evidence / notes",
