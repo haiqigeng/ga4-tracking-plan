@@ -170,7 +170,7 @@ def check_repo_maintenance_docs() -> None:
         "business context",
         "analysis needs",
         "XLSX",
-        "Maintenance Guardrails",
+        "Maintenance Checklist",
         "Universal Analytics",
         "validate_package.py",
     ]:
@@ -182,7 +182,7 @@ def check_repo_maintenance_docs() -> None:
     for expected in ["web analyst", "business context", "skill/references", "validate_package.py"]:
         if expected not in contributing:
             fail(f"CONTRIBUTING.md is missing maintenance guidance: {expected}")
-    for expected in ["Scalability And Maintenance", "validate_package.py", "Custom events", "XLSX-facing"]:
+    for expected in ["Scalability And Maintenance", "validate_package.py", "Custom events", "Workbook changes"]:
         if expected not in pr_template:
             fail(f"Pull request template is missing review guardrail: {expected}")
     for template_name, template_text in {

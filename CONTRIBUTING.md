@@ -22,7 +22,7 @@ Implementation work for GTM, dataLayer, server-side tagging, or browser automati
 - Keep changes small and explain the analytics reason for the change.
 - Update `skill/SKILL.md` when the skill behavior changes.
 - Move detailed event libraries, scenario guidance, and maintenance rules into `skill/references/` when they would bloat `SKILL.md`.
-- Keep examples and fixtures generic, reusable, and non-sensitive.
+- Keep examples generic, reusable, and non-sensitive.
 - Do not commit client secrets, API keys, PII, private tracking plans, or proprietary analytics data.
 
 ## Validation
