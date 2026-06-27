@@ -112,7 +112,11 @@
         "reason": "Piano click.navigation is more precise for internal navigation than a generic action click."
       }
     ],
-    "custom_event_acceptance": []
+    "custom_event_acceptance": [],
+    "scalability_notes": [
+      "Keep Piano page and click properties separate from GA4 parameters when adding cross-platform mappings later.",
+      "Reuse page chapter and navigation taxonomies across content pages so reports remain comparable."
+    ]
   },
   "events": [
     {

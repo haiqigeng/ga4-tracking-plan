@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a problem with the skill or example tracking plan.
+description: Report a problem with the skill, generated tracking plan, template, or validation.
 title: "[Bug]: "
 labels: ["bug"]
 body:
@@ -17,10 +17,28 @@ body:
       description: What should happen instead?
     validations:
       required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform scope
+      options:
+        - GA4
+        - Piano Analytics
+        - Cross-platform
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: analyst_context
+    attributes:
+      label: Analyst context
+      description: What business scenario, journey, or analysis need is affected?
+    validations:
+      required: false
   - type: textarea
     id: context
     attributes:
-      label: Context
-      description: Add non-sensitive examples or references.
+      label: Non-sensitive context
+      description: Add generic examples, official documentation links, or anonymized references only.
     validations:
       required: false

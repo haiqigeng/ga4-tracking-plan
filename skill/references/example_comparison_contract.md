@@ -15,6 +15,7 @@ Use this reference when the user provides a tracking plan, spreadsheet, or imple
 
 - Copying client names, live URLs, emails, sheet links, screenshots, bug reports, or container IDs into the generic skill.
 - Treating legacy wrapper names such as `gtm.custom_event`, `action`, or `label` as GA4 event authority.
+- Reusing Universal Analytics schema such as `eventCategory`, `eventAction`, `eventLabel`, `nonInteraction`, `dimension1`, `metric1`, UA Enhanced Ecommerce, or UA property IDs. UA is sunset; use these examples only to infer business intent.
 - Creating one workbook tab per event by default; it can become hard to navigate on full ecommerce plans. Prefer a compact event inventory plus grouped matrix and QA sheets.
 - Mixing website bug reporting, design QA, or consent implementation issues into the tracking-plan template unless the user explicitly asks for that scope.
 - Using example status labels, colors, or mandatory flags when they conflict with official GA4 requirements or the skill's QA contract.
@@ -29,6 +30,7 @@ Evaluate examples against:
 | Navigation | Clear cover, sheet links, sheet purpose | Add a concise overview and avoid excess empty styled canvas |
 | Event inventory | Event name, classification, trigger, key event, QA status | Add official GA4 classification and avoid wrapper-first naming |
 | Parameter detail | Type, requirement, allowed values, source, explanation | Add scope, official/custom classification, custom definition need, PII/cardinality risk |
+| Legacy migration value | Business journeys, macro/micro strategy, QA evidence habits | Remove UA field names, numbered dimensions, legacy ecommerce payloads, and old property IDs |
 | Implementation clarity | dataLayer example, source object, trigger timing | Keep code generic and avoid client/container-specific snippets |
 | Recette readiness | QA status, comments, expected event payload | Add stable event IDs, QA IDs, expected dataLayer and GA4/network checks |
 | Analyst UX | Scannable tables, restrained color, hidden gridlines, wrapped text | Reduce visual density and move evidence/comments to QA sheets |

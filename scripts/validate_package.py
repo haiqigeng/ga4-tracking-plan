@@ -22,6 +22,9 @@ REQUIRED_REFERENCE_FILES = [
     SKILL / "references" / "mainstream_analytics_tool_policy.md",
     SKILL / "references" / "business_scenario_analysis.md",
     SKILL / "references" / "website_archetype_decision_matrix.md",
+    SKILL / "references" / "corpus_learning_policy.md",
+    SKILL / "references" / "custom_event_decision_matrix.md",
+    SKILL / "references" / "parameter_proposition_library.json",
     SKILL / "references" / "piano_analytics_reference.md",
     SKILL / "references" / "piano_official_events.json",
     SKILL / "references" / "tracking_plan_schema.json",
@@ -44,16 +47,26 @@ REQUIRED_SKILL_SCRIPTS = [
     SKILL / "scripts" / "generate_tracking_plan_workbook.py",
     SKILL / "scripts" / "validate_tracking_plan.py",
     SKILL / "scripts" / "export_tracking_plan_csv.py",
+    SKILL / "scripts" / "analyze_tracking_plan_corpus.ps1",
 ]
 REQUIRED_SKILL_FILES = [
+    ROOT / "README.md",
+    ROOT / "CONTRIBUTING.md",
+    ROOT / "SECURITY.md",
+    ROOT / ".gitignore",
+    ROOT / ".github" / "workflows" / "validate-skill.yml",
+    ROOT / ".github" / "pull_request_template.md",
+    ROOT / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml",
+    ROOT / ".github" / "ISSUE_TEMPLATE" / "feature_request.yml",
+    ROOT / ".github" / "ISSUE_TEMPLATE" / "config.yml",
     SKILL / "SKILL.md",
     SKILL / "agents" / "openai.yaml",
     SKILL / "assets" / "ga4_tracking_plan_template.xlsx",
-    ROOT / "scripts" / "create_tracking_plan_template.py",
     ROOT / "scripts" / "create_event_scenario_library.py",
     ROOT / "scripts" / "generate_tracking_plan_workbook.py",
     ROOT / "scripts" / "validate_tracking_plan.py",
     ROOT / "scripts" / "export_tracking_plan_csv.py",
+    ROOT / "scripts" / "analyze_tracking_plan_corpus.ps1",
     ROOT / "scripts" / "validate_package.py",
     *REQUIRED_REFERENCE_FILES,
     *REQUIRED_SKILL_SCRIPTS,
@@ -69,7 +82,7 @@ EXPECTED_TABS = [
 WORKBOOKS_TO_VALIDATE = [
     SKILL / "assets" / "ga4_tracking_plan_template.xlsx",
 ]
-TEXT_SUFFIXES = {".md", ".py", ".yml", ".yaml", ".json", ".txt", ".gitignore", ".gitattributes"}
+TEXT_SUFFIXES = {".md", ".py", ".ps1", ".yml", ".yaml", ".json", ".txt", ".gitignore", ".gitattributes"}
 BANNED_PROJECT_PATTERNS = [
     re.compile(pattern, re.IGNORECASE)
     for pattern in [
@@ -91,6 +104,12 @@ SECRET_PATTERNS = {
     "slack_token": re.compile(r"xox[baprs]-[0-9A-Za-z-]{20,}"),
     "windows_user_path": re.compile(r"C:\\Users\\", re.IGNORECASE),
 }
+LOCAL_ARTIFACT_DIRS = [
+    ROOT / "files",
+    ROOT / "release",
+    ROOT / "generated",
+    ROOT / "tracking-plan-corpus-analysis",
+]
 
 
 def fail(message: str) -> None:
@@ -132,6 +151,50 @@ def check_skill_frontmatter() -> None:
         fail("Skill description is required")
     if len(description) > 1024:
         fail("Skill description must be <= 1024 characters")
+    for expected in ["web analyst", "business-context", "analysis-needs", "scalable GA4"]:
+        if expected.lower() not in description.lower():
+            fail(f"Skill description should mention {expected!r} to preserve web analyst positioning")
+
+
+def check_repo_maintenance_docs() -> None:
+    readme = read_text(ROOT / "README.md")
+    openai_yaml = read_text(SKILL / "agents" / "openai.yaml")
+    contributing = read_text(ROOT / "CONTRIBUTING.md")
+    pr_template = read_text(ROOT / ".github" / "pull_request_template.md")
+    bug_template = read_text(ROOT / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml")
+    feature_template = read_text(ROOT / ".github" / "ISSUE_TEMPLATE" / "feature_request.yml")
+    gitignore = read_text(ROOT / ".gitignore")
+
+    for expected in [
+        "web analyst",
+        "business context",
+        "analysis needs",
+        "XLSX",
+        "Maintenance Guardrails",
+        "Universal Analytics",
+        "validate_package.py",
+    ]:
+        if expected not in readme:
+            fail(f"README.md is missing maintenance or positioning text: {expected}")
+    for expected in ["GA4 Web Analyst", "web analyst", "$ga4-tracking-plan"]:
+        if expected not in openai_yaml:
+            fail(f"skill/agents/openai.yaml is missing UI metadata text: {expected}")
+    for expected in ["web analyst", "business context", "skill/references", "validate_package.py"]:
+        if expected not in contributing:
+            fail(f"CONTRIBUTING.md is missing maintenance guidance: {expected}")
+    for expected in ["Scalability And Maintenance", "validate_package.py", "Custom events", "XLSX-facing"]:
+        if expected not in pr_template:
+            fail(f"Pull request template is missing review guardrail: {expected}")
+    for template_name, template_text in {
+        "bug_report.yml": bug_template,
+        "feature_request.yml": feature_template,
+    }.items():
+        for expected in ["Platform scope", "GA4", "Piano Analytics"]:
+            if expected not in template_text:
+                fail(f"{template_name} is missing issue routing field: {expected}")
+    for expected in ["generated/", "release/", "tracking-plan-corpus-analysis/", "*.zip"]:
+        if expected not in gitignore:
+            fail(f".gitignore is missing artifact guardrail: {expected}")
 
 
 def check_skill_resource_links() -> None:
@@ -144,6 +207,9 @@ def check_skill_resource_links() -> None:
         "references/mainstream_analytics_tool_policy.md",
         "references/business_scenario_analysis.md",
         "references/website_archetype_decision_matrix.md",
+        "references/corpus_learning_policy.md",
+        "references/custom_event_decision_matrix.md",
+        "references/parameter_proposition_library.json",
         "references/piano_analytics_reference.md",
         "references/piano_official_events.json",
         "references/tracking_plan_schema.json",
@@ -164,6 +230,7 @@ def check_skill_resource_links() -> None:
         "scripts/generate_tracking_plan_workbook.py",
         "scripts/validate_tracking_plan.py",
         "scripts/export_tracking_plan_csv.py",
+        "scripts/analyze_tracking_plan_corpus.ps1",
     ]:
         if rel not in text:
             fail(f"SKILL.md does not mention bundled resource {rel}")
@@ -246,6 +313,28 @@ def check_mainstream_analytics_references() -> None:
         if expected not in business_text:
             fail(f"Business scenario analysis reference is missing {expected}")
 
+    corpus_text = read_text(SKILL / "references" / "corpus_learning_policy.md")
+    for expected in ["Universal Analytics is sunset", "Legacy context only", "Do not copy client names", "Promotion Criteria"]:
+        if expected not in corpus_text:
+            fail(f"Corpus learning policy is missing {expected}")
+
+    custom_decision_text = read_text(SKILL / "references" / "custom_event_decision_matrix.md")
+    for expected in ["filter_apply", "sort_apply", "select_item", "view_item", "view_item_list", "eventCategory"]:
+        if expected not in custom_decision_text:
+            fail(f"Custom event decision matrix is missing {expected}")
+
+    parameter_library = load_json(SKILL / "references" / "parameter_proposition_library.json")
+    parameter_families = {family.get("family") for family in parameter_library.get("families", [])}
+    for expected in [
+        "global_page_context",
+        "search_listing_filter_sort",
+        "forms_leads_quotes",
+        "ga4_ecommerce_event_parameters",
+        "ga4_ecommerce_item_parameters",
+    ]:
+        if expected not in parameter_families:
+            fail(f"Parameter proposition library is missing {expected}")
+
     archetype_text = read_text(SKILL / "references" / "website_archetype_decision_matrix.md")
     for expected in [
         "Retail ecommerce",
@@ -305,6 +394,8 @@ def check_tracking_plan_contract() -> None:
         if not all(event.get("data_dependencies") for event in candidate["events"]):
             fail(f"{label} has events without data_dependencies")
         strategy = candidate.get("measurement_strategy", {})
+        if not strategy.get("scalability_notes"):
+            fail(f"{label} has no scalability_notes in measurement_strategy")
         family_ids = {
             family.get("family_id")
             for family in strategy.get("selected_event_families", [])
@@ -615,6 +706,33 @@ def check_tracking_plan_negative_lints() -> None:
 
         expect_validator_error(fixture, temp_dir, "low_signal_custom_name", low_signal_custom_name, "LOW_SIGNAL_CUSTOM_EVENT_NAME")
 
+        def legacy_ua_parameter(candidate: dict) -> None:
+            event = candidate["events"][0]
+            event["parameters"].append("eventCategory")
+            event["ga4_payload"]["parameters"]["eventCategory"] = "navigation"
+            candidate["parameters"].append(
+                {
+                    "parameter_name": "eventCategory",
+                    "display_name": "Event category",
+                    "scope": "event",
+                    "type": "string",
+                    "classification": "custom_event_parameter",
+                    "required": "optional",
+                    "description": "Legacy UA event category.",
+                    "reporting_purpose": "Attempts to reuse legacy UA category reporting in GA4.",
+                    "value_rules": "Legacy UA category value.",
+                    "example_value": "navigation",
+                    "allowed_values": [],
+                    "source": "legacy UA plan",
+                    "register_custom_definition": False,
+                    "cardinality_risk": "low",
+                    "pii_risk": "low",
+                    "consent_dependency": "analytics consent",
+                }
+            )
+
+        expect_validator_error(fixture, temp_dir, "legacy_ua_parameter", legacy_ua_parameter, "LEGACY_UA_FIELD")
+
         def missing_qa_network_event_name(candidate: dict) -> None:
             candidate["events"][0]["qa"]["expected_network"] = ["GA4 request contains page metadata."]
 
@@ -896,7 +1014,7 @@ def event_slot_values(ws, row: int) -> list[str]:
 
 def block_event_types(ws, start: int, end: int) -> list[str]:
     for row in range(start, end + 1):
-        if ws.cell(row, 1).value == "event_type":
+        if ws.cell(row, 1).value == "event_classification":
             return [str(value) for value in event_slot_values(ws, row)]
     return []
 
@@ -909,28 +1027,28 @@ def check_event_matrix(workbook_path: Path) -> None:
 
         ws = wb["03 Event Matrix"]
         header_values = [ws.cell(5, col).value for col in range(1, ws.max_column + 1)]
-        if header_values[:2] != ["Variable / parameter", "Type"]:
-            fail(f"{display_path(workbook_path)} Event Matrix must start with human-readable variable and type columns")
+        if header_values[:2] != ["Field / parameter path", "Type"]:
+            fail(f"{display_path(workbook_path)} Event Matrix must start with human-readable field/parameter and type columns")
         for value_col in range(3, ws.max_column + 1, 2):
             status_col = value_col + 1
             if status_col > ws.max_column:
                 break
-            if ws.cell(5, value_col).value != "Value / rule" or ws.cell(5, status_col).value != "Test status":
-                fail(f"{display_path(workbook_path)} Event Matrix must keep each Test status column directly after its Value / rule column")
+            if ws.cell(5, value_col).value != "Expected value / rule" or ws.cell(5, status_col).value != "Test status":
+                fail(f"{display_path(workbook_path)} Event Matrix must keep each Test status column directly after its Expected value / rule column")
         matrix_labels = {str(row[0].value) for row in ws.iter_rows() if row and row[0].value}
-        for expected_label in ["measurement_role", "business_event_family", "page_or_component", "data_dependencies"]:
+        for expected_label in ["event_id", "event", "event_classification", "key_event", "page_or_component", "trigger", "screenshot_id", "qa_id"]:
             if expected_label not in matrix_labels:
                 fail(f"{display_path(workbook_path)} Event Matrix is missing {expected_label} row")
         overview = wb["00 Overview"]
         overview_values = {cell.value for row in overview.iter_rows() for cell in row}
-        for expected in ["Measurement Strategy", "Family ID", "Event Inventory"]:
+        for expected in ["Document Summary", "Sheet Contents", "Version History", "Publish date"]:
             if expected not in overview_values:
                 fail(f"{display_path(workbook_path)} Overview is missing {expected}")
         found_ecommerce_block = False
         for start, end in event_blocks(ws):
             block_name = str(ws.cell(start, 1).value or "")
             types = block_event_types(ws, start, end)
-            is_ecommerce = any("ecommerce" in event_type.lower() for event_type in types) or "Ecommerce" in block_name or "Promotion" in block_name
+            is_ecommerce = any(event_type == "recommended_ecommerce" for event_type in types) or "Ecommerce" in block_name
             if not is_ecommerce:
                 continue
 
@@ -944,7 +1062,7 @@ def check_event_matrix(workbook_path: Path) -> None:
                     fail(f"{display_path(workbook_path)} ecommerce block {block_name} is missing {required}")
             event_names = []
             for row in range(start, end + 1):
-                if ws.cell(row, 1).value == "event_name":
+                if ws.cell(row, 1).value == "event":
                     event_names = [str(value) for value in event_slot_values(ws, row)]
                     break
             if any(name in {"purchase", "refund"} for name in event_names) and "transaction_id" not in rows:
@@ -972,9 +1090,15 @@ def check_workbooks() -> None:
 
 
 def check_no_release_only_files_folder() -> None:
-    files_dir = ROOT / "files"
-    if files_dir.exists():
-        fail("files/ is a release-only artifact folder and must not be kept in the repo")
+    artifact_findings = []
+    for artifact_dir in LOCAL_ARTIFACT_DIRS:
+        if not artifact_dir.exists():
+            continue
+        files = [path for path in artifact_dir.rglob("*") if path.is_file()]
+        if artifact_dir.name == "files" or files:
+            artifact_findings.append(f"{display_path(artifact_dir)} ({len(files)} file(s))")
+    if artifact_findings:
+        fail("Release, generated, or local analysis artifact folders must not be kept in the repo:\n" + "\n".join(artifact_findings))
 
     all_path_findings = []
     for path in ROOT.rglob("*"):
@@ -1022,6 +1146,7 @@ def main() -> int:
     checks = [
         check_required_files,
         check_skill_frontmatter,
+        check_repo_maintenance_docs,
         check_skill_resource_links,
         check_reference_navigation,
         check_mainstream_analytics_references,

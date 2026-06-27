@@ -1,6 +1,6 @@
 # Business Scenario Analysis
 
-Use this reference when the user gives a website, page, user journey, or limited brief and expects a practical tracking plan.
+Use this reference when the user gives a website, page, user journey, or limited brief and expects practical web analyst judgment, not just event generation.
 
 ## Contents
 
@@ -18,9 +18,11 @@ Use this reference when the user gives a website, page, user journey, or limited
 2. Translate visible actions into business questions before choosing events.
 3. Separate macro conversions, micro conversions, and diagnostic signals.
 4. Prefer platform-native events where semantics fit.
-5. Add custom events only when they answer a clear question that native events do not answer.
-6. Consolidate repeated interactions into one reusable event with controlled values.
-7. Reject or deprioritize low-signal tracking that creates maintenance cost without analysis value.
+5. Use `custom_event_decision_matrix.md` before accepting custom events.
+6. Use `parameter_proposition_library.json` to choose reusable parameters and value rules, then verify official parameters in current platform docs.
+7. Consolidate repeated interactions into one reusable event with controlled values.
+8. Design event families, parameter names, and QA identifiers so the plan can scale to future pages, markets, components, and journey variants.
+9. Reject or deprioritize low-signal tracking that creates maintenance cost without analysis value.
 
 When information is missing, continue with assumptions instead of stalling. Flag assumptions in the plan.
 
@@ -79,6 +81,8 @@ Prefer reusable parameters:
 - `filter_category`, `filter_value`, `sort_type`, `result_count`
 - `login_status`, `customer_type`, `audience_type` when privacy-safe and low-cardinality
 
+Reusable parameters should feel like a durable reporting taxonomy, not one-off labels copied from the current page design. Keep names stable even when the UI wording changes.
+
 Avoid or heavily restrict:
 
 - raw text fields, comments, messages, addresses, claim details, order notes
@@ -111,6 +115,7 @@ A tracking plan is ready for human review when:
 - official events are cited and custom events are justified
 - ecommerce blocks use official parameter names and required fields
 - every controlled value uses a clear rule
+- parameter names and controlled values can support future similar pages or journey variants
 - custom definitions or Data Model properties are listed
 - risky fields are flagged
 - each testable event has a QA case and screenshot placeholder

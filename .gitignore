@@ -3,9 +3,14 @@ Thumbs.db
 
 *.tmp
 *.bak
+*.log
+*.zip
 ~$*.xlsx
 
 __pycache__/
 *.py[cod]
 .venv/
 dist/
+generated/
+release/
+tracking-plan-corpus-analysis/

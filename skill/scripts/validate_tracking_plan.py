@@ -41,6 +41,41 @@ VALUE_EVENTS_REQUIRE_CURRENCY = ECOMMERCE_EVENTS | {
 
 LEGACY_WRAPPER_EVENT_KEYS = {"gtm.custom_event", "custom_event"}
 LEGACY_WRAPPER_PARAMETERS = {"event_name", "action", "label"}
+LEGACY_UA_FIELD_NAMES = {
+    "ua",
+    "ga",
+    "ga3",
+    "gau",
+    "universal_analytics",
+    "ua_property",
+    "ua_property_id",
+    "ua_tracking_id",
+    "tracking_id",
+    "hit_type",
+    "hittype",
+    "event_category",
+    "eventcategory",
+    "event_action",
+    "eventaction",
+    "event_label",
+    "eventlabel",
+    "event_value",
+    "eventvalue",
+    "non_interaction",
+    "noninteraction",
+    "enhanced_ecommerce",
+    "enhancedecommerce",
+    "product_action",
+    "productaction",
+    "product_list",
+    "productlist",
+    "checkout_step",
+    "checkoutstep",
+    "checkout_option",
+    "checkoutoption",
+}
+UA_PROPERTY_ID_RE = re.compile(r"\bUA-\d+-\d+\b", re.IGNORECASE)
+UA_LEGACY_INDEXED_FIELD_RE = re.compile(r"^(dimension|metric)\d+$", re.IGNORECASE)
 AUTOMATIC_EVENTS = {"page_view", "first_visit", "session_start", "user_engagement"}
 GA4_EVENT_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,39}$")
 GA4_PARAMETER_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,39}$")
@@ -409,6 +444,34 @@ def check_pii_name(name: str, path: str, issues: list[Issue]) -> None:
         add_issue(issues, "error", "PII_FIELD_NAME", path, f"Field '{name}' looks like direct or contact-derived PII.")
 
 
+def legacy_ua_token(name: str) -> str:
+    token = re.sub(r"[^A-Za-z0-9]+", "_", str(name)).strip("_").lower()
+    return token.replace("_", "")
+
+
+def check_legacy_ua_field(name: str, path: str, issues: list[Issue]) -> None:
+    if not name:
+        return
+    raw = str(name).strip()
+    lowered = raw.lower()
+    underscored = re.sub(r"[^A-Za-z0-9]+", "_", raw).strip("_").lower()
+    compact = legacy_ua_token(raw)
+    if (
+        lowered in LEGACY_UA_FIELD_NAMES
+        or underscored in LEGACY_UA_FIELD_NAMES
+        or compact in LEGACY_UA_FIELD_NAMES
+        or UA_LEGACY_INDEXED_FIELD_RE.fullmatch(raw)
+        or UA_PROPERTY_ID_RE.search(raw)
+    ):
+        add_issue(
+            issues,
+            "error",
+            "LEGACY_UA_FIELD",
+            path,
+            f"'{raw}' is Universal Analytics legacy data. Use it only as migration context and redesign the field through current GA4 or Piano official models.",
+        )
+
+
 def check_platform_mapping(
     event: dict[str, Any],
     event_index: int,
@@ -425,13 +488,17 @@ def check_platform_mapping(
     if not isinstance(props, dict):
         props = {}
 
+    check_legacy_ua_field(event_name, f"{base}.event_name", issues)
+
     for key in props:
         check_pii_name(str(key), f"{base}.parameters_or_properties.{key}", issues)
+        check_legacy_ua_field(str(key), f"{base}.parameters_or_properties.{key}", issues)
     for item_index, item in enumerate(mapping.get("items_or_products", []) if isinstance(mapping.get("items_or_products"), list) else []):
         if not isinstance(item, dict):
             continue
         for key in item:
             check_pii_name(str(key), f"{base}.items_or_products[{item_index}].{key}", issues)
+            check_legacy_ua_field(str(key), f"{base}.items_or_products[{item_index}].{key}", issues)
 
     if platform == "ga4":
         if event_name and event_name != event.get("event_name") and classification in {"automatic", "enhanced_measurement", "recommended", "recommended_ecommerce", "custom"}:
@@ -1001,6 +1068,8 @@ def check_event(
     ga4_payload = event.get("ga4_payload", {})
     privacy = event.get("privacy", {})
 
+    check_legacy_ua_field(str(event_name), f"{base}.event_name", issues)
+
     if not event.get("primary_platform"):
         add_issue(issues, "error", "PRIMARY_PLATFORM_MISSING", f"{base}.primary_platform", "Every event needs primary_platform for platform-specific QA and mapping.")
     if not str(event.get("official_match", "")).strip():
@@ -1064,6 +1133,7 @@ def check_event(
 
     for parameter in parameters:
         check_pii_name(str(parameter), f"{base}.parameters", issues)
+        check_legacy_ua_field(str(parameter), f"{base}.parameters", issues)
         if parameter in LEGACY_WRAPPER_PARAMETERS:
             add_issue(
                 issues,
@@ -1100,6 +1170,7 @@ def check_event(
             )
         for path, key in walk_keys(push, f"{base}.data_layer.push"):
             check_pii_name(key, path, issues)
+            check_legacy_ua_field(key, path, issues)
 
     payload_name = ga4_payload.get("event_name")
     if payload_name and payload_name != event_name:
@@ -1108,6 +1179,7 @@ def check_event(
     payload_parameters = ga4_payload.get("parameters", {}) if isinstance(ga4_payload.get("parameters"), dict) else {}
     for name in payload_parameters:
         check_pii_name(name, f"{base}.ga4_payload.parameters.{name}", issues)
+        check_legacy_ua_field(name, f"{base}.ga4_payload.parameters.{name}", issues)
 
     if event_name in ECOMMERCE_EVENTS and classification != "recommended_ecommerce":
         add_issue(issues, "warning", "ECOMMERCE_CLASSIFICATION", f"{base}.classification", f"Official ecommerce event '{event_name}' should usually be classified as recommended_ecommerce.")
@@ -1196,10 +1268,12 @@ def check_event(
     for payload_index, payload in enumerate(event.get("implementation_payloads", [])):
         if not isinstance(payload, dict):
             continue
+        check_legacy_ua_field(str(payload.get("event_name", "")), f"{base}.implementation_payloads[{payload_index}].event_name", issues)
         payload_data = payload.get("payload", {})
         if isinstance(payload_data, dict):
             for key in payload_data:
                 check_pii_name(str(key), f"{base}.implementation_payloads[{payload_index}].payload.{key}", issues)
+                check_legacy_ua_field(str(key), f"{base}.implementation_payloads[{payload_index}].payload.{key}", issues)
 
     check_piano_event_shape(event, index, piano_catalog, issues)
     check_ga4_event_shape(event, index, ga4_catalog, issues)
@@ -1274,6 +1348,7 @@ def validate_plan_data(plan: dict[str, Any], schema_path: Path | None = None) ->
             continue
         name = str(param.get("parameter_name", ""))
         check_pii_name(name, f"$.parameters[{index}].parameter_name", issues)
+        check_legacy_ua_field(name, f"$.parameters[{index}].parameter_name", issues)
         classification = param.get("classification")
         if should_lint_ga4_parameter_name(name, param):
             check_ga4_name(name, f"$.parameters[{index}].parameter_name", "parameter", issues)

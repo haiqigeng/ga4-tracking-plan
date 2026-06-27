@@ -1,21 +1,23 @@
 ---
 name: ga4-tracking-plan
-description: Create and review implementation-ready analytics tracking schemas and tracking plans, with GA4 as the default and Piano Analytics support when requested. Use for GA4 event design, ecommerce tracking, lead or signup funnels, journey-based measurement planning, template adaptation, event/property naming, custom dimensions or Data Model properties, GTM/dataLayer specs, Piano SDK specs, and QA-ready analytics plans. Always verify standard, recommended, ecommerce, and platform-native events against official documentation and classify native, recommended, ecommerce, custom, and implementation variables.
+description: Act as a real-life web analyst to create and review implementation-ready analytics tracking schemas and tracking plans, with GA4 as the default and Piano Analytics support when requested. Use for business-context analysis, analysis-needs framing, scalable GA4 event design, ecommerce tracking, lead or signup funnels, journey-based measurement planning, template adaptation, event/property naming, custom dimensions or Data Model properties, GTM/dataLayer specs, Piano SDK specs, and QA-ready analytics plans. Always verify standard, recommended, ecommerce, and platform-native events against official documentation and classify native, recommended, ecommerce, custom, and implementation variables.
 ---
 
 # GA4 Tracking Plan
 
-Create an implementation-ready tracking schema that is useful for analysis, not just a list of trackable interactions. GA4 is the default platform for this skill; when the user requests Piano Analytics or another named analytics tool, keep the platform's native event and property model separate and explicit. Optimize for business questions, clean reporting, low noise, privacy, QA readiness, and maintainable implementation.
+Act as a practical web analyst, not a generic event generator. Create an implementation-ready tracking schema that starts from business context, analysis needs, and future site evolution, then translates that into a readable plan for analysts, developers, media teams, QA, and stakeholders. GA4 is the default platform for this skill; when the user requests Piano Analytics or another named analytics tool, keep the platform's native event and property model separate and explicit. Optimize for business questions, clean reporting, low noise, privacy, QA readiness, and maintainable implementation.
 
 ## Operating Rules
 
 - Start from the user's measurement context and concerned journeys before designing events.
+- Translate business context and analysis needs into measurement decisions before listing interactions.
 - Ask whether the user already has a tracking plan template, spreadsheet, schema file, naming convention, or previous GA4/GTM documentation.
 - If a template exists, analyze its structure and reuse its format where practical.
 - Ask or infer the analytics platform in scope. Default to GA4 for GA4 tracking-plan requests; use Piano Analytics rules only when Piano is requested or clearly in scope.
 - Always check current official documentation for the selected platform before recommending standard, recommended, ecommerce, dataLayer, SDK, or setup decisions.
 - Keep tool-specific schemas separate. Do not translate GA4 event names into Piano event names, or Piano event names into GA4 event names, unless the official platform model supports that exact name.
 - Privilege official GA4/GTM setup over client examples unless the user explicitly asks to preserve a legacy implementation.
+- Treat Universal Analytics, GAU, GA3, GA360, UA Enhanced Ecommerce, and UA fields such as `eventCategory`, `eventAction`, `eventLabel`, `nonInteraction`, `dimension1`, and `metric1` as sunset legacy context only. Never propose them as GA4 or Piano schema.
 - Prefer GA4 automatic, enhanced measurement, and recommended events when their semantics fit.
 - Design custom events only when no native or recommended GA4 option answers the business need cleanly.
 - For Piano plans, prefer Piano standard, Sales Insights, AV Insights, and conversion patterns when their semantics fit.
@@ -28,6 +30,7 @@ Create an implementation-ready tracking schema that is useful for analysis, not 
 - When a plan should be reusable, testable, or converted to XLSX, design it against `references/tracking_plan_schema.json`.
 - For reusable or QA-ready plans, make the measurement strategy explicit before listing events: detected business archetype, page roles, selected event families, excluded event families, and custom-event acceptance decisions.
 - Treat output quality as part of the deliverable: the tracking plan must be readable for web analysts, developers, media teams, QA, and stakeholders, with concise labels, grouped journeys, clear value rules, and no machine-only clutter in analyst-facing tabs.
+- Design for future site growth: reusable event families, stable parameter taxonomies, controlled values, and QA identifiers should scale to new pages without renaming the plan every time.
 - Keep future QA usage in mind: each testable event should have a stable `event_id`, `qa_id`, expected dataLayer or SDK behavior, expected network payload, and test status.
 - Never commit or release client-specific tracking plans, screenshots, test evidence, URLs, exports, or confidential data into a generic skill package.
 - Stop after the GA4 tracking schema or tracking plan is approved unless the user asks for implementation.
@@ -54,19 +57,29 @@ For Piano Analytics:
 - AV Insights: https://developers.piano.io/analytics/data-collection/how-to-send-events/av-insights/
 - Data Model properties: https://analytics-docs.piano.io/en/analytics/v1/properties
 
+For legacy migration context only:
+
+- Universal Analytics sunset: https://support.google.com/analytics/answer/11583528
+
 If current docs cannot be checked, say so and mark standard/recommended/native choices as unverified.
 
 ## Official-First Review
 
 When reviewing an existing tracking plan example, translating a legacy implementation plan into GA4, or preparing a plan for future QA/recette usage, read `references/official_first_review.md`. When comparing a fresh draft with user-provided examples, also read `references/example_comparison_contract.md`. Use them to lint event names, parameter scope, dataLayer examples, privacy risks, mandatory flags, workbook density, and QA readiness against official GA4/GTM setup.
 
+When learning from several historical tracking plans or a folder of examples, read `references/corpus_learning_policy.md` before extracting lessons. Use it to classify GA4, Piano, mixed, and Universal Analytics legacy plans, and to prevent client-specific or UA-era schema from entering the generic skill.
+
+On Windows, when a folder-level inventory is useful, run `scripts/analyze_tracking_plan_corpus.ps1` to produce a privacy-safe JSON summary. Do not add the generated inventory or source workbooks to the skill package.
+
 ## Default Workbook Template
 
 When the user does not provide an existing tracking-plan template, use `assets/ga4_tracking_plan_template.xlsx` as the default human-facing XLSX structure. Adapt its sheets and event matrix to the user's journeys instead of inventing a new workbook layout.
 
-Treat the bundled XLSX template as the primary delivery format for analyst-facing tracking plans. Improve readability through the generator's styling and grouping rules, but keep the default sheet structure stable unless the user explicitly asks for a different workbook. Keep visible workbook content human-oriented: plain-language headers, compact event inventory, journey-grouped event matrix blocks, concise value rules, and implementation notes only where they help a human build or test the plan.
+Treat the bundled XLSX template as the primary delivery format for analyst-facing tracking plans. Improve readability through the generator's styling and grouping rules, but keep the default sheet structure stable unless the user explicitly asks for a different workbook. Keep visible workbook content human-oriented: plain-language headers, concise value rules, and implementation notes only where they help a human build or test the plan.
 
-For template improvements learned from examples, prefer reusable sections inside the stable workbook: workbook navigation, compact event inventory, custom-definition registration, grouped event matrix, and QA/recette records. Do not create one tab per event by default unless the user explicitly asks for that format.
+The Event Matrix is the main working tab. Overview, GTM Protocol, Parameter Reference, Screenshot Register, and QA Cases are support tabs and must stay lean. Do not add agent-only metadata, planning rationale, template provenance, audience summaries, or explanatory blocks to the visible workbook. Keep Overview to document/version/navigation, keep official links in GTM Protocol, keep Parameter Reference as a variable dictionary, and keep QA/screenshot tabs as compact evidence registers.
+
+For template improvements learned from examples, prefer reusable sections inside the stable workbook: workbook navigation, grouped event matrix, compact parameter dictionary, and QA/recette records. Do not create one tab per event by default unless the user explicitly asks for that format.
 
 When the plan is available as canonical JSON and an XLSX artifact is requested or implied, use `scripts/generate_tracking_plan_workbook.py` from this skill folder to generate the workbook rather than manually rebuilding every sheet. Run `scripts/validate_tracking_plan.py` first, or rely on the generator's built-in validation gate, before sharing workbook output.
 
@@ -95,6 +108,10 @@ Before designing events, read `references/ga4_event_scenario_library.md` when av
 
 Use `references/ga4_event_scenario_library.json` for structured lookup when producing machine-readable tracking-plan outputs. Treat typical custom events in the library as patterns, not standards: always prefer official GA4 events when their semantics match.
 
+Read `references/custom_event_decision_matrix.md` before proposing custom events, replacing official GA4 or Piano events, or deciding whether filter, sort, locator, form-step, contact, account-intent, calculator, support, or checkout-diagnostic tracking deserves a custom event.
+
+Use `references/parameter_proposition_library.json` when selecting reusable parameters for GA4 plans. Treat it as a proposition library, not as official documentation; official GA4 ecommerce and recommended-event parameters still come from current Google documentation.
+
 Read `references/piano_analytics_reference.md` when Piano Analytics is requested or when a cross-platform plan includes Piano. Use it to select Piano standard, Sales Insights, AV Insights, conversion, SDK, Collection API, and Data Model property patterns.
 
 Use `references/piano_official_events.json` for structured Piano event lookup when producing machine-readable plans, validating platform mappings, or deciding whether a Piano event is standard, Sales Insights, AV Insights, or custom.
@@ -113,6 +130,9 @@ Read only the additional scenario references that match the requested scope:
 - `references/qa_contract.md` for DebugView, GTM Preview, network, evidence, and future testing-skill readiness
 - `references/official_first_review.md` when reviewing example plans, translating legacy wrappers, or optimizing for both web analysts and future QA/recette agents
 - `references/example_comparison_contract.md` when comparing a generated plan with user-provided examples and deciding whether the skill should evolve
+- `references/corpus_learning_policy.md` when learning from multiple real tracking plans, historical workbooks, recette files, or migration examples
+- `references/custom_event_decision_matrix.md` when deciding whether an event should be official, consolidated, custom, or not tracked
+- `references/parameter_proposition_library.json` when choosing reusable custom parameters, value rules, and registration defaults
 - `references/mainstream_analytics_tool_policy.md` when the plan must support GA4 plus Piano or another mainstream tool
 - `references/piano_analytics_reference.md` when Piano Analytics is in scope
 - `references/piano_official_events.json` for structured Piano standard, Sales Insights, AV Insights, and scenario mapping lookup
@@ -167,6 +187,7 @@ For reusable JSON or XLSX plans, populate `measurement_strategy` before event de
 - `selected_event_families`: official-first event families or custom families accepted for this scope, with platform and rationale
 - `excluded_event_families`: event families intentionally not proposed, such as checkout events on a homepage-only brief
 - `custom_event_acceptance`: for each custom event, official alternatives considered, business reason, required parameters, and registration notes
+- `scalability_notes`: reusable naming, parameter, and QA decisions that should survive new pages, markets, components, or journey variants
 
 Each event must reference one selected family through `business_event_family`. This keeps event proposals tied to business analysis rather than isolated interaction tracking.
 
@@ -176,6 +197,7 @@ For each journey, identify:
 - micro conversions that explain funnel progression
 - diagnostic events that help debug drop-off or UX friction
 - the business decision, report, audience, or optimization action each custom event will support
+- the reusable parameter families and controlled values needed for future reporting
 - events that should be avoided because they are noisy, redundant, or not actionable
 - reporting dimensions and segments needed to answer the analysis questions
 
@@ -300,6 +322,8 @@ For each parameter, define:
 
 In XLSX event matrices, an event slot should represent one reusable event definition, not one visual component whenever the same event can cover multiple components. For example, use one `select_content` slot for category, size, and catalogue-entry selections when the only difference is `content_type`, `content_id`, `content_name`, or `cta_location`. Use one `view_promotion` slot and one `select_promotion` slot for homepage promotions when the same official ecommerce parameter structure applies. Split into separate event slots only when the trigger, data availability, QA method, business meaning, or official GA4 event format is genuinely different.
 
+Keep XLSX Event Matrix columns limited to the field or parameter path, type, and repeated event slots with an expected value/rule column followed immediately by its test status column. Use only the human-useful event context rows needed to implement and test, such as `event_id`, `event`, `event_classification`, `key_event`, `page_or_component`, `trigger`, `screenshot_id`, and `qa_id`. Keep deeper rationale, measurement strategy, and validation metadata in the canonical JSON, not as visible workbook rows.
+
 For ecommerce XLSX blocks:
 
 - use ecommerce-only blocks such as `Ecommerce promotions`, `Product list`, `Cart`, `Checkout`, or `Purchase`
@@ -392,6 +416,7 @@ Before finalizing, review the plan as a web analyst:
 - Are expected reports, explorations, or audiences supported by the schema?
 - Is implementation feasible from available page, dataLayer, or server data?
 - Is the XLSX output easy to read, with human-friendly labels, compact grouped events, visible value rules, status columns next to values, and no rows that exist only for the AI agent?
+- Can the naming, parameter taxonomy, and QA IDs scale to similar future pages or journey variants without redesigning the plan?
 
 ## Step 7: QA And Approval Boundary
 

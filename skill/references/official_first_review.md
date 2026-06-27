@@ -15,7 +15,7 @@ Use this reference when reviewing an existing tracking plan example, translating
 
 1. Treat official Google Analytics and Google Tag Manager documentation as the source of truth.
 2. Prefer automatic, enhanced measurement, recommended, and recommended ecommerce events before custom events.
-3. Treat `gtm.custom_event`, `event_name`, `action`, `label`, UA Enhanced Ecommerce, and vendor wrapper patterns as migration context, not GA4 authority.
+3. Treat `gtm.custom_event`, `event_name`, `action`, `label`, UA Enhanced Ecommerce, `eventCategory`, `eventAction`, `eventLabel`, `nonInteraction`, `dimension1`, `metric1`, and vendor wrapper patterns as migration context, not GA4 authority.
 4. Keep the skill workbook template stable unless the user explicitly asks to change it.
 5. Borrow useful implementation and QA ideas from examples, but do not preserve legacy naming, PII fields, or dense layouts when they weaken the GA4 plan.
 
@@ -33,6 +33,7 @@ Run this pass after every independent draft and again after comparing the user-p
 | Optional ecommerce parameters | Useful optional official parameters are visible rather than silently omitted | Mark rows as `send`, `send_default_quantity`, `event_level_used`, `not_available`, or `not_applicable` |
 | Required ecommerce fields | Required or conditionally required fields are present | Require `items`, one of `items[].item_id` or `items[].item_name`, and `transaction_id` for `purchase` or `refund` |
 | DataLayer hygiene | Reused ecommerce data cannot leak between events | Add `dataLayer.push({ ecommerce: null })` before ecommerce pushes in GTM/dataLayer examples |
+| Legacy UA boundary | UA fields do not appear in the proposed GA4 schema | Extract business intent only, then redesign events and parameters through current GA4 official docs |
 | PII | GA4 plan excludes direct and contact-derived PII | Remove email, phone, hashed email, hashed phone, customer IDs, addresses, order notes, and free-text messages |
 | Custom events | Each custom event has a business reason no official event covers | Map weak custom click events to official events or list as not tracked |
 | Mandatory flags | Required status reflects GA4 rules and business-critical needs | Demote useful-but-optional fields from mandatory to optional |
@@ -97,6 +98,8 @@ From ecommerce examples, keep implementation realism such as core dataLayer inve
 From implementation-template examples, keep cover navigation, compact event inventories, global dataLayer and custom-definition registers, event-level trigger/variable detail, and recette status columns. Fold these into the stable six-sheet workbook instead of creating one tab per event by default.
 
 From brand, healthcare, regulated-product, and professional-resource examples, separate product discovery from transactions. Use `view_item_list`, `select_item`, and `view_item` for product catalog discovery when item data exists, but do not add cart, checkout, purchase, or refund events unless the website actually supports those journeys.
+
+From UA or mixed GAU/GA4 migration examples, keep only business journeys, macro/micro structure, implementation questions, QA habits, and data-availability notes. Discard UA field names, numbered custom dimensions, UA Enhanced Ecommerce commands, and UA property IDs.
 
 Improve recurring issues:
 

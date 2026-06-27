@@ -1,0 +1,547 @@
+{
+  "scope": "Generic parameter proposition library for GA4-first tracking plans, with Piano properties kept separate when Piano is requested.",
+  "policy": [
+    "Use official GA4 parameters and item parameters when the event is official or ecommerce.",
+    "Use custom parameters only when they answer a concrete analysis, segmentation, QA, or optimization need.",
+    "Use lowercase ASCII snake_case for controlled values and remove accents.",
+    "Do not use Universal Analytics fields such as eventCategory, eventAction, eventLabel, nonInteraction, dimension1, or metric1.",
+    "Do not send PII, contact-derived identifiers, free text, account IDs, addresses, or sensitive user input."
+  ],
+  "families": [
+    {
+      "family": "global_page_context",
+      "use_when": "Useful across page, content, form, support, and discovery events when values are stable and low-cardinality.",
+      "parameters": [
+        {
+          "parameter_name": "page_type",
+          "display_name": "Page type",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled lowercase ASCII snake_case, for example home | product_list | product_detail | cart | checkout | confirmation | content | support.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "page_template",
+          "display_name": "Page template",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Stable template key from CMS or frontend routing; avoid page titles or release-specific labels.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "journey_name",
+          "display_name": "Journey name",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled business journey key, for example product_discovery | checkout | lead_form | account_access | support.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "journey_step",
+          "display_name": "Journey step",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled step key, for example step_1 | shipping | payment | confirmation; do not include PII or raw form values.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "language",
+          "display_name": "Language",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "ISO language code when available, for example fr | en | de.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "login_status",
+          "display_name": "Login status",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled values such as logged_in | logged_out | unknown. Do not send account IDs.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        }
+      ]
+    },
+    {
+      "family": "component_and_content",
+      "use_when": "Useful for select_content, navigation/content choices, contact intent, promotion context, and module analysis.",
+      "parameters": [
+        {
+          "parameter_name": "component_type",
+          "display_name": "Component type",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled component category, for example hero | carousel | menu | footer | recommendation | form | locator.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "component_id",
+          "display_name": "Component ID",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Stable CMS or design-system ID; avoid dynamic or campaign-specific labels if high-cardinality.",
+          "registration_default": "custom_dimension_only_if_stable"
+        },
+        {
+          "parameter_name": "component_name",
+          "display_name": "Component name",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Human-readable stable name normalized to lowercase ASCII snake_case when controlled.",
+          "registration_default": "custom_dimension_only_if_stable"
+        },
+        {
+          "parameter_name": "cta_location",
+          "display_name": "CTA location",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled placement, for example header | hero | product_card | sticky_footer | checkout_summary.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "content_type",
+          "display_name": "Content type",
+          "scope": "event",
+          "type": "string",
+          "classification": "ga4_recommended_parameter",
+          "value_rules": "Use with GA4 recommended select_content/share patterns when applicable; controlled values such as article | guide | product_category | faq.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "content_id",
+          "display_name": "Content ID",
+          "scope": "event",
+          "type": "string",
+          "classification": "ga4_recommended_parameter",
+          "value_rules": "Stable non-personal content identifier; avoid raw URLs with sensitive query parameters.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "content_name",
+          "display_name": "Content name",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Readable controlled title or label when useful; monitor cardinality.",
+          "registration_default": "custom_dimension_only_if_low_cardinality"
+        }
+      ]
+    },
+    {
+      "family": "search_listing_filter_sort",
+      "use_when": "Product discovery, site search, locators, listings, filtered results, and sorted lists.",
+      "parameters": [
+        {
+          "parameter_name": "search_term",
+          "display_name": "Search term",
+          "scope": "event",
+          "type": "string",
+          "classification": "ga4_recommended_parameter",
+          "value_rules": "Required for GA4 search; send only safe search terms according to privacy rules and avoid sensitive free text.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "result_count",
+          "display_name": "Result count",
+          "scope": "event",
+          "type": "integer",
+          "classification": "custom_event_parameter",
+          "value_rules": "Integer count after search, filter, or sort is applied.",
+          "registration_default": "custom_dimension_or_metric_when_needed"
+        },
+        {
+          "parameter_name": "filter_category",
+          "display_name": "Filter category",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled filter group, for example price | size | color | brand | availability | location.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "filter_value",
+          "display_name": "Filter value",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled normalized value or range bucket; avoid raw free text and excessive combinations.",
+          "registration_default": "custom_dimension_only_if_cardinality_is_controlled"
+        },
+        {
+          "parameter_name": "sort_type",
+          "display_name": "Sort type",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled values such as relevance | price_asc | price_desc | newest | best_sellers.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "item_list_id",
+          "display_name": "Item list ID",
+          "scope": "event",
+          "type": "string",
+          "classification": "ga4_ecommerce_parameter",
+          "value_rules": "Official GA4 ecommerce list identifier when item-list context exists.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "item_list_name",
+          "display_name": "Item list name",
+          "scope": "event",
+          "type": "string",
+          "classification": "ga4_ecommerce_parameter",
+          "value_rules": "Official GA4 ecommerce list name when item-list context exists.",
+          "registration_default": "not_needed_for_official_parameter"
+        }
+      ]
+    },
+    {
+      "family": "forms_leads_quotes",
+      "use_when": "Forms, lead generation, quote flows, contact requests, appointments, and multi-step tools.",
+      "parameters": [
+        {
+          "parameter_name": "form_name",
+          "display_name": "Form name",
+          "scope": "event",
+          "type": "string",
+          "classification": "ga4_recommended_parameter",
+          "value_rules": "Stable form key; do not include user-entered values.",
+          "registration_default": "not_needed_or_custom_dimension_if_reporting_needs_it"
+        },
+        {
+          "parameter_name": "form_id",
+          "display_name": "Form ID",
+          "scope": "event",
+          "type": "string",
+          "classification": "ga4_recommended_parameter",
+          "value_rules": "Stable form identifier from the DOM, CMS, or app config.",
+          "registration_default": "not_needed_or_custom_dimension_if_reporting_needs_it"
+        },
+        {
+          "parameter_name": "form_step",
+          "display_name": "Form step",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled step key or numeric step label, for example step_1 | personal_info | confirmation. Do not send field values.",
+          "registration_default": "custom_dimension_when_used_for_funnel_reporting"
+        },
+        {
+          "parameter_name": "form_type",
+          "display_name": "Form type",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled values such as contact | quote | callback | appointment | newsletter | account.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "lead_type",
+          "display_name": "Lead type",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled non-personal lead category; avoid qualification details that reveal sensitive information.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "validation_status",
+          "display_name": "Validation status",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled values such as success | error | blocked.",
+          "registration_default": "custom_dimension_when_used_for_diagnostics"
+        },
+        {
+          "parameter_name": "error_type",
+          "display_name": "Error type",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled error family, for example validation | technical | payment | eligibility. Do not send raw error text.",
+          "registration_default": "custom_dimension_when_used_for_diagnostics"
+        },
+        {
+          "parameter_name": "error_code",
+          "display_name": "Error code",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Stable non-personal code approved for analytics; avoid messages and user-entered content.",
+          "registration_default": "custom_dimension_only_if_stable"
+        }
+      ]
+    },
+    {
+      "family": "ga4_ecommerce_event_parameters",
+      "use_when": "GA4 official ecommerce events. Keep event-level and item-level parameters separate.",
+      "parameters": [
+        {
+          "parameter_name": "currency",
+          "display_name": "Currency",
+          "scope": "event",
+          "type": "string",
+          "classification": "ga4_ecommerce_parameter",
+          "value_rules": "ISO 4217 currency code; required when value is sent.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "value",
+          "display_name": "Value",
+          "scope": "event",
+          "type": "number",
+          "classification": "ga4_ecommerce_parameter",
+          "value_rules": "Monetary value for the event, excluding shipping and tax when applicable according to GA4 ecommerce rules.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "transaction_id",
+          "display_name": "Transaction ID",
+          "scope": "event",
+          "type": "string",
+          "classification": "ga4_ecommerce_parameter",
+          "value_rules": "Required for purchase/refund deduplication; use non-personal order identifier.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "coupon",
+          "display_name": "Coupon",
+          "scope": "event",
+          "type": "string",
+          "classification": "ga4_ecommerce_parameter",
+          "value_rules": "Event-level coupon when the coupon applies to the whole event; item-level coupon only when item-specific.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "shipping",
+          "display_name": "Shipping",
+          "scope": "event",
+          "type": "number",
+          "classification": "ga4_ecommerce_parameter",
+          "value_rules": "Shipping cost for transaction events when available.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "tax",
+          "display_name": "Tax",
+          "scope": "event",
+          "type": "number",
+          "classification": "ga4_ecommerce_parameter",
+          "value_rules": "Tax amount for transaction events when available.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "shipping_tier",
+          "display_name": "Shipping tier",
+          "scope": "event",
+          "type": "string",
+          "classification": "ga4_ecommerce_parameter",
+          "value_rules": "Official GA4 shipping option label for add_shipping_info.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "payment_type",
+          "display_name": "Payment type",
+          "scope": "event",
+          "type": "string",
+          "classification": "ga4_ecommerce_parameter",
+          "value_rules": "Official GA4 payment method label for add_payment_info.",
+          "registration_default": "not_needed_for_official_parameter"
+        }
+      ]
+    },
+    {
+      "family": "ga4_ecommerce_item_parameters",
+      "use_when": "GA4 official ecommerce item arrays.",
+      "parameters": [
+        {
+          "parameter_name": "items[].item_id",
+          "display_name": "Item ID",
+          "scope": "item",
+          "type": "string",
+          "classification": "ga4_ecommerce_item_parameter",
+          "value_rules": "Official item identifier. Each item needs item_id or item_name.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "items[].item_name",
+          "display_name": "Item name",
+          "scope": "item",
+          "type": "string",
+          "classification": "ga4_ecommerce_item_parameter",
+          "value_rules": "Official readable item name. Each item needs item_id or item_name.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "items[].item_brand",
+          "display_name": "Item brand",
+          "scope": "item",
+          "type": "string",
+          "classification": "ga4_ecommerce_item_parameter",
+          "value_rules": "Official brand field when available.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "items[].item_category",
+          "display_name": "Item category",
+          "scope": "item",
+          "type": "string",
+          "classification": "ga4_ecommerce_item_parameter",
+          "value_rules": "Official primary category; use item_category2 to item_category5 for hierarchy.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "items[].item_variant",
+          "display_name": "Item variant",
+          "scope": "item",
+          "type": "string",
+          "classification": "ga4_ecommerce_item_parameter",
+          "value_rules": "Official variant field; use for size, color, option, or variant when sufficient before custom item fields.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "items[].price",
+          "display_name": "Item price",
+          "scope": "item",
+          "type": "number",
+          "classification": "ga4_ecommerce_item_parameter",
+          "value_rules": "Official item unit price.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "items[].quantity",
+          "display_name": "Item quantity",
+          "scope": "item",
+          "type": "integer",
+          "classification": "ga4_ecommerce_item_parameter",
+          "value_rules": "Official quantity; send 1 by default when the action concerns one item.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "items[].discount",
+          "display_name": "Item discount",
+          "scope": "item",
+          "type": "number",
+          "classification": "ga4_ecommerce_item_parameter",
+          "value_rules": "Official item-level discount when available.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "items[].index",
+          "display_name": "Item index",
+          "scope": "item",
+          "type": "integer",
+          "classification": "ga4_ecommerce_item_parameter",
+          "value_rules": "Official position in list or placement when available.",
+          "registration_default": "not_needed_for_official_parameter"
+        }
+      ]
+    },
+    {
+      "family": "support_contact_locator",
+      "use_when": "Contact CTAs, store/clinic/agency locators, support content, FAQ, downloads, and chat.",
+      "parameters": [
+        {
+          "parameter_name": "contact_method",
+          "display_name": "Contact method",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled values such as phone | email | chat | form | appointment | store | representative. Do not send the actual contact detail.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "support_topic",
+          "display_name": "Support topic",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled support category, never raw user text.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "download_type",
+          "display_name": "Download type",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled file category, for example catalog | manual | brochure | price_list | guide.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "locator_type",
+          "display_name": "Locator type",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled values such as store | clinic | agency | distributor | professional.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "location_id",
+          "display_name": "Location ID",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Stable non-personal location identifier; do not send precise user address or coordinates unless governed.",
+          "registration_default": "custom_dimension_only_if_low_cardinality"
+        }
+      ]
+    },
+    {
+      "family": "media_and_content_engagement",
+      "use_when": "Video, publisher, editorial, educational, and rich-content engagement.",
+      "parameters": [
+        {
+          "parameter_name": "video_title",
+          "display_name": "Video title",
+          "scope": "event",
+          "type": "string",
+          "classification": "ga4_native_parameter",
+          "value_rules": "Use enhanced-measurement video parameter when available; monitor cardinality.",
+          "registration_default": "not_needed_for_native_parameter"
+        },
+        {
+          "parameter_name": "video_provider",
+          "display_name": "Video provider",
+          "scope": "event",
+          "type": "string",
+          "classification": "ga4_native_parameter",
+          "value_rules": "Use enhanced-measurement provider when available.",
+          "registration_default": "not_needed_for_native_parameter"
+        },
+        {
+          "parameter_name": "video_percent",
+          "display_name": "Video percent",
+          "scope": "event",
+          "type": "integer",
+          "classification": "ga4_native_parameter",
+          "value_rules": "Use enhanced-measurement progress percentage when available.",
+          "registration_default": "not_needed_for_native_parameter"
+        },
+        {
+          "parameter_name": "engagement_type",
+          "display_name": "Engagement type",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled values such as helpful | not_helpful | share | save | print.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        }
+      ]
+    }
+  ],
+  "piano_note": "For Piano Analytics, use Piano Data Model property names from official Piano documentation and keep them separate from GA4 parameters. Do not reuse this GA4 library as Piano property authority."
+}

@@ -145,7 +145,11 @@
         "reason": "Piano native Sales Insights transaction and product events cover the ecommerce scenario."
       }
     ],
-    "custom_event_acceptance": []
+    "custom_event_acceptance": [],
+    "scalability_notes": [
+      "Keep Piano Sales Insights product, cart, and transaction properties separate from GA4 ecommerce item parameters.",
+      "Use stable transaction and product identifiers so future recette can reconcile confirmation and purchased-product events."
+    ]
   },
   "events": [
     {

@@ -185,6 +185,11 @@
         ],
         "registration_notes": "Register cta_location and cta_text only if account-entry performance is needed in GA4 reports or audiences."
       }
+    ],
+    "scalability_notes": [
+      "Reuse the same homepage discovery event families for future home, landing, or campaign-entry pages when the trigger and parameter structure match.",
+      "Keep event_id and qa_id stable so future GTM Preview and network recette can map tests back to the Event Matrix.",
+      "Use controlled lowercase ASCII snake_case values for component, content, and CTA parameters so future French labels remain reportable."
     ]
   },
   "events": [

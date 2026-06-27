@@ -230,7 +230,8 @@
         "page_roles",
         "selected_event_families",
         "excluded_event_families",
-        "custom_event_acceptance"
+        "custom_event_acceptance",
+        "scalability_notes"
       ],
       "properties": {
         "detected_archetypes": {
@@ -265,6 +266,9 @@
           "items": {
             "$ref": "#/$defs/customEventAcceptance"
           }
+        },
+        "scalability_notes": {
+          "$ref": "#/$defs/stringArray"
         }
       }
     },

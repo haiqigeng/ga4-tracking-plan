@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest an improvement to the skill package.
+description: Suggest a web analyst, tracking-plan, template, validation, or QA-readiness improvement.
 title: "[Feature]: "
 labels: ["enhancement"]
 body:
@@ -10,6 +10,17 @@ body:
       description: What tracking-plan workflow should this improve?
     validations:
       required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform scope
+      options:
+        - GA4
+        - Piano Analytics
+        - Cross-platform
+        - Generic workflow
+    validations:
+      required: true
   - type: textarea
     id: proposal
     attributes:
@@ -18,9 +29,16 @@ body:
     validations:
       required: true
   - type: textarea
+    id: analyst_value
+    attributes:
+      label: Analyst value
+      description: What business question, reporting need, implementation clarity, or QA workflow would improve?
+    validations:
+      required: true
+  - type: textarea
     id: ga4_docs
     attributes:
-      label: GA4 documentation
-      description: Link to relevant official GA4 docs if the request concerns standard events or parameters.
+      label: Official documentation
+      description: Link to official GA4 or Piano docs if the request concerns native events, parameters, properties, ecommerce, or SDK behavior.
     validations:
       required: false
