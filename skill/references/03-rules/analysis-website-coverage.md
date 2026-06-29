@@ -4,25 +4,44 @@ Use this reference when the user asks for a whole website, large journey set,
 or greenfield tracking plan. The goal is to avoid missing important journeys
 before event design starts.
 
+## Contents
+
+- [Coverage Source Order](#coverage-source-order)
+- [Coverage Map Requirements](#coverage-map-requirements)
+- [Playwright Decision](#playwright-decision)
+- [Coverage Gate](#coverage-gate)
+
 ## Coverage Source Order
 
-Prefer sources in this order when available:
+Prefer sources in this precision order when available:
 
-1. `sitemap.xml` and sitemap indexes for canonical URL families.
-2. Header navigation, footer navigation, account menu, breadcrumbs, and mobile
-   menu for business-prioritized journeys.
-3. `robots.txt` for sitemap discovery and intentionally blocked areas.
-4. Internal search, category/listing structures, filters, and result pages.
-5. Representative page templates such as homepage, PLP, PDP, cart, checkout,
-   account, contact, support, content, store locator, and confirmation pages.
-6. Browser or Playwright exploration for dynamic menus, checkout, forms,
-   modals, SPA routes, or journeys hidden behind interaction.
-7. Existing client tracking plans, dev specs, recette plans, and event
-   inventories as hints for client-specific criteria.
-8. Analytics, search-console, or backend exports when the user provides them.
+1. User-provided scope, business brief, concerned journeys, URLs, and analysis
+   needs. This is the clearest signal for what the plan must answer.
+2. Existing client tracking plans, templates, naming conventions, dev specs,
+   recette files, event inventories, or approved business documentation. Use
+   these for expected structure and client-specific logic, but challenge legacy
+   or weak measurement choices.
+3. Manual browser exploration by the analyst or agent. Use it to understand
+   real user journeys, visible components, interactions, modals, filters,
+   checkout/account gates, and screenshot needs.
+4. Playwright or rendered-DOM exploration. Use it when dynamic navigation,
+   filters, forms, SPA routes, or interaction-revealed elements matter and the
+   environment can run it safely.
+5. Header navigation, footer navigation, account menu, breadcrumbs, mobile
+   menu, internal search, listing structures, filters, and representative page
+   templates such as homepage, PLP, PDP, cart, checkout, account, contact,
+   support, content, store locator, and confirmation pages.
+6. `sitemap.xml`, sitemap indexes, URL inventories, analytics exports,
+   search-console exports, or backend exports when provided. Use these for
+   canonical URL coverage and completeness checks.
+7. `robots.txt` for sitemap discovery and intentionally blocked areas.
+8. Static HTML discovery helper output from `scripts/discover_site_journeys.py`.
+   Use it as a support inventory, not as final journey truth.
 
 Existing tracking files can reveal historical expectations, but they are not
-the source of truth for website coverage unless the user explicitly says so.
+the source of truth for GA4 design quality. Sitemap, robots, static HTML, and
+exports can reveal missing URL families, but they should not override business
+scope, client priorities, or observed user journeys.
 
 ## Coverage Map Requirements
 
@@ -44,7 +63,7 @@ concise. Do not add a dense visible workbook tab unless the user asks for it;
 summarize assumptions and evidence through Overview, Screenshot Register, and
 QA Cases.
 
-Use `scripts/discover_site_journeys.py` as a first-pass helper when a URL is
+Use `scripts/discover_site_journeys.py` as a support helper when a URL is
 provided and no complete URL inventory exists:
 
 ```powershell
@@ -52,9 +71,9 @@ python scripts/discover_site_journeys.py https://www.example.com/ --output site_
 ```
 
 The helper reads robots, sitemap candidates, static links, forms, and obvious
-URL patterns. Treat its output as input evidence, not final truth. Use
-Playwright or manual browser exploration for dynamic navigation, filters,
-checkout, account, forms, modals, or SPA routes.
+URL patterns. Treat its output as completeness evidence, not final journey
+truth. Use manual browser exploration or Playwright for dynamic navigation,
+filters, checkout, account, forms, modals, or SPA routes.
 
 Use `scripts/discover_site_journeys_playwright.py` when rendered DOM discovery
 is needed and the environment can run Playwright:
@@ -72,15 +91,16 @@ credential-gated or payment-like journeys as `needs_discovery`, `blocked`, or
 
 Use Playwright or equivalent browser exploration when:
 
-- no reliable sitemap or URL list exists for a whole-site request;
 - menus, filters, checkout, forms, account, or SPA routes are dynamic;
 - important journeys require interaction to discover;
+- manual browser exploration is unavailable or needs repeatable rendered-DOM
+  support;
 - the plan will be used as a real delivery and missing journeys would create
   implementation or recette risk.
 
-Playwright is optional when sitemap, navigation, client files, and page
-templates already provide enough coverage for the requested scope. State this
-choice in the coverage map.
+Playwright is optional when the user/client scope, existing client files,
+manual browser exploration, navigation, and page templates already provide
+enough coverage for the requested scope. State this choice in the coverage map.
 
 ## Coverage Gate
 

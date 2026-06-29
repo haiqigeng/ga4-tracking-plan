@@ -25,4 +25,4 @@ signals. Do not commit source workbooks or generated inventories.
 5. Promote a lesson only when it is generic, privacy-safe, official-first,
    human-readable, and useful for future QA.
 
-Use `references/03-rules/corpus-learning-policy.md` for the decision policy.
+Use `references/03-rules/review-corpus-learning-policy.md` for the decision policy.

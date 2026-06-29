@@ -2,136 +2,240 @@
 
 [![Validate skill](https://github.com/HQ-Guillaume/ga4-tracking-plan/actions/workflows/validate-skill.yml/badge.svg)](https://github.com/HQ-Guillaume/ga4-tracking-plan/actions/workflows/validate-skill.yml)
 
-Codex skill package for creating GA4-first tracking plans that are useful in real analytics projects. It helps frame the business context, choose the right events, define clean parameters, and produce a readable XLSX tracking plan. Piano Analytics is supported when explicitly requested.
+A reusable AI skill for creating GA4 tracking plans with the mindset of a real
+web analyst.
 
-## What It Helps With
+The goal is simple: help analytics, marketing, ecommerce, and implementation
+teams decide what a website should measure, why it matters, how it should be
+implemented, and how it can be tested later. The skill is not only an event
+list generator. It starts from business context, journeys, expected actions,
+analysis needs, and future scalability before proposing events and parameters.
 
-- Understand the pages, journeys, coverage sources, business goals, expected actions, and analysis needs before listing events.
-- Choose the correct execution mode: client template adaptation or greenfield best-practice planning.
-- Prefer official GA4 automatic, enhanced-measurement, recommended, and ecommerce events when they fit.
-- Design custom events only when they answer a clear business or diagnostic question.
-- Keep ecommerce events separate and aligned with the official GA4 ecommerce format.
-- Record official verification, collection source, duplicate-risk, and ecommerce parameter profile decisions in structured plans.
-- Keep parameter names, controlled values, and QA IDs stable enough to scale to future pages and journeys.
-- Produce a tracking plan that web analysts, developers, media teams, QA, and stakeholders can read without extra explanation.
+GA4 is the default platform. Piano Analytics is supported only when it is
+requested or clearly in scope. Universal Analytics is treated as legacy context
+only.
 
-## What Is Included
+## Who This Is For
 
-- `skill/` - Codex skill definition and display settings
-- `skill/scripts/` - Runtime scripts bundled with the installed skill
-- `skill/references/01-skill/` - Purpose, users, questions, inputs, outputs, acceptance criteria, and non-goals
-- `skill/references/02-commands/` - Validation, workbook generation, and historical-plan review commands
-- `skill/references/03-rules/` - Event, parameter, privacy, QA, platform, scenario, and judgement rules
-- `skill/assets/ga4_tracking_plan_template.xlsx` - Default XLSX tracking plan template
-- `scripts/create_event_scenario_library.py` - Regenerates GA4 scenario references from official documentation
-- `scripts/generate_tracking_plan_workbook.py` - Generates an XLSX tracking plan from a structured plan file
-- `scripts/validate_tracking_plan.py` - Checks a structured plan file before workbook generation
-- `scripts/export_tracking_plan_csv.py` - Exports a long-format CSV for review or comparison
-- `scripts/discover_site_journeys.py` - Creates a privacy-safe first-pass website discovery JSON from robots, sitemap, static links, forms, and inferred journeys
-- `scripts/discover_site_journeys_playwright.py` - Optional rendered-DOM discovery for dynamic navigation, filters, forms, and SPA routes
-- `scripts/annotate_screenshot.py` - Adds rectangle-only red callouts to screenshots for click, form, CTA, filter, menu, or other interaction evidence
-- `scripts/create_release_package.py` - Builds the public release zip for the reusable skill package
-- `scripts/analyze_tracking_plan_corpus.ps1` - Creates a privacy-safe summary of historical tracking-plan files on Windows
-- `scripts/validate_package.py` - Runs package checks before publishing changes
+- Web analysts who need to create or review a tracking plan.
+- Marketing teams who need reliable acquisition, ecommerce, lead, and campaign
+  measurement.
+- Ecommerce teams who need clean product, cart, checkout, and purchase tracking.
+- Developers who need a clear GTM/dataLayer implementation specification.
+- QA teams who need a plan that can later be tested in GTM Preview, DebugView,
+  and network requests.
+- Agencies, consultants, or AI agents such as Codex, Claude Code, and Gemini
+  that need repeatable tracking-plan rules.
 
-## Skill Focus
+## Problems It Helps Solve
 
-The skill starts from business context, analysis needs, concerned pages or journeys, website coverage evidence, and reusable measurement decisions. GA4 remains the default and strictest supported output path. Piano Analytics is supported through dedicated platform guidance when requested.
+- Tracking plans that list too many events without explaining the business
+  reason.
+- Ecommerce events mixed with custom click events or non-official parameters.
+- Custom events created when a GA4 native, recommended, or ecommerce event would
+  be better.
+- French labels, campaign names, filter values, or CTA text that are not
+  normalized for reporting.
+- Parameters that are hard to understand, too high-cardinality, or risky for
+  privacy.
+- Workbooks that are difficult for humans to read or use in implementation.
+- Missing screenshot evidence, unclear QA expectations, or tracking plans that
+  cannot scale into a later recette workflow.
 
-XLSX is the primary delivery format. The workbook should stay readable: lean overview, clear GTM protocol, practical parameter reference, grouped event matrix, and compact evidence or QA-preparation tabs when useful.
+The skill is designed to answer one practical question:
 
-The skill is intentionally scoped to tracking-plan creation and review. GTM implementation, dataLayer development, server-side tagging, and automated QA are separate follow-up phases.
+> What should this website or journey measure in GA4 so teams can analyse,
+> implement, and test the setup reliably?
 
-The expected behavior is close to a real web analyst:
+## How Plan Creation Works
 
-- understand the business model, journey role, macro conversions, micro conversions, and diagnostic needs before proposing events
-- map whole-site or broad journey coverage from sitemap, navigation, representative templates, existing client files, and browser or Playwright exploration when needed
-- generate Screenshot Register rows from the event draft for every event, then capture evidence, share evidence, or mark skipped/not-needed evidence before final workbook delivery
-- preserve client templates when the mode requires it, while still challenging weak existing events
-- use official GA4 events and parameters when their meaning fits the action
-- justify every custom event with its analysis need, official alternatives, reusable parameters, privacy checks, and QA expectations
-- keep the visible workbook focused on what humans need to build and review the plan
-- design event families, naming, and controlled values that can scale to future pages, journeys, markets, and later QA automation
+The workflow follows the order a web analyst would normally use.
 
-The included GA4 event scenario library helps map common website scenarios to automatic, enhanced-measurement, recommended, ecommerce, and typical custom events with expected parameters and dataLayer patterns.
+1. **Confirm the scope and template**
+   Identify the website, journeys, pages, existing tracking-plan template,
+   naming convention, platform, and expected delivery format.
 
-The package also includes scenario guidance for ecommerce, lead generation, search/listing, account/support/content, SPA routing, website coverage mapping, business-model analysis, website archetype inference, data quality/privacy, official-first review, example comparison, ecommerce parameter policy, Piano Analytics mappings, mainstream analytics tool policy, and QA readiness.
+2. **Understand the business context**
+   Clarify what the page or journey is supposed to do: sell products, generate
+   leads, help users search, support customer service, create accounts, or move
+   users through checkout.
 
-Tracking plans generated with this skill consolidate repeated same-name events whenever the same trigger logic and parameter structure can cover multiple components. Controlled analytics values should use lowercase ASCII `snake_case`, with accents removed, so French labels such as `Nouveautes` become `nouveautes`.
+3. **Map website coverage**
+   For whole-site work, build a coverage map from user scope, existing files,
+   browser or Playwright evidence, navigation, sitemap, robots.txt, and static
+   discovery. Sitemap and robots are support evidence, not the only source of
+   journey importance.
 
-Every generated workbook includes a Screenshot Register row for each event. Accessible events should be marked for capture or linked to shared evidence. Login, credential-gated, account, checkout, payment, or otherwise restricted steps can use `skip_allowed` when approved credentials or a safe test environment are unavailable.
+4. **Choose official-first events**
+   Use GA4 automatic, enhanced-measurement, recommended, and ecommerce events
+   when their meaning fits the action. Ecommerce events keep the official GA4
+   format and stay separate from custom interactions.
 
-Ecommerce events are handled as a stricter case: they should stay in ecommerce-only blocks and use the official GA4 ecommerce parameter names, including required item parameters from Google documentation. GTM/dataLayer wrapper paths such as `ecommerce.items` are implementation mapping details, not replacements for GA4 parameters like `items` and `items[].item_id`.
+5. **Design custom events only when needed**
+   A custom event must answer a clear business or diagnostic question. The plan
+   records official alternatives considered, required parameters, privacy notes,
+   and QA expectations.
 
-## Structured Plan Format
+6. **Define useful parameters**
+   Parameters get human names, descriptions, value rules, examples, custom
+   definition guidance, cardinality risk, and privacy risk. Controlled values
+   should use lowercase ASCII `snake_case`, with French accents removed.
 
-Reusable or QA-ready plans should follow `skill/references/03-rules/tracking-plan-schema.json`. This format keeps the execution context, template policy, website coverage map, measurement brief, strategy, scalability notes, events, parameters, official verification, collection strategy, ecommerce profiles, key events, not-tracked decisions, documentation sources, assumptions, and QA cases in one consistent structure.
+7. **Prepare the XLSX tracking plan**
+   The workbook keeps the overview short, puts links and implementation rules in
+   the GTM protocol tab, keeps parameters readable, and groups events by journey
+   in the Event Matrix.
 
-Example files are included for reference:
+8. **Prepare evidence and QA readiness**
+   The workbook includes a Screenshot Register row for each event. Accessible
+   events can use embedded screenshot evidence. Login, account, checkout,
+   payment, and other credential-gated actions can use `skip_allowed` until a
+   safe test account or environment is available.
 
-- `skill/references/03-rules/generic-tracking-plan-example.json` - GA4-first example
-- `skill/references/03-rules/generic-piano-tracking-plan-example.json` - Piano-only content-page example
-- `skill/references/03-rules/generic-piano-ecommerce-tracking-plan-example.json` - Piano Sales Insights ecommerce example
+## Inputs
 
-These examples use `example.com` and placeholder values only.
+The skill can work from one or more of these sources:
 
-To generate an XLSX workbook from a JSON plan:
+- Website URL or list of URLs.
+- Journey description, page scope, business goals, expected actions, and
+  analysis needs.
+- Existing tracking plan, workbook template, dev specification, naming
+  convention, or event inventory.
+- Sitemap, robots.txt, navigation evidence, screenshots, or browser findings.
+- GA4, GTM, dataLayer, Piano Analytics, or QA context when available.
 
-```text
-python scripts/generate_tracking_plan_workbook.py skill/references/03-rules/generic-tracking-plan-example.json --output generated_tracking_plan.xlsx
+When no client template or naming convention exists, the skill uses a
+greenfield best-practice template.
+
+## Outputs
+
+Depending on the request, the skill can produce:
+
+- A GA4-first XLSX tracking plan.
+- A structured JSON plan that can be validated and reused for future QA
+  automation.
+- A Parameter Reference with variable names, display names, value rules,
+  examples, custom definition guidance, and privacy notes.
+- A journey-grouped Event Matrix for page, ecommerce, form, account, search,
+  lead, support, and interaction events.
+- A Screenshot Register with embedded, row-readable screenshot previews when
+  evidence is available.
+- QA Cases for later recette in GTM Preview, GA4 DebugView, and network checks.
+- CSV exports for review or comparison.
+
+## What It Will Not Do
+
+- It will not create GTM tags or publish GTM versions unless a separate
+  implementation phase is explicitly requested.
+- It will not treat Universal Analytics as a valid target model for new GA4
+  plans.
+- It will not copy client-specific tracking plans, screenshots, domains, or
+  test evidence into the reusable skill package.
+- It will not send raw PII, passwords, payment details, customer identifiers,
+  message bodies, addresses, emails, or phone numbers as normal GA4 event
+  parameters.
+- It will not create one custom event for every link, card, or button when one
+  reusable event with controlled values is clearer.
+- It will not force screenshots for login, checkout, payment, or other gated
+  actions when safe credentials or a test environment are unavailable.
+
+## Repository Structure
+
+- `skill/SKILL.md`: agent-facing workflow and routing instructions.
+- `skill/agents/openai.yaml`: Codex skill metadata and default prompt.
+- `skill/assets/`: default XLSX workbook template.
+- `skill/references/01-skill/`: product purpose, users, inputs, outputs,
+  acceptance criteria, and non-goals.
+- `skill/references/02-commands/`: validation, workbook generation, and corpus
+  review commands.
+- `skill/references/03-rules/`: scenario rules, GA4 event libraries, ecommerce
+  policy, parameter library, privacy rules, QA readiness, Piano references, and
+  schema examples.
+- `skill/scripts/`: runtime helpers used by the installed skill.
+- `scripts/`: root wrappers and repository maintenance scripts.
+- `tests/`: regression tests for helper scripts and wrappers.
+- `.github/`: validation, release packaging, issue templates, and pull request
+  templates.
+
+Rule files stay flat on purpose. Prefixes describe their role:
+`analysis-*`, `decision-*`, `scenario-*`, `policy-*`, `library-*`,
+`platform-*`, `review-*`, `schema-*`, `example-*`, and `qa-*`.
+
+## Useful Commands
+
+Run from the repository root.
+
+Validate a structured tracking plan:
+
+```powershell
+python scripts/validate_tracking_plan.py skill/references/03-rules/example-ga4-tracking-plan.json
 ```
 
-To validate a structured plan and export a long-format CSV:
+Generate an XLSX workbook:
 
-```text
-python scripts/validate_tracking_plan.py skill/references/03-rules/generic-tracking-plan-example.json
-python scripts/export_tracking_plan_csv.py skill/references/03-rules/generic-tracking-plan-example.json --output generated_tracking_plan.csv
+```powershell
+python scripts/generate_tracking_plan_workbook.py skill/references/03-rules/example-ga4-tracking-plan.json --output generated_tracking_plan.xlsx
 ```
 
-To create a first-pass website discovery JSON:
+If a `screenshots/` folder exists next to the JSON plan, the workbook generator
+automatically embeds standardized screenshot previews in the Screenshot
+Register. You can also pass a folder explicitly:
 
-```text
+```powershell
+python scripts/generate_tracking_plan_workbook.py plan.json --output plan.xlsx --screenshot-dir screenshots
+```
+
+Export a CSV review file:
+
+```powershell
+python scripts/export_tracking_plan_csv.py skill/references/03-rules/example-ga4-tracking-plan.json --output generated_tracking_plan.csv
+```
+
+Create a first-pass website discovery file:
+
+```powershell
 python scripts/discover_site_journeys.py https://www.example.com/ --output site_discovery.json
 ```
 
-For rendered-DOM discovery on dynamic websites, install Playwright only when needed:
+Use rendered-DOM discovery only when dynamic menus, filters, forms, or SPA
+routes matter:
 
-```text
+```powershell
 python -m pip install playwright
 python -m playwright install chromium
 python scripts/discover_site_journeys_playwright.py https://www.example.com/ --output site_discovery_rendered.json
 ```
 
-To annotate an interaction screenshot before embedding it in a workbook:
+Annotate an interaction screenshot before workbook generation:
 
-```text
+```powershell
 python scripts/annotate_screenshot.py source.png annotated.png --box x1,y1,x2,y2
 ```
 
-The validator checks the structure, event classifications, GA4 ecommerce rules, parameter value rules, privacy risks, custom-event justification, official documentation coverage, and QA links.
+Create a privacy-safe inventory of historical tracking plans:
 
-When learning from a folder of historical tracking plans on Windows, generate a privacy-safe inventory outside the repo:
-
-```text
+```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/analyze_tracking_plan_corpus.ps1 -InputFolder "C:\path\to\tracking-plans" -OutputJson "C:\path\to\inventory.json"
 ```
 
-The inventory keeps only counts, sheet names, dimensions, and platform/scenario signals. Do not commit source workbooks or generated inventories.
+Do not commit generated inventories or client source files.
 
-Generated client plans, screenshots, GTM previews, request exports, and test evidence should stay outside this generic package unless they are deliberately anonymized examples.
+## Safety And Privacy
 
-## Maintenance Checklist
+This repository should only contain reusable skill instructions, generic
+scripts, templates, schema examples, and public documentation.
 
-- Keep `skill/SKILL.md` under 500 lines and move detailed scenario logic into `skill/references/03-rules/`.
-- Preserve the numbered reference structure: `01-skill` for product orientation, `02-commands` for repeatable checks and generation, and `03-rules` for workload rules.
-- Keep references generic, privacy-safe, and platform-separated; do not copy client workbook rows into the skill.
-- Validate the package with `ruff check .`, `python -m compileall -q scripts skill/scripts tests`, `python -m unittest discover -s tests`, and `python scripts/validate_package.py`.
-- Treat Universal Analytics examples as migration context only; do not promote UA fields or event models into GA4 plans.
-- Use `scripts/analyze_tracking_plan_corpus.ps1` only for privacy-safe inventory. Generated inventories belong outside the repository.
+Do not commit client workbooks, generated tracking plans, screenshots, GTM
+exports, request logs, container IDs, domains, emails, phone numbers, addresses,
+payment details, credentials, API keys, or temporary reports.
+
+Generated deliverables should stay outside the repository unless they are
+generic examples using placeholder domains such as `example.com`.
 
 ## Install Locally
 
-Copy the `skill/` folder into your local Codex skills directory and rename it to `ga4-tracking-plan`:
+Copy the `skill/` folder into your local Codex skills directory and rename it
+to `ga4-tracking-plan`:
 
 ```text
 %USERPROFILE%\.codex\skills\ga4-tracking-plan
@@ -144,37 +248,58 @@ SKILL.md
 agents/openai.yaml
 assets/ga4_tracking_plan_template.xlsx
 references/
-references/01-skill/
-references/02-commands/
-references/03-rules/
 scripts/
 ```
 
 ## Example Prompt
 
 ```text
-Use $ga4-tracking-plan to create a GA4 tracking plan for these pages and journeys.
+Use $ga4-tracking-plan to create a GA4 tracking plan for this ecommerce website.
 ```
 
-## Release Package
+## Validate A Release
 
-The release package should contain the reusable `skill/` folder, `requirements.txt`, `README.md`, and `LICENSE`. Site-specific tracking plans, screenshots, test evidence, and confidential files should never be committed or attached to releases.
-
-Build a local package with:
-
-```text
-python scripts/create_release_package.py --version vX.Y.Z
-```
-
-Published GitHub releases build and upload this zip automatically through `.github/workflows/release-package.yml`.
-
-## Validate Locally
-
-```text
+```powershell
 python -m pip install -r requirements.txt
 python -m pip install ruff
 ruff check .
 python -m compileall -q scripts skill/scripts tests
 python -m unittest discover -s tests
 python scripts/validate_package.py
+git diff --check
+git status --short
 ```
+
+Build a local release package:
+
+```powershell
+python scripts/create_release_package.py --version vX.Y.Z
+```
+
+The release package contains the reusable `skill/` folder, `requirements.txt`,
+`README.md`, and `LICENSE`. Site-specific files should not be included.
+
+## Maintenance Checklist
+
+- Keep the README written for web analysts and marketing teams, not only AI
+  agents.
+- Keep `skill/SKILL.md` concise and move detailed rules into
+  `skill/references/03-rules/`.
+- Keep the reference structure stable: `01-skill` for orientation,
+  `02-commands` for repeatable checks, and `03-rules` for workload rules.
+- Keep examples generic and privacy-safe.
+- Keep GA4, Piano Analytics, and legacy Universal Analytics boundaries clear.
+- Run `validate_package.py` before every release.
+- Run `create_release_package.py` or the GitHub release workflow before
+  publishing.
+
+## Versioning
+
+Releases use semantic versioning while the skill is actively evolving:
+
+- Minor versions for visible workflow, workbook, schema, or library
+  improvements.
+- Patch versions for bug fixes, validation fixes, and documentation cleanup.
+
+Release notes should be written for web analysts and marketing stakeholders:
+what improved, why it matters, how it was validated, and what limits remain.

@@ -3,11 +3,13 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from tempfile import TemporaryDirectory
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
 from openpyxl import Workbook
+from openpyxl.drawing.image import Image as XLImage
 from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter, quote_sheetname
@@ -57,6 +59,10 @@ CENTER = Alignment(wrap_text=True, vertical="center", horizontal="center")
 EVENT_SLOT_COUNT = 4
 STATUS_OPTIONS = "OK,KO,Cannot test"
 SCREENSHOT_STATUS_OPTIONS = "capture_required,captured,shared_evidence,skip_allowed,not_needed,blocked"
+SCREENSHOT_PREVIEW_WIDTH = 260
+SCREENSHOT_PREVIEW_HEIGHT = 160
+SCREENSHOT_ROW_HEIGHT = 132
+SCREENSHOT_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
 GATED_SCREENSHOT_TERMS = {
     "account",
     "authentication",
@@ -81,8 +87,14 @@ def matrix_value_columns() -> list[int]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate a human analytics tracking-plan workbook from the canonical JSON contract.")
-    parser.add_argument("plan", type=Path, help="Path to a JSON tracking plan using tracking-plan-schema.json.")
+    parser.add_argument("plan", type=Path, help="Path to a JSON tracking plan using schema-tracking-plan.json.")
     parser.add_argument("--output", "-o", type=Path, required=True, help="Output XLSX path.")
+    parser.add_argument(
+        "--screenshot-dir",
+        type=Path,
+        default=None,
+        help="Optional screenshot evidence folder. Defaults to a screenshots folder next to the plan JSON when present.",
+    )
     return parser.parse_args()
 
 
@@ -231,7 +243,7 @@ def compact_json(value: Any) -> str:
 def event_requires_gated_access(event: dict[str, Any]) -> bool:
     text = " ".join(
         str(event.get(key, ""))
-        for key in ["page_type", "page_or_component", "trigger", "page_url_pattern", "implementation_notes"]
+        for key in ["page_type", "page_or_component", "trigger", "page_url_pattern"]
     ).lower()
     return any(term in text for term in GATED_SCREENSHOT_TERMS)
 
@@ -584,12 +596,132 @@ def build_event_matrix(wb: Workbook, plan: dict[str, Any]) -> None:
     style_event_matrix_rows(ws)
 
 
-def build_screenshot_register(wb: Workbook, plan: dict[str, Any]) -> None:
+def screenshot_files(screenshot_dir: Path | None) -> list[Path]:
+    if not screenshot_dir or not screenshot_dir.exists():
+        return []
+    return sorted(
+        path
+        for path in screenshot_dir.iterdir()
+        if path.is_file() and path.suffix.lower() in SCREENSHOT_IMAGE_EXTENSIONS
+    )
+
+
+def screenshot_evidence_by_journey(plan: dict[str, Any], available_files: list[Path]) -> dict[str, list[Path]]:
+    by_name = {path.name.lower(): path for path in available_files}
+    evidence: dict[str, list[Path]] = defaultdict(list)
+    coverage = plan.get("website_coverage_map", {})
+    for journey in coverage.get("journeys_covered", []):
+        if not isinstance(journey, dict):
+            continue
+        journey_id = str(journey.get("journey_id", ""))
+        for item in journey.get("evidence", []):
+            item_name = Path(str(item)).name.lower()
+            if item_name in by_name:
+                evidence[journey_id].append(by_name[item_name])
+    return evidence
+
+
+def screenshot_keywords_for_event(event: dict[str, Any]) -> list[str]:
+    event_name = str(event.get("event_name", "")).lower()
+    journey_id = str(event.get("journey_id", "")).lower()
+    page_type = str(event.get("page_type", "")).lower()
+    component = str(event.get("page_or_component", "")).lower()
+    text = " ".join([event_name, journey_id, page_type, component])
+
+    if any(term in text for term in ["checkout", "payment", "purchase", "cart", "panier", "commander"]):
+        return ["cart_checkout", "checkout", "cart", "panier", "commander"]
+    if any(term in text for term in ["login", "sign_up", "account", "authentication", "espaceclient"]):
+        return ["login", "account", "espaceclient"]
+    if any(term in text for term in ["contact", "support", "faq"]):
+        return ["contact", "support", "faq"]
+    if any(term in text for term in ["catalog", "catalogue", "direct_order"]):
+        return ["catalog", "catalogue", "contact", "support"]
+    if any(term in text for term in ["product_detail", "view_item", "add_to_cart", "pdp"]):
+        return ["product_detail_valid", "product_detail", "pdp", "product"]
+    if any(term in text for term in ["listing", "search", "filter", "sort", "select_item", "item_list", "plp"]):
+        return ["listing", "soldes", "plp", "search"]
+    if any(term in text for term in ["home", "homepage", "promotion", "select_content", "navigation"]):
+        return ["home", "homepage", "listing"]
+    if any(term in text for term in ["site_context", "all_pages", "page_view", "scroll", "rendered page"]):
+        return ["home", "homepage", "listing"]
+    return []
+
+
+def resolve_screenshot_for_event(
+    event: dict[str, Any],
+    available_files: list[Path],
+    evidence_by_journey: dict[str, list[Path]],
+) -> Path | None:
+    if not available_files:
+        return None
+
+    for keyword in screenshot_keywords_for_event(event):
+        for path in available_files:
+            if keyword in path.stem.lower():
+                return path
+
+    for path in evidence_by_journey.get(str(event.get("journey_id", "")), []):
+        return path
+
+    return None
+
+
+def create_screenshot_preview(source: Path, destination: Path) -> Path | None:
+    try:
+        from PIL import Image as PILImage
+        from PIL import ImageDraw, ImageOps
+    except ImportError:
+        return None
+
+    with PILImage.open(source) as image:
+        image = ImageOps.exif_transpose(image).convert("RGB")
+        crop_height = min(image.height, max(1, int(image.width * SCREENSHOT_PREVIEW_HEIGHT / SCREENSHOT_PREVIEW_WIDTH)))
+        crop_box = (0, 0, image.width, crop_height)
+        cropped = image.crop(crop_box)
+        cropped.thumbnail((SCREENSHOT_PREVIEW_WIDTH, SCREENSHOT_PREVIEW_HEIGHT), PILImage.Resampling.LANCZOS)
+
+        canvas = PILImage.new("RGB", (SCREENSHOT_PREVIEW_WIDTH, SCREENSHOT_PREVIEW_HEIGHT), "white")
+        offset = ((SCREENSHOT_PREVIEW_WIDTH - cropped.width) // 2, (SCREENSHOT_PREVIEW_HEIGHT - cropped.height) // 2)
+        canvas.paste(cropped, offset)
+        draw = ImageDraw.Draw(canvas)
+        draw.rectangle((0, 0, SCREENSHOT_PREVIEW_WIDTH - 1, SCREENSHOT_PREVIEW_HEIGHT - 1), outline="#BBC8D6", width=1)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        canvas.save(destination, "PNG", optimize=True)
+        return destination
+
+
+def screenshot_status(event: dict[str, Any], screenshot_path: Path | None) -> str:
+    if event_requires_gated_access(event):
+        return "skip_allowed"
+    if screenshot_path:
+        return "shared_evidence"
+    return "capture_required"
+
+
+def screenshot_notes(event: dict[str, Any], screenshot_path: Path | None) -> str:
+    if screenshot_path and event_requires_gated_access(event):
+        return "Representative page evidence embedded; action capture can be skipped until approved test access is available."
+    if screenshot_path:
+        return "Representative screenshot preview embedded. Capture a more precise action screenshot during QA if needed."
+    if event_requires_gated_access(event):
+        return "Skip is allowed when approved credentials or a safe test environment are unavailable."
+    return "Capture during coverage or later QA when the journey is accessible."
+
+
+def build_screenshot_register(
+    wb: Workbook,
+    plan: dict[str, Any],
+    screenshot_dir: Path | None = None,
+    preview_dir: Path | None = None,
+) -> None:
     ws = wb.create_sheet("04 Screenshot Register")
-    title(ws, "Screenshot Register", "Capture requirements and visual evidence for later recette.", 8)
-    ws.append(["Journey", "Event", "Page / component", "URL / route", "Capture objective", "Automation cue", "Status", "Notes"])
-    header(ws, 3, 8)
+    title(ws, "Screenshot Register", "Capture requirements and visual evidence for later recette.", 9)
+    ws.append(["Journey", "Event", "Screenshot preview", "Page / component", "URL / route", "Capture objective", "Automation cue", "Status", "Notes"])
+    header(ws, 3, 9)
     journey_names = {brief["journey_id"]: brief["journey_name"] for brief in plan["measurement_brief"]}
+    available_files = screenshot_files(screenshot_dir)
+    evidence_by_journey = screenshot_evidence_by_journey(plan, available_files)
+    preview_dir = preview_dir or (screenshot_dir / "_workbook_previews" if screenshot_dir else None)
 
     def automation_cue(event: dict[str, Any]) -> str:
         classification = event.get("classification", "")
@@ -604,41 +736,48 @@ def build_screenshot_register(wb: Workbook, plan: dict[str, Any]) -> None:
             return "Open the route, perform the trigger, and capture the component state."
         return "Open the route and capture the rendered page state."
 
-    def screenshot_status(event: dict[str, Any]) -> str:
-        if event_requires_gated_access(event):
-            return "skip_allowed"
-        return "capture_required"
-
-    def screenshot_notes(event: dict[str, Any]) -> str:
-        if event_requires_gated_access(event):
-            return "Skip is allowed when approved credentials or a safe test environment are unavailable."
-        return "Capture during coverage or later QA when the journey is accessible."
-
+    image_rows: list[tuple[int, Path]] = []
     for event in plan["events"]:
+        screenshot_path = resolve_screenshot_for_event(event, available_files, evidence_by_journey)
+        row_number = ws.max_row + 1
         ws.append([
             journey_names.get(event["journey_id"], event["journey_id"]),
             event["event_name"],
+            "",
             event["page_or_component"],
             event["page_url_pattern"],
             f"{event['page_or_component']} - {event['trigger']}",
             automation_cue(event),
-            screenshot_status(event),
-            screenshot_notes(event),
+            screenshot_status(event, screenshot_path),
+            screenshot_notes(event, screenshot_path),
         ])
+        if screenshot_path and preview_dir:
+            image_rows.append((row_number, screenshot_path))
     for row in range(4, ws.max_row + 1):
-        ws.row_dimensions[row].height = 56
+        ws.row_dimensions[row].height = SCREENSHOT_ROW_HEIGHT
+    for row_number, screenshot_path in image_rows:
+        preview_path = create_screenshot_preview(
+            screenshot_path,
+            preview_dir / f"{row_number:03d}_{screenshot_path.stem}.png",
+        )
+        if not preview_path:
+            continue
+        image = XLImage(str(preview_path))
+        image.width = SCREENSHOT_PREVIEW_WIDTH
+        image.height = SCREENSHOT_PREVIEW_HEIGHT
+        ws.add_image(image, f"C{row_number}")
     status_dv = DataValidation(type="list", formula1=f'"{SCREENSHOT_STATUS_OPTIONS}"', allow_blank=True)
     ws.add_data_validation(status_dv)
-    status_dv.add(f"G4:G{ws.max_row + 200}")
-    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"captured"'], fill=PatternFill("solid", fgColor=GREEN)))
-    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"shared_evidence"'], fill=PatternFill("solid", fgColor=TEAL_LIGHT)))
-    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"skip_allowed"'], fill=PatternFill("solid", fgColor=NOT_AVAILABLE_FILL)))
-    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"capture_required"'], fill=PatternFill("solid", fgColor=YELLOW)))
-    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"blocked"'], fill=PatternFill("solid", fgColor=RED)))
-    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"not_needed"'], fill=PatternFill("solid", fgColor=GRAY)))
-    set_widths(ws, [24, 28, 24, 34, 36, 40, 18, 36])
+    status_dv.add(f"H4:H{ws.max_row + 200}")
+    ws.conditional_formatting.add(f"H4:H{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"captured"'], fill=PatternFill("solid", fgColor=GREEN)))
+    ws.conditional_formatting.add(f"H4:H{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"shared_evidence"'], fill=PatternFill("solid", fgColor=TEAL_LIGHT)))
+    ws.conditional_formatting.add(f"H4:H{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"skip_allowed"'], fill=PatternFill("solid", fgColor=NOT_AVAILABLE_FILL)))
+    ws.conditional_formatting.add(f"H4:H{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"capture_required"'], fill=PatternFill("solid", fgColor=YELLOW)))
+    ws.conditional_formatting.add(f"H4:H{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"blocked"'], fill=PatternFill("solid", fgColor=RED)))
+    ws.conditional_formatting.add(f"H4:H{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"not_needed"'], fill=PatternFill("solid", fgColor=GRAY)))
+    set_widths(ws, [24, 24, 38, 24, 34, 40, 38, 18, 40])
     ws.freeze_panes = "A4"
-    ws.auto_filter.ref = f"A3:H{ws.max_row}"
+    ws.auto_filter.ref = f"A3:I{ws.max_row}"
     style_cells(ws)
 
 
@@ -684,14 +823,18 @@ def build_qa_cases(wb: Workbook, plan: dict[str, Any]) -> None:
     style_cells(ws)
 
 
-def build_workbook(plan: dict[str, Any]) -> Workbook:
+def build_workbook(
+    plan: dict[str, Any],
+    screenshot_dir: Path | None = None,
+    preview_dir: Path | None = None,
+) -> Workbook:
     wb = Workbook()
     wb.remove(wb.active)
     build_overview(wb, plan)
     build_gtm_protocol(wb, plan)
     build_parameter_reference(wb, plan)
     build_event_matrix(wb, plan)
-    build_screenshot_register(wb, plan)
+    build_screenshot_register(wb, plan, screenshot_dir=screenshot_dir, preview_dir=preview_dir)
     build_qa_cases(wb, plan)
     apply_workbook_settings(wb)
     return wb
@@ -706,8 +849,14 @@ def main() -> int:
     if any(issue.severity == "error" for issue in issues):
         return 1
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    workbook = build_workbook(plan)
-    workbook.save(args.output)
+    screenshot_dir = args.screenshot_dir
+    if screenshot_dir is None:
+        default_screenshot_dir = args.plan.parent / "screenshots"
+        if default_screenshot_dir.exists():
+            screenshot_dir = default_screenshot_dir
+    with TemporaryDirectory(prefix="tracking_plan_screenshot_previews_") as tmp_dir:
+        workbook = build_workbook(plan, screenshot_dir=screenshot_dir, preview_dir=Path(tmp_dir))
+        workbook.save(args.output)
     print(args.output)
     return 0
 

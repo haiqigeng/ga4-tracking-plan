@@ -35,15 +35,16 @@ privacy-sensitive field names, and QA links.
 
 ## Website Discovery Helper
 
-Run when a broad website scope needs first-pass URL and journey evidence:
+Run when a broad website scope needs support URL and journey evidence:
 
 ```powershell
 python scripts/discover_site_journeys.py https://www.example.com/ --output path\to\site_discovery.json
 ```
 
-The output is a privacy-safe discovery aid. It does not replace Playwright or
-manual browser exploration for dynamic checkout, filters, account, forms,
-modals, or SPA routes.
+The output is a privacy-safe completeness aid. It does not replace the
+user/client scope, existing client files, manual browser exploration, or
+Playwright for dynamic checkout, filters, account, forms, modals, or SPA
+routes.
 
 Use rendered-DOM discovery when dynamic navigation, filters, forms, or SPA
 routes materially affect whole-site coverage:

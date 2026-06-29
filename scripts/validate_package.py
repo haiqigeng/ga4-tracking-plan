@@ -28,36 +28,39 @@ REQUIRED_REFERENCE_FILES = [
     COMMANDS / "validation-commands.md",
     COMMANDS / "workbook-generation.md",
     COMMANDS / "corpus-review-workflow.md",
-    RULES / "ga4-event-scenario-library.md",
-    RULES / "ga4-event-scenario-library.json",
-    RULES / "official-ga4-recommended-events.json",
-    RULES / "mainstream-analytics-tool-policy.md",
-    RULES / "business-scenario-analysis.md",
-    RULES / "website-archetype-decision-matrix.md",
-    RULES / "measurement-coherence-review.md",
-    RULES / "website-coverage-mapping.md",
-    RULES / "corpus-learning-policy.md",
-    RULES / "custom-event-decision-matrix.md",
-    RULES / "parameter-proposition-library.json",
-    RULES / "piano-analytics-reference.md",
-    RULES / "piano-official-events.json",
-    RULES / "tracking-plan-schema.json",
-    RULES / "generic-tracking-plan-example.json",
-    RULES / "generic-piano-tracking-plan-example.json",
-    RULES / "generic-piano-ecommerce-tracking-plan-example.json",
+    RULES / "library-ga4-event-scenarios.md",
+    RULES / "library-ga4-event-scenarios.json",
+    RULES / "library-ga4-recommended-events.json",
+    RULES / "policy-platform-boundaries.md",
+    RULES / "analysis-business-scenarios.md",
+    RULES / "analysis-website-archetypes.md",
+    RULES / "analysis-measurement-coherence.md",
+    RULES / "analysis-website-coverage.md",
+    RULES / "review-corpus-learning-policy.md",
+    RULES / "decision-custom-events.md",
+    RULES / "library-parameters.json",
+    RULES / "platform-piano-reference.md",
+    RULES / "platform-piano-official-events.json",
+    RULES / "schema-tracking-plan.json",
+    RULES / "example-ga4-tracking-plan.json",
+    RULES / "example-piano-tracking-plan.json",
+    RULES / "example-piano-ecommerce-tracking-plan.json",
     RULES / "scenario-ecommerce.md",
     RULES / "scenario-lead-generation.md",
     RULES / "scenario-search-listing.md",
     RULES / "scenario-account-support-content.md",
     RULES / "scenario-spa-routing.md",
-    RULES / "data-quality-privacy.md",
+    RULES / "policy-data-quality-privacy.md",
     RULES / "qa-readiness.md",
-    RULES / "official-first-review.md",
-    RULES / "example-comparison-contract.md",
-    RULES / "ga4-ecommerce-parameter-policy.md",
+    RULES / "review-official-first.md",
+    RULES / "review-example-comparison.md",
+    RULES / "policy-ga4-ecommerce-parameters.md",
 ]
 REQUIRED_SKILL_SCRIPTS = [
     SKILL / "scripts" / "ecommerce_matrix.py",
+    SKILL / "scripts" / "tracking_plan_validation_catalogs.py",
+    SKILL / "scripts" / "tracking_plan_validation_events.py",
+    SKILL / "scripts" / "tracking_plan_validation_model.py",
     SKILL / "scripts" / "generate_tracking_plan_workbook.py",
     SKILL / "scripts" / "validate_tracking_plan.py",
     SKILL / "scripts" / "export_tracking_plan_csv.py",
@@ -237,33 +240,33 @@ def check_skill_resource_links() -> None:
         "references/02-commands/validation-commands.md",
         "references/02-commands/workbook-generation.md",
         "references/02-commands/corpus-review-workflow.md",
-        "references/03-rules/ga4-event-scenario-library.md",
-        "references/03-rules/ga4-event-scenario-library.json",
-        "references/03-rules/official-ga4-recommended-events.json",
-        "references/03-rules/mainstream-analytics-tool-policy.md",
-        "references/03-rules/business-scenario-analysis.md",
-        "references/03-rules/website-archetype-decision-matrix.md",
-        "references/03-rules/measurement-coherence-review.md",
-        "references/03-rules/website-coverage-mapping.md",
-        "references/03-rules/corpus-learning-policy.md",
-        "references/03-rules/custom-event-decision-matrix.md",
-        "references/03-rules/parameter-proposition-library.json",
-        "references/03-rules/piano-analytics-reference.md",
-        "references/03-rules/piano-official-events.json",
-        "references/03-rules/tracking-plan-schema.json",
-        "references/03-rules/generic-tracking-plan-example.json",
-        "references/03-rules/generic-piano-tracking-plan-example.json",
-        "references/03-rules/generic-piano-ecommerce-tracking-plan-example.json",
+        "references/03-rules/library-ga4-event-scenarios.md",
+        "references/03-rules/library-ga4-event-scenarios.json",
+        "references/03-rules/library-ga4-recommended-events.json",
+        "references/03-rules/policy-platform-boundaries.md",
+        "references/03-rules/analysis-business-scenarios.md",
+        "references/03-rules/analysis-website-archetypes.md",
+        "references/03-rules/analysis-measurement-coherence.md",
+        "references/03-rules/analysis-website-coverage.md",
+        "references/03-rules/review-corpus-learning-policy.md",
+        "references/03-rules/decision-custom-events.md",
+        "references/03-rules/library-parameters.json",
+        "references/03-rules/platform-piano-reference.md",
+        "references/03-rules/platform-piano-official-events.json",
+        "references/03-rules/schema-tracking-plan.json",
+        "references/03-rules/example-ga4-tracking-plan.json",
+        "references/03-rules/example-piano-tracking-plan.json",
+        "references/03-rules/example-piano-ecommerce-tracking-plan.json",
         "references/03-rules/scenario-ecommerce.md",
         "references/03-rules/scenario-lead-generation.md",
         "references/03-rules/scenario-search-listing.md",
         "references/03-rules/scenario-account-support-content.md",
         "references/03-rules/scenario-spa-routing.md",
-        "references/03-rules/data-quality-privacy.md",
+        "references/03-rules/policy-data-quality-privacy.md",
         "references/03-rules/qa-readiness.md",
-        "references/03-rules/official-first-review.md",
-        "references/03-rules/example-comparison-contract.md",
-        "references/03-rules/ga4-ecommerce-parameter-policy.md",
+        "references/03-rules/review-official-first.md",
+        "references/03-rules/review-example-comparison.md",
+        "references/03-rules/policy-ga4-ecommerce-parameters.md",
         "scripts/ecommerce_matrix.py",
         "scripts/generate_tracking_plan_workbook.py",
         "scripts/validate_tracking_plan.py",
@@ -292,7 +295,7 @@ def load_json(path: Path):
 
 
 def check_mainstream_analytics_references() -> None:
-    piano_text = read_text(RULES / "piano-analytics-reference.md")
+    piano_text = read_text(RULES / "platform-piano-reference.md")
     for expected in [
         "page.display",
         "click.action",
@@ -311,7 +314,7 @@ def check_mainstream_analytics_references() -> None:
         if expected not in piano_text:
             fail(f"Piano Analytics reference is missing {expected}")
 
-    piano_catalog = load_json(RULES / "piano-official-events.json")
+    piano_catalog = load_json(RULES / "platform-piano-official-events.json")
     events = {
         event.get("event")
         for family in piano_catalog.get("event_families", [])
@@ -344,27 +347,27 @@ def check_mainstream_analytics_references() -> None:
         if expected not in scenarios:
             fail(f"Piano official events catalog is missing scenario mapping {expected}")
 
-    policy_text = read_text(RULES / "mainstream-analytics-tool-policy.md")
+    policy_text = read_text(RULES / "policy-platform-boundaries.md")
     for expected in ["business action", "platform mappings", "GA4", "Piano Analytics"]:
         if expected not in policy_text:
             fail(f"Mainstream analytics policy is missing {expected}")
 
-    business_text = read_text(RULES / "business-scenario-analysis.md")
+    business_text = read_text(RULES / "analysis-business-scenarios.md")
     for expected in ["macro conversions", "micro conversions", "Diagnostic events", "Custom Event Design Checklist", "Event Consolidation", "Approval Readiness"]:
         if expected not in business_text:
             fail(f"Business scenario analysis reference is missing {expected}")
 
-    corpus_text = read_text(RULES / "corpus-learning-policy.md")
+    corpus_text = read_text(RULES / "review-corpus-learning-policy.md")
     for expected in ["Universal Analytics is sunset", "Legacy context only", "Do not copy client names", "Promotion Criteria"]:
         if expected not in corpus_text:
             fail(f"Corpus learning policy is missing {expected}")
 
-    custom_decision_text = read_text(RULES / "custom-event-decision-matrix.md")
+    custom_decision_text = read_text(RULES / "decision-custom-events.md")
     for expected in ["filter_apply", "sort_apply", "select_item", "view_item", "view_item_list", "eventCategory"]:
         if expected not in custom_decision_text:
             fail(f"Custom event decision matrix is missing {expected}")
 
-    parameter_library = load_json(RULES / "parameter-proposition-library.json")
+    parameter_library = load_json(RULES / "library-parameters.json")
     parameter_families = {family.get("family") for family in parameter_library.get("families", [])}
     for expected in [
         "global_page_context",
@@ -376,7 +379,7 @@ def check_mainstream_analytics_references() -> None:
         if expected not in parameter_families:
             fail(f"Parameter proposition library is missing {expected}")
 
-    archetype_text = read_text(RULES / "website-archetype-decision-matrix.md")
+    archetype_text = read_text(RULES / "analysis-website-archetypes.md")
     for expected in [
         "Retail ecommerce",
         "Product catalog without online checkout",
@@ -394,23 +397,23 @@ def check_mainstream_analytics_references() -> None:
         if expected not in archetype_text:
             fail(f"Website archetype decision matrix is missing {expected}")
 
-    schema = load_json(RULES / "tracking-plan-schema.json")
+    schema = load_json(RULES / "schema-tracking-plan.json")
     schema_text = json.dumps(schema)
     for expected in ["execution_context", "template_policy", "input_artifact_inventory", "official_verification", "collection_strategy", "duplicate_risk", "parameter_profile", "custom_item_parameter", "official_match", "primary_platform", "measurementRole", "measurement_strategy", "website_coverage_map", "journeys_discovered", "business_event_family", "page_or_component", "data_dependencies", "reporting_purpose", "platform_mappings", "implementation_payloads", "piano_analytics", "piano_custom_property", "piano_data_model_property"]:
         if expected not in schema_text:
             fail(f"Tracking plan schema is missing cross-platform support for {expected}")
 
-    coverage_text = read_text(RULES / "website-coverage-mapping.md")
+    coverage_text = read_text(RULES / "analysis-website-coverage.md")
     for expected in ["sitemap", "robots.txt", "navigation", "Playwright", "website_coverage_map", "Coverage Gate"]:
         if expected not in coverage_text:
             fail(f"Website coverage mapping reference is missing {expected}")
 
 
 def check_tracking_plan_contract() -> None:
-    schema_path = RULES / "tracking-plan-schema.json"
-    fixture_path = RULES / "generic-tracking-plan-example.json"
-    piano_fixture_path = RULES / "generic-piano-tracking-plan-example.json"
-    piano_ecommerce_fixture_path = RULES / "generic-piano-ecommerce-tracking-plan-example.json"
+    schema_path = RULES / "schema-tracking-plan.json"
+    fixture_path = RULES / "example-ga4-tracking-plan.json"
+    piano_fixture_path = RULES / "example-piano-tracking-plan.json"
+    piano_ecommerce_fixture_path = RULES / "example-piano-ecommerce-tracking-plan.json"
     schema = load_json(schema_path)
     fixture = load_json(fixture_path)
     piano_fixture = load_json(piano_fixture_path)
@@ -429,7 +432,7 @@ def check_tracking_plan_contract() -> None:
             for error in errors[:8]:
                 path = ".".join(str(part) for part in error.path) or "<root>"
                 formatted.append(f"{path}: {error.message}")
-            fail(f"{label} does not match tracking-plan-schema.json:\n" + "\n".join(formatted))
+            fail(f"{label} does not match schema-tracking-plan.json:\n" + "\n".join(formatted))
         roles = {event.get("measurement_role") for event in candidate["events"]}
         if not roles <= {"macro_conversion", "micro_conversion", "diagnostic", "context"}:
             fail(f"{label} has invalid measurement_role values: {sorted(roles)}")
@@ -563,9 +566,9 @@ def run_command(command: list[str], label: str) -> subprocess.CompletedProcess[s
 
 def check_tracking_plan_validator() -> None:
     for fixture_path in [
-        RULES / "generic-tracking-plan-example.json",
-        RULES / "generic-piano-tracking-plan-example.json",
-        RULES / "generic-piano-ecommerce-tracking-plan-example.json",
+        RULES / "example-ga4-tracking-plan.json",
+        RULES / "example-piano-tracking-plan.json",
+        RULES / "example-piano-ecommerce-tracking-plan.json",
     ]:
         run_command(
             [
@@ -607,8 +610,8 @@ def expect_validator_error(base_fixture: dict, temp_dir: Path, label: str, mutat
 
 
 def check_tracking_plan_negative_lints() -> None:
-    fixture = load_json(RULES / "generic-tracking-plan-example.json")
-    piano_ecommerce_fixture = load_json(RULES / "generic-piano-ecommerce-tracking-plan-example.json")
+    fixture = load_json(RULES / "example-ga4-tracking-plan.json")
+    piano_ecommerce_fixture = load_json(RULES / "example-piano-ecommerce-tracking-plan.json")
     with tempfile.TemporaryDirectory() as temp_dir_name:
         temp_dir = Path(temp_dir_name)
 
@@ -958,9 +961,9 @@ def check_tracking_plan_negative_lints() -> None:
 
 
 def check_generated_workbook() -> None:
-    fixture_path = RULES / "generic-tracking-plan-example.json"
-    piano_fixture_path = RULES / "generic-piano-tracking-plan-example.json"
-    piano_ecommerce_fixture_path = RULES / "generic-piano-ecommerce-tracking-plan-example.json"
+    fixture_path = RULES / "example-ga4-tracking-plan.json"
+    piano_fixture_path = RULES / "example-piano-tracking-plan.json"
+    piano_ecommerce_fixture_path = RULES / "example-piano-ecommerce-tracking-plan.json"
     with tempfile.TemporaryDirectory() as temp_dir:
         output = Path(temp_dir) / "generic_tracking_plan.xlsx"
         run_command(
@@ -1027,9 +1030,9 @@ def check_generated_workbook() -> None:
 
 
 def check_csv_export() -> None:
-    fixture_path = RULES / "generic-tracking-plan-example.json"
-    piano_fixture_path = RULES / "generic-piano-tracking-plan-example.json"
-    piano_ecommerce_fixture_path = RULES / "generic-piano-ecommerce-tracking-plan-example.json"
+    fixture_path = RULES / "example-ga4-tracking-plan.json"
+    piano_fixture_path = RULES / "example-piano-tracking-plan.json"
+    piano_ecommerce_fixture_path = RULES / "example-piano-ecommerce-tracking-plan.json"
     with tempfile.TemporaryDirectory() as temp_dir:
         output = Path(temp_dir) / "generic_tracking_plan.csv"
         run_command(
@@ -1176,10 +1179,11 @@ def check_event_matrix(workbook_path: Path) -> None:
             if expected not in overview_values:
                 fail(f"{display_path(workbook_path)} Overview is missing {expected}")
         screenshot_register = wb["04 Screenshot Register"]
-        screenshot_headers = [screenshot_register.cell(3, col).value for col in range(1, 9)]
+        screenshot_headers = [screenshot_register.cell(3, col).value for col in range(1, 10)]
         expected_screenshot_headers = [
             "Journey",
             "Event",
+            "Screenshot preview",
             "Page / component",
             "URL / route",
             "Capture objective",
@@ -1193,7 +1197,7 @@ def check_event_matrix(workbook_path: Path) -> None:
         if "File path or link" in screenshot_values:
             fail(f"{display_path(workbook_path)} Screenshot Register should not expose local file path/link columns")
         screenshot_statuses = {
-            str(screenshot_register.cell(row, 7).value)
+            str(screenshot_register.cell(row, 8).value)
             for row in range(4, screenshot_register.max_row + 1)
             if screenshot_register.cell(row, 2).value not in (None, "")
         }

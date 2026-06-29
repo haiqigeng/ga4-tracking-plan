@@ -40,9 +40,10 @@ Read `references/01-skill/purpose.md` for the product objective,
   requested or implied. Format compliance does not mean measurement compliance:
   keep independent web-analyst judgement on event quality.
 - Map website coverage before event selection when the request covers a whole
-  website or broad journey set. Use sitemap, robots.txt, navigation,
-  representative templates, existing client files, and Playwright/browser
-  exploration when needed, then state uncovered or assumed journeys.
+  website or broad journey set. Use the precision order in
+  `references/03-rules/analysis-website-coverage.md`: user/client scope and
+  templates first, manual or rendered browser evidence next, then navigation,
+  sitemap, robots, and static discovery as support evidence.
 - Default to GA4 with GTM/dataLayer when implementation context is unknown.
 - Use Piano Analytics rules only when Piano is requested or clearly in scope.
 - Always check current official documentation for standard, recommended,
@@ -118,16 +119,16 @@ Load only the files required by scope:
 | --- | --- |
 | Product purpose, users, questions, inputs, outputs, acceptance criteria, non-goals | `references/01-skill/purpose.md`, `references/01-skill/users-and-questions.md`, `references/01-skill/inputs-outputs.md`, `references/01-skill/acceptance-criteria.md`, `references/01-skill/non-goals.md` |
 | Validation, workbook generation, and corpus review commands | `references/02-commands/validation-commands.md`, `references/02-commands/workbook-generation.md`, `references/02-commands/corpus-review-workflow.md` |
-| Business model, page role, journey logic, measurement coherence, and custom-event judgement | `references/03-rules/business-scenario-analysis.md`, `references/03-rules/website-archetype-decision-matrix.md`, `references/03-rules/measurement-coherence-review.md`, `references/03-rules/custom-event-decision-matrix.md` |
-| Whole-site or multi-journey URL and journey coverage | `references/03-rules/website-coverage-mapping.md` |
-| GA4 event scenario selection and official recommended-event lookup | `references/03-rules/ga4-event-scenario-library.md`, `references/03-rules/ga4-event-scenario-library.json`, `references/03-rules/official-ga4-recommended-events.json` |
-| Ecommerce journeys and official parameter scope | `references/03-rules/scenario-ecommerce.md`, `references/03-rules/ga4-ecommerce-parameter-policy.md` |
+| Business model, page role, journey logic, measurement coherence, and custom-event judgement | `references/03-rules/analysis-business-scenarios.md`, `references/03-rules/analysis-website-archetypes.md`, `references/03-rules/analysis-measurement-coherence.md`, `references/03-rules/decision-custom-events.md` |
+| Whole-site or multi-journey URL and journey coverage | `references/03-rules/analysis-website-coverage.md` |
+| GA4 event scenario selection and official recommended-event lookup | `references/03-rules/library-ga4-event-scenarios.md`, `references/03-rules/library-ga4-event-scenarios.json`, `references/03-rules/library-ga4-recommended-events.json` |
+| Ecommerce journeys and official parameter scope | `references/03-rules/scenario-ecommerce.md`, `references/03-rules/policy-ga4-ecommerce-parameters.md` |
 | Lead, search/listing, account/support/content, and SPA journeys | `references/03-rules/scenario-lead-generation.md`, `references/03-rules/scenario-search-listing.md`, `references/03-rules/scenario-account-support-content.md`, `references/03-rules/scenario-spa-routing.md` |
-| Parameter taxonomy, controlled values, privacy, and sensitive data | `references/03-rules/parameter-proposition-library.json`, `references/03-rules/data-quality-privacy.md` |
+| Parameter taxonomy, controlled values, privacy, and sensitive data | `references/03-rules/library-parameters.json`, `references/03-rules/policy-data-quality-privacy.md` |
 | QA and future recette readiness | `references/03-rules/qa-readiness.md` |
-| Existing examples, historical plans, or corpus learning | `references/03-rules/official-first-review.md`, `references/03-rules/example-comparison-contract.md`, `references/03-rules/corpus-learning-policy.md` |
-| Piano Analytics or cross-platform mappings | `references/03-rules/mainstream-analytics-tool-policy.md`, `references/03-rules/piano-analytics-reference.md`, `references/03-rules/piano-official-events.json` |
-| Structured plan format and generic examples | `references/03-rules/tracking-plan-schema.json`, `references/03-rules/generic-tracking-plan-example.json`, `references/03-rules/generic-piano-tracking-plan-example.json`, `references/03-rules/generic-piano-ecommerce-tracking-plan-example.json` |
+| Existing examples, historical plans, or corpus learning | `references/03-rules/review-official-first.md`, `references/03-rules/review-example-comparison.md`, `references/03-rules/review-corpus-learning-policy.md` |
+| Piano Analytics or cross-platform mappings | `references/03-rules/policy-platform-boundaries.md`, `references/03-rules/platform-piano-reference.md`, `references/03-rules/platform-piano-official-events.json` |
+| Structured plan format and generic examples | `references/03-rules/schema-tracking-plan.json`, `references/03-rules/example-ga4-tracking-plan.json`, `references/03-rules/example-piano-tracking-plan.json`, `references/03-rules/example-piano-ecommerce-tracking-plan.json` |
 
 Use scripts as deterministic gates or transformers:
 `scripts/validate_tracking_plan.py` for structured plan linting,
@@ -149,10 +150,12 @@ helper used by the validator and exporters.
    journeys, URL/route, existing template or naming convention, delivery format,
    `execution_mode`, input artifact inventory, and template preservation policy.
 2. **Map website and journey coverage**. For broad website requests, build a
-   concise coverage map from sitemap, robots.txt, navigation, representative
-   page templates, existing client files, and browser/Playwright exploration
-   when dynamic journeys cannot be inferred reliably. Use
-   `scripts/discover_site_journeys.py` as a first-pass helper when useful.
+   concise coverage map in precision order: user-provided scope and templates,
+   existing tracking/dev/recette files, manual browser exploration,
+   Playwright/rendered-DOM exploration when useful, navigation, sitemap,
+   robots.txt, and static discovery helper output. Treat sitemap, robots, and
+   static discovery as completeness support, not as the main source of journey
+   importance.
 3. **Collect or infer the measurement brief**. Capture journey name, scope,
    expected actions, business goal, analysis needs, success signals, available
    data, implementation context, constraints, priority, and open questions.
@@ -162,7 +165,7 @@ helper used by the validator and exporters.
 5. **Define and review the measurement strategy**. Identify business
    archetype, page roles, selected event families, excluded event families,
    custom-event acceptance, and scalability notes. Apply
-   `references/03-rules/measurement-coherence-review.md` so events and
+   `references/03-rules/analysis-measurement-coherence.md` so events and
    parameters work together around business goals and analysis needs.
 6. **Choose official-first events**. Prefer GA4 native/recommended/ecommerce
    events or Piano standard families when semantics fit. Record
@@ -175,7 +178,7 @@ helper used by the validator and exporters.
    easy to scan. Add collection strategy, duplicate-risk, ecommerce parameter
    profile fields, and enough trigger/component context to decide screenshot
    needs. For reusable plans, follow
-   `references/03-rules/tracking-plan-schema.json`.
+   `references/03-rules/schema-tracking-plan.json`.
 9. **Prepare screenshot evidence**. Generate the Screenshot Register from the
    event draft before final workbook generation. Every event must have a row:
    use `capture_required`, `captured`, `shared_evidence`, `skip_allowed`,
@@ -188,7 +191,9 @@ helper used by the validator and exporters.
    filter, menu, CTA, or other interaction targets.
 10. **Generate outputs when needed**. Use the workbook generator for XLSX and the
    CSV exporter for long-format review. Embed selected screenshot previews in
-   the Screenshot Register when captured evidence is available.
+   the Screenshot Register when captured evidence is available. Use cropped,
+   standardized previews for full-page screenshots so the page or action remains
+   identifiable inside normal spreadsheet rows.
 11. **Validate**. Run the relevant commands in
    `references/02-commands/validation-commands.md`. Apply
    `references/01-skill/acceptance-criteria.md` before delivery.
@@ -210,7 +215,9 @@ sheet structure stable unless the user asks for a different workbook:
 - `04 Screenshot Register`: capture requirements, visual evidence, and
   automation cues for later recette; include every event with capture,
   shared-evidence, skip, not-needed, or blocked status; do not use it as a
-  local file-path index;
+  local file-path index; embed available screenshot evidence directly as
+  row-readable previews instead of leaving screenshots only in a separate
+  folder;
   annotate screenshots with a red target rectangle or equivalent callout only
   for click, form submit, CTA, filter, menu, or other interaction events; keep
   passive render/state evidence such as `page_view`, `view_item_list`,

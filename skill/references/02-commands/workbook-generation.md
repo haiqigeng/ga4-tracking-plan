@@ -19,7 +19,9 @@ Use this file when a tracking plan should be delivered as XLSX.
      clearly instead of forcing a screenshot.
 5. Capture and embed representative screenshot previews when useful. One
    screenshot can support several events, and not every event needs a
-   screenshot.
+   screenshot. When screenshots are full-page captures, crop them to a
+   row-readable viewport preview before embedding; do not scale a very tall
+   page screenshot into a tiny unreadable workbook image.
 6. Generate the workbook with `scripts/generate_tracking_plan_workbook.py`.
 7. Review the Event Matrix for journey grouping, value rules, and visual
    density.
@@ -59,6 +61,10 @@ Before delivery, confirm:
   columns or become a dense QA execution sheet;
 - Screenshot Register status should use `capture_required`, `captured`,
   `shared_evidence`, `skip_allowed`, `not_needed`, or `blocked`;
+- captured screenshot evidence should be embedded directly in the Screenshot
+  Register, not only stored in a side folder;
+- full-page captures should be standardized into compact viewport previews that
+  let a reader identify the page or tracked action at normal spreadsheet zoom;
 - screenshot previews for click, form submit, CTA, filter, menu, or other
   interaction events should highlight the target element with a red rectangle
   or equivalent callout; prefer rectangle-only annotations in workbook

@@ -1,6 +1,6 @@
-﻿{
+{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/HQ-Guillaume/ga4-tracking-plan/schema/tracking-plan-schema.json",
+  "$id": "https://github.com/HQ-Guillaume/ga4-tracking-plan/schema/schema-tracking-plan.json",
   "title": "Analytics tracking plan contract",
   "description": "Canonical machine-readable structure for tracking plans produced by the skill. GA4 remains the default platform, with optional platform mappings for Piano Analytics and later QA automation.",
   "type": "object",

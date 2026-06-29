@@ -113,7 +113,7 @@ executes tests.
 
 ## Measurement Coherence
 
-Apply `measurement-coherence-review.md` before approving a generated or
+Apply `analysis-measurement-coherence.md` before approving a generated or
 adapted plan. A plan is not acceptable just because every event is valid in
 isolation; the event families, parameters, screenshots, QA cues, and
 not-tracked decisions must explain the same business journey.

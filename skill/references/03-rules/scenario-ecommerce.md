@@ -1,4 +1,4 @@
-﻿# Ecommerce Scenario Reference
+# Ecommerce Scenario Reference
 
 Use this reference when the scoped journey includes merchandising, product discovery, cart, checkout, purchase, refund, coupons, shipping, or promotions.
 
@@ -14,7 +14,7 @@ Use this reference when the scoped journey includes merchandising, product disco
 - Use explicit availability states: `send`, `send_default_quantity`, `event_level_used`, `not_available`, or `not_applicable`.
 - If required ecommerce data is unavailable, mark the ecommerce event as not implementable for that scope and consider a separate non-ecommerce intent event.
 - Consolidate repeated same-name events when the parameter structure is identical; list allowed values for list names, creative slots, item categories, or component locations.
-Read `ga4-ecommerce-parameter-policy.md` before finalizing ecommerce matrices or CSV exports.
+Read `policy-ga4-ecommerce-parameters.md` before finalizing ecommerce matrices or CSV exports.
 
 ## Event Selection
 
