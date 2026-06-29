@@ -32,6 +32,8 @@ Before proposing events for broad scope, capture:
 - sources checked and what each source was used for;
 - covered journeys with representative URLs, page templates, key interactions,
   and coverage status;
+- discovered journeys with include, exclude, out-of-scope, or needs-discovery
+  decisions;
 - coverage gaps, blocked areas, assumptions, and journeys intentionally out of
   scope;
 - whether Playwright or deeper browser exploration was required, optional, not
@@ -41,6 +43,18 @@ Use `website_coverage_map` in the structured plan. Keep this information
 concise. Do not add a dense visible workbook tab unless the user asks for it;
 summarize assumptions and evidence through Overview, Screenshot Register, and
 QA Cases.
+
+Use `scripts/discover_site_journeys.py` as a first-pass helper when a URL is
+provided and no complete URL inventory exists:
+
+```powershell
+python scripts/discover_site_journeys.py https://www.example.com/ --output site_discovery.json
+```
+
+The helper reads robots, sitemap candidates, static links, forms, and obvious
+URL patterns. Treat its output as input evidence, not final truth. Use
+Playwright or manual browser exploration for dynamic navigation, filters,
+checkout, account, forms, modals, or SPA routes.
 
 ## Playwright Decision
 
@@ -62,3 +76,8 @@ Do not finalize a whole-site plan until every measurement-brief journey has a
 matching coverage entry. For any important journey not covered by evidence,
 either add a coverage gap or mark the journey as assumed, blocked, or out of
 scope.
+
+For whole-site plans, `journeys_discovered` must list discovered journeys and a
+decision for each one. If a discovered journey is marked `include_in_plan`, it
+must appear in `measurement_brief` and `journeys_covered`. If it is marked
+`needs_discovery`, add a matching coverage gap with the impact and next step.

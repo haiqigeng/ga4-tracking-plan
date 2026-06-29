@@ -56,18 +56,15 @@ CENTER = Alignment(wrap_text=True, vertical="center", horizontal="center")
 
 EVENT_SLOT_COUNT = 4
 STATUS_OPTIONS = "OK,KO,Cannot test"
+SCREENSHOT_STATUS_OPTIONS = "capture_required,captured,shared_evidence,not_needed,blocked"
 
 
 def matrix_max_col() -> int:
-    return 2 + (EVENT_SLOT_COUNT * 2)
+    return 2 + EVENT_SLOT_COUNT
 
 
 def matrix_value_columns() -> list[int]:
-    return [3 + index * 2 for index in range(EVENT_SLOT_COUNT)]
-
-
-def matrix_status_columns() -> list[int]:
-    return [4 + index * 2 for index in range(EVENT_SLOT_COUNT)]
+    return [3 + index for index in range(EVENT_SLOT_COUNT)]
 
 
 def parse_args() -> argparse.Namespace:
@@ -279,9 +276,6 @@ def style_event_matrix_rows(ws) -> None:
         for col in range(1, max_col + 1):
             ws.cell(row, col).fill = PatternFill("solid", fgColor=WHITE)
         for col in value_columns:
-            test_status = str(ws.cell(row, col).offset(column=1).value or "")
-            if test_status not in {"OK", "KO", "Cannot test"}:
-                continue
             value = str(ws.cell(row, col).value or "")
             if value == "not_applicable":
                 style_matrix_value_cell(ws.cell(row, col), "not_applicable")
@@ -397,8 +391,8 @@ def build_overview(wb: Workbook, plan: dict[str, Any]) -> None:
         ["1", "00 Overview", "Document information and version history.", "", "", "", "", ""],
         ["2", "01 GTM Protocol", "Shared GTM/dataLayer rules and official references.", "", "", "", "", ""],
         ["3", "02 Parameter Reference", "Variable dictionary and value rules.", "", "", "", "", ""],
-        ["4", "03 Event Matrix", "Main tracking plan: events, parameters, values, and test status.", "", "", "", "", ""],
-        ["5", "04 Screenshot Register", "Screenshot links for page and interaction evidence.", "", "", "", "", ""],
+        ["4", "03 Event Matrix", "Main tracking plan: events, parameters, and value rules.", "", "", "", "", ""],
+        ["5", "04 Screenshot Register", "Capture requirements and visual evidence for later recette.", "", "", "", "", ""],
         ["6", "05 QA Cases", "Manual recette checks and validation status.", "", "", "", "", ""],
         [],
         ["Version History", "", "", "", "", "", "", "", ""],
@@ -436,11 +430,11 @@ def build_gtm_protocol(wb: Workbook, plan: dict[str, Any]) -> None:
     rows = [
         ["Topic", "Rule", "Example", "Notes"],
         ["GTM base script", "Load the GTM container once on every page. Replace GTM-XXXX with the project container ID.", "<!-- Google Tag Manager -->\n<script>/* GTM base script with GTM-XXXX */</script>\n<!-- End Google Tag Manager -->", "For SPA websites, keep the container in the root HTML shell."],
-        ["dataLayer push", "Use dataLayer.push for event and context values. Do not overwrite the dataLayer object after GTM loads.", "window.dataLayer = window.dataLayer || [];\ndataLayer.push({ event: \"event_name\" });", "The Event Matrix lists the exact event and parameter values."],
+        ["dataLayer push", "Use dataLayer.push for event and context values. Do not overwrite the dataLayer object after GTM loads.", "window.dataLayer = window.dataLayer || [];\ndataLayer.push({ event: \"add_to_cart\" });", "In the dataLayer object, the GTM trigger key is event. GA4 event_name is the GA4 tag setting/payload name."],
         ["Flush reusable objects", "Flush page_data, ecommerce, or event_data before a new event when previous values could persist.", "dataLayer.push({ ecommerce: null });", "Use a separate push for flushing."],
         ["Controlled values", "Use lowercase ASCII snake_case, replace spaces with underscores, and remove accents for controlled analytics values.", "pret_a_porter_femme", "Keep product IDs, ISO codes, numeric values, URLs, and safe raw terms when required."],
         ["GA4 ecommerce", "Use official GA4 ecommerce event names and parameters. Keep ecommerce event blocks separate from interaction events.", "items[].item_id\nitems[].item_name\ncurrency\nvalue", "Map GTM wrapper paths in implementation notes, not as replacements for GA4 names."],
-        ["Matrix status", "Record testing status as OK, KO, or Cannot test.", "OK / KO / Cannot test", "Status columns sit directly after each event value column."],
+        ["QA status", "Record execution status in QA Cases or Screenshot Register, not inside the Event Matrix.", "OK / KO / Cannot test / captured", "Keep the Event Matrix focused on implementation rules."],
         ["Official references", "Check current official documentation before approving standard, recommended, ecommerce, and GTM dataLayer decisions.", "GA4 recommended events: https://developers.google.com/analytics/devguides/collection/ga4/reference/events\nGA4 ecommerce: https://developers.google.com/analytics/devguides/collection/ga4/ecommerce\nGA4 item parameters: https://developers.google.com/analytics/devguides/collection/ga4/item-scoped-ecommerce\nGTM dataLayer: https://developers.google.com/tag-platform/tag-manager/datalayer", "Keep external references here, not on the Overview tab."],
     ]
     if "piano_analytics" in set(plan.get("analytics_platforms", [])):
@@ -515,14 +509,11 @@ def build_event_matrix(wb: Workbook, plan: dict[str, Any]) -> None:
     max_col = matrix_max_col()
     title(ws, "Event Matrix", "Main tracking plan. One event slot is one reusable event definition; ecommerce blocks stay separate.", max_col)
     for slot_index, start_col in enumerate(matrix_value_columns(), 1):
-        ws.merge_cells(start_row=4, start_column=start_col, end_row=4, end_column=start_col + 1)
         cell = ws.cell(4, start_col, f"Event slot {slot_index}")
         cell.fill = PatternFill("solid", fgColor=GREEN)
         cell.font = Font(bold=True)
         cell.alignment = CENTER
-    slot_headers = []
-    for _ in range(EVENT_SLOT_COUNT):
-        slot_headers.extend(["Expected value / rule", "Test status"])
+    slot_headers = ["Expected value / rule"] * EVENT_SLOT_COUNT
     ws.append(["Field / parameter path", "Type", *slot_headers])
     header(ws, 5, max_col)
 
@@ -539,24 +530,19 @@ def build_event_matrix(wb: Workbook, plan: dict[str, Any]) -> None:
             block_title = f"J-{block_index:03d} - {journey_names.get(journey_id, journey_id)} - {family}"
             row = [block_title, ""]
             for event in chunk:
-                row.extend([event["event_name"], ""])
+                row.append(event["event_name"])
             row.extend([""] * (max_col - len(row)))
             ws.append(row)
 
             standard_rows = [
-                ("event_id", "string", lambda event: event["event_id"]),
-                ("event", "string", transport_event_name),
                 ("event_classification", "string", lambda event: event["classification"]),
-                ("key_event", "boolean", lambda event: "yes" if event["key_event"] else "no"),
-                ("page_or_component", "string", lambda event: event["page_or_component"]),
                 ("trigger", "string", lambda event: event["trigger"]),
-                ("screenshot_id", "string", lambda event: f"SCR-{event['event_id']}"),
-                ("qa_id", "string", lambda event: event["qa"]["qa_id"]),
+                ("event", "string", transport_event_name),
             ]
             for variable, value_type, resolver in standard_rows:
                 matrix_row = [variable, value_type]
                 for event in chunk:
-                    matrix_row.extend([resolver(event), "Cannot test"])
+                    matrix_row.append(resolver(event))
                 matrix_row.extend([""] * (max_col - len(matrix_row)))
                 ws.append(matrix_row)
 
@@ -565,22 +551,12 @@ def build_event_matrix(wb: Workbook, plan: dict[str, Any]) -> None:
                 matrix_row = [parameter, parameter_types.get(parameter, parameter_type(parameter))]
                 for event in chunk:
                     value = parameter_value(event, parameter)
-                    matrix_row.extend([value, "Cannot test"])
+                    matrix_row.append(value)
                 matrix_row.extend([""] * (max_col - len(matrix_row)))
                 ws.append(matrix_row)
             block_index += 1
 
-    status_dv = DataValidation(type="list", formula1=f'"{STATUS_OPTIONS}"', allow_blank=True)
-    ws.add_data_validation(status_dv)
-    for col_idx in matrix_status_columns():
-        col = get_column_letter(col_idx)
-        status_dv.add(f"{col}6:{col}2000")
-        ws.conditional_formatting.add(f"{col}6:{col}2000", CellIsRule(operator="equal", formula=['"OK"'], fill=PatternFill("solid", fgColor=GREEN)))
-        ws.conditional_formatting.add(f"{col}6:{col}2000", CellIsRule(operator="equal", formula=['"KO"'], fill=PatternFill("solid", fgColor=RED)))
-        ws.conditional_formatting.add(f"{col}6:{col}2000", CellIsRule(operator="equal", formula=['"Cannot test"'], fill=PatternFill("solid", fgColor=YELLOW)))
-    widths = [34, 18]
-    for _ in range(EVENT_SLOT_COUNT):
-        widths.extend([42, 16])
+    widths = [34, 18] + ([44] * EVENT_SLOT_COUNT)
     set_widths(ws, widths)
     ws.freeze_panes = "C6"
     ws.auto_filter.ref = f"A5:{get_column_letter(max_col)}{ws.max_row}"
@@ -590,24 +566,44 @@ def build_event_matrix(wb: Workbook, plan: dict[str, Any]) -> None:
 
 def build_screenshot_register(wb: Workbook, plan: dict[str, Any]) -> None:
     ws = wb.create_sheet("04 Screenshot Register")
-    title(ws, "Screenshot Register", "Attach or link screenshots used to validate Event Matrix rows.", 8)
-    ws.append(["Screenshot ID", "Journey", "Event name", "Page / component", "URL / route", "What to capture", "File path or link", "Notes"])
+    title(ws, "Screenshot Register", "Capture requirements and visual evidence for later recette.", 8)
+    ws.append(["Journey", "Event", "Page / component", "URL / route", "Capture objective", "Automation cue", "Status", "Notes"])
     header(ws, 3, 8)
     journey_names = {brief["journey_id"]: brief["journey_name"] for brief in plan["measurement_brief"]}
+
+    def automation_cue(event: dict[str, Any]) -> str:
+        classification = event.get("classification", "")
+        role = event.get("measurement_role", "")
+        if role == "transaction":
+            return "Use a controlled test order; validate payload in the future QA skill."
+        if classification == "recommended_ecommerce":
+            return "Open the route and reproduce the ecommerce state before validating GA4 payload."
+        if classification in {"custom_event", "interaction"}:
+            return "Open the route, perform the trigger, and capture the component state."
+        return "Open the route and capture the rendered page state."
+
     for event in plan["events"]:
         ws.append([
-            f"SCR-{event['event_id']}",
             journey_names.get(event["journey_id"], event["journey_id"]),
             event["event_name"],
             event["page_or_component"],
             event["page_url_pattern"],
             f"{event['page_or_component']} - {event['trigger']}",
-            "",
-            f"QA case: {event['qa']['qa_id']}",
+            automation_cue(event),
+            "capture_required",
+            "Capture during coverage or later QA when the journey is accessible.",
         ])
     for row in range(4, ws.max_row + 1):
         ws.row_dimensions[row].height = 56
-    set_widths(ws, [24, 30, 24, 36, 34, 54, 42, 34])
+    status_dv = DataValidation(type="list", formula1=f'"{SCREENSHOT_STATUS_OPTIONS}"', allow_blank=True)
+    ws.add_data_validation(status_dv)
+    status_dv.add(f"G4:G{ws.max_row + 200}")
+    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"captured"'], fill=PatternFill("solid", fgColor=GREEN)))
+    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"shared_evidence"'], fill=PatternFill("solid", fgColor=TEAL_LIGHT)))
+    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"capture_required"'], fill=PatternFill("solid", fgColor=YELLOW)))
+    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"blocked"'], fill=PatternFill("solid", fgColor=RED)))
+    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"not_needed"'], fill=PatternFill("solid", fgColor=GRAY)))
+    set_widths(ws, [24, 28, 24, 34, 36, 40, 18, 36])
     ws.freeze_panes = "A4"
     ws.auto_filter.ref = f"A3:H{ws.max_row}"
     style_cells(ws)
@@ -617,9 +613,9 @@ def build_qa_cases(wb: Workbook, plan: dict[str, Any]) -> None:
     ws = wb.create_sheet("05 QA Cases")
     title(ws, "QA Cases", "Manual recette checklist for the events in the Event Matrix.", 9)
     ws.append([
-        "QA ID",
         "Event name",
         "Journey",
+        "Page / component",
         "Test method",
         "Test steps",
         "Expected dataLayer",
@@ -633,9 +629,9 @@ def build_qa_cases(wb: Workbook, plan: dict[str, Any]) -> None:
     for case in plan["qa_cases"]:
         event = events_by_id.get(case["event_id"], {})
         ws.append([
-            case["qa_id"],
             case["event_name"],
             journey_names.get(event.get("journey_id"), event.get("journey_id", "")),
+            event.get("page_or_component", ""),
             join_values(case["methods"]),
             "\n".join(case["steps"]),
             "\n".join(case["expected_data_layer"]),

@@ -14,6 +14,8 @@ Required or inferred inputs:
 - expected user actions and success signals;
 - existing tracking-plan template, naming convention, or previous GA4/GTM
   documentation when available;
+- execution mode signal: client template adaptation, existing plan review,
+  event recommendation, or greenfield best-practice plan;
 - analytics platform scope: GA4 by default, Piano Analytics only when requested
   or clearly in scope;
 - implementation context, such as GTM, dataLayer, gtag.js, CMS, ecommerce
@@ -34,21 +36,31 @@ Possible outputs:
 - structured JSON plan for validation and future automation;
 - long-format CSV for review, diffing, or QA ingestion;
 - measurement brief and assumptions;
+- execution context, input artifact inventory, and template policy;
 - website coverage map for broad website or multi-journey scope;
 - measurement strategy and scalability notes;
 - journey-grouped Event Matrix;
 - Parameter Reference with value rules and examples;
 - GTM Protocol;
-- Screenshot Register;
-- QA Cases;
+- Screenshot Register when screenshots or capture requirements are part of the
+  planning evidence, generated from event rows and focused on capture
+  objectives, automation cues, evidence status, and future recette needs rather
+  than local file paths;
+- lightweight QA preparation only when useful for handoff to a QA/recette
+  skill;
 - key event recommendations;
 - custom definition recommendations;
 - not-tracked decisions;
 - documentation sources checked.
+- official verification status for events and parameters;
+- collection source and duplicate-risk decisions;
+- ecommerce parameter profile when ecommerce events are present.
 
 ## Default Workbook
 
 The XLSX workbook is the main human deliverable. The Event Matrix should be the
 main working tab. Overview, GTM Protocol, Parameter Reference, Screenshot
 Register, and QA Cases should support the Event Matrix without becoming dense
-or filled with internal reasoning.
+or filled with internal reasoning. Do not show internal event IDs, screenshot
+IDs, QA IDs, or tracking-row IDs in the Event Matrix; those belong to structured
+JSON or the future QA phase if they are needed at all.

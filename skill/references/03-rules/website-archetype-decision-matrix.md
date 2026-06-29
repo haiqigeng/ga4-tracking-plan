@@ -71,6 +71,8 @@ Better semantic examples when justified: `account_access_intent`, `contact_inten
 
 ## QA Implications
 
-- Every macro conversion and key micro conversion needs a stable `event_id`, `qa_id`, reproduction steps, expected platform payload, and network expectation.
+- Every macro conversion and key micro conversion needs clear reproduction
+  context, expected platform payload, and network expectation for a future QA
+  skill. Do not expose QA-only identifiers in the analyst-facing Event Matrix.
 - When official events are automatic or enhanced measurement, QA should state how to confirm the native event and avoid duplicate custom tracking.
 - When custom events are accepted, QA must verify that normalized parameter values match the allowed values in the plan.

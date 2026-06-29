@@ -60,6 +60,8 @@ REQUIRED_SKILL_SCRIPTS = [
     SKILL / "scripts" / "generate_tracking_plan_workbook.py",
     SKILL / "scripts" / "validate_tracking_plan.py",
     SKILL / "scripts" / "export_tracking_plan_csv.py",
+    SKILL / "scripts" / "discover_site_journeys.py",
+    SKILL / "scripts" / "annotate_screenshot.py",
     SKILL / "scripts" / "analyze_tracking_plan_corpus.ps1",
 ]
 REQUIRED_SKILL_FILES = [
@@ -79,6 +81,8 @@ REQUIRED_SKILL_FILES = [
     ROOT / "scripts" / "generate_tracking_plan_workbook.py",
     ROOT / "scripts" / "validate_tracking_plan.py",
     ROOT / "scripts" / "export_tracking_plan_csv.py",
+    ROOT / "scripts" / "discover_site_journeys.py",
+    ROOT / "scripts" / "annotate_screenshot.py",
     ROOT / "scripts" / "analyze_tracking_plan_corpus.ps1",
     ROOT / "scripts" / "validate_package.py",
     *REQUIRED_REFERENCE_FILES,
@@ -205,7 +209,7 @@ def check_repo_maintenance_docs() -> None:
         for expected in ["Platform scope", "GA4", "Piano Analytics"]:
             if expected not in template_text:
                 fail(f"{template_name} is missing issue routing field: {expected}")
-    for expected in ["generated/", "release/", "tracking-plan-corpus-analysis/", "*.zip"]:
+    for expected in ["generated/", "deliverables/", "release/", "tracking-plan-corpus-analysis/", "*.zip"]:
         if expected not in gitignore:
             fail(f".gitignore is missing artifact guardrail: {expected}")
 
@@ -252,6 +256,7 @@ def check_skill_resource_links() -> None:
         "scripts/generate_tracking_plan_workbook.py",
         "scripts/validate_tracking_plan.py",
         "scripts/export_tracking_plan_csv.py",
+        "scripts/discover_site_journeys.py",
         "scripts/analyze_tracking_plan_corpus.ps1",
     ]:
         if rel not in text:
@@ -377,7 +382,7 @@ def check_mainstream_analytics_references() -> None:
 
     schema = load_json(RULES / "tracking-plan-schema.json")
     schema_text = json.dumps(schema)
-    for expected in ["official_match", "primary_platform", "measurementRole", "measurement_strategy", "website_coverage_map", "business_event_family", "page_or_component", "data_dependencies", "reporting_purpose", "platform_mappings", "implementation_payloads", "piano_analytics", "piano_custom_property", "piano_data_model_property"]:
+    for expected in ["execution_context", "template_policy", "input_artifact_inventory", "official_verification", "collection_strategy", "duplicate_risk", "parameter_profile", "custom_item_parameter", "official_match", "primary_platform", "measurementRole", "measurement_strategy", "website_coverage_map", "journeys_discovered", "business_event_family", "page_or_component", "data_dependencies", "reporting_purpose", "platform_mappings", "implementation_payloads", "piano_analytics", "piano_custom_property", "piano_data_model_property"]:
         if expected not in schema_text:
             fail(f"Tracking plan schema is missing cross-platform support for {expected}")
 
@@ -420,6 +425,16 @@ def check_tracking_plan_contract() -> None:
             fail(f"{label} has events without page_or_component")
         if not all(event.get("data_dependencies") for event in candidate["events"]):
             fail(f"{label} has events without data_dependencies")
+        if not candidate.get("execution_context", {}).get("template_policy"):
+            fail(f"{label} has no execution_context.template_policy")
+        if not candidate.get("website_coverage_map", {}).get("journeys_discovered"):
+            fail(f"{label} has no website_coverage_map.journeys_discovered")
+        if not all(event.get("official_verification") for event in candidate["events"]):
+            fail(f"{label} has events without official_verification")
+        if not all(event.get("collection_strategy") for event in candidate["events"]):
+            fail(f"{label} has events without collection_strategy")
+        if not all(parameter.get("official_verification") for parameter in candidate["parameters"]):
+            fail(f"{label} has parameters without official_verification")
         strategy = candidate.get("measurement_strategy", {})
         if not strategy.get("scalability_notes"):
             fail(f"{label} has no scalability_notes in measurement_strategy")
@@ -643,6 +658,11 @@ def check_tracking_plan_negative_lints() -> None:
 
         expect_validator_error(fixture, temp_dir, "missing_measurement_strategy", missing_measurement_strategy, "SCHEMA_VALIDATION")
 
+        def missing_execution_context(candidate: dict) -> None:
+            candidate.pop("execution_context", None)
+
+        expect_validator_error(fixture, temp_dir, "missing_execution_context", missing_execution_context, "SCHEMA_VALIDATION")
+
         def unknown_business_event_family(candidate: dict) -> None:
             candidate["events"][0]["business_event_family"] = "missing_family"
 
@@ -696,6 +716,17 @@ def check_tracking_plan_negative_lints() -> None:
             candidate["website_coverage_map"]["journeys_covered"][0]["journey_id"] = "missing_journey"
 
         expect_validator_error(fixture, temp_dir, "unknown_coverage_journey", unknown_coverage_journey, "COVERAGE_JOURNEY_UNKNOWN")
+
+        def discovered_journey_not_in_brief(candidate: dict) -> None:
+            candidate["website_coverage_map"]["journeys_discovered"][0]["journey_id"] = "missing_journey"
+
+        expect_validator_error(
+            fixture,
+            temp_dir,
+            "discovered_journey_not_in_brief",
+            discovered_journey_not_in_brief,
+            "DISCOVERED_JOURNEY_NOT_IN_MEASUREMENT_BRIEF",
+        )
 
         def empty_declared_journey(candidate: dict) -> None:
             candidate["measurement_brief"].append(
@@ -794,6 +825,27 @@ def check_tracking_plan_negative_lints() -> None:
             ]
 
         expect_validator_error(fixture, temp_dir, "missing_ga4_official_source", missing_ga4_official_source, "GA4_OFFICIAL_SOURCE_MISSING")
+
+        def unverified_official_event(candidate: dict) -> None:
+            candidate["events"][1]["official_verification"]["status"] = "unverified"
+
+        expect_validator_error(fixture, temp_dir, "unverified_official_event", unverified_official_event, "OFFICIAL_VERIFICATION_NOT_VERIFIED")
+
+        def weak_duplicate_risk(candidate: dict) -> None:
+            event = next(event for event in candidate["events"] if event["event_name"] == "search")
+            event["collection_strategy"]["duplicate_risk"] = {
+                "level": "low",
+                "reason": "manual",
+                "dedupe_rule": "none"
+            }
+
+        expect_validator_error(fixture, temp_dir, "weak_duplicate_risk", weak_duplicate_risk, "DUPLICATE_RISK_DECISION_WEAK")
+
+        def missing_ecommerce_profile(candidate: dict) -> None:
+            event = next(event for event in candidate["events"] if event["event_name"] == "view_promotion")
+            event.pop("parameter_profile", None)
+
+        expect_validator_error(fixture, temp_dir, "missing_ecommerce_profile", missing_ecommerce_profile, "ECOMMERCE_PARAMETER_PROFILE_MISSING")
 
         def missing_custom_definition(candidate: dict) -> None:
             candidate["custom_definitions"] = [
@@ -979,9 +1031,12 @@ def check_csv_export() -> None:
         if not output.exists() or output.stat().st_size == 0:
             fail("CSV exporter did not create a non-empty output file")
         header = output.read_text(encoding="utf-8-sig").splitlines()[0]
-        for expected in ["event_id", "event_name", "measurement_role", "business_event_family", "page_or_component", "data_dependencies", "official_match", "parameter", "reporting_purpose", "scope_rule", "analytics_platform", "platform_event_name"]:
+        for expected in ["event_name", "measurement_role", "business_event_family", "page_or_component", "data_dependencies", "official_match", "official_verification_status", "collection_source", "duplicate_risk_level", "parameter_profile", "parameter", "reporting_purpose", "scope_rule", "analytics_platform", "platform_event_name"]:
             if expected not in header:
                 fail(f"CSV exporter output is missing header {expected}")
+        for hidden in ["event_id", "qa_id"]:
+            if hidden in header:
+                fail(f"CSV exporter should not expose internal header {hidden}")
 
         piano_output = Path(temp_dir) / "generic_piano_tracking_plan.csv"
         run_command(
@@ -1039,7 +1094,7 @@ def row_values(ws, start: int, end: int) -> list[str]:
 def event_slot_values(ws, row: int) -> list[str]:
     return [
         ws.cell(row, col).value
-        for col in range(3, ws.max_column + 1, 2)
+        for col in range(3, ws.max_column + 1)
         if ws.cell(row, col).value not in (None, "")
     ]
 
@@ -1061,21 +1116,38 @@ def check_event_matrix(workbook_path: Path) -> None:
         header_values = [ws.cell(5, col).value for col in range(1, ws.max_column + 1)]
         if header_values[:2] != ["Field / parameter path", "Type"]:
             fail(f"{display_path(workbook_path)} Event Matrix must start with human-readable field/parameter and type columns")
-        for value_col in range(3, ws.max_column + 1, 2):
-            status_col = value_col + 1
-            if status_col > ws.max_column:
-                break
-            if ws.cell(5, value_col).value != "Expected value / rule" or ws.cell(5, status_col).value != "Test status":
-                fail(f"{display_path(workbook_path)} Event Matrix must keep each Test status column directly after its Expected value / rule column")
+        for value_col in range(3, ws.max_column + 1):
+            if ws.cell(5, value_col).value != "Expected value / rule":
+                fail(f"{display_path(workbook_path)} Event Matrix must keep one Expected value / rule column per event slot")
         matrix_labels = {str(row[0].value) for row in ws.iter_rows() if row and row[0].value}
-        for expected_label in ["event_id", "event", "event_classification", "key_event", "page_or_component", "trigger", "screenshot_id", "qa_id"]:
+        for expected_label in ["event_classification", "trigger", "event"]:
             if expected_label not in matrix_labels:
                 fail(f"{display_path(workbook_path)} Event Matrix is missing {expected_label} row")
+        for hidden_label in ["event_id", "screenshot_id", "qa_id", "key_event", "page_or_component", "dataLayer.event"]:
+            if hidden_label in matrix_labels:
+                fail(f"{display_path(workbook_path)} Event Matrix should not expose internal {hidden_label} rows")
         overview = wb["00 Overview"]
         overview_values = {cell.value for row in overview.iter_rows() for cell in row}
         for expected in ["Document Summary", "Sheet Contents", "Version History", "Publish date"]:
             if expected not in overview_values:
                 fail(f"{display_path(workbook_path)} Overview is missing {expected}")
+        screenshot_register = wb["04 Screenshot Register"]
+        screenshot_headers = [screenshot_register.cell(3, col).value for col in range(1, 9)]
+        expected_screenshot_headers = [
+            "Journey",
+            "Event",
+            "Page / component",
+            "URL / route",
+            "Capture objective",
+            "Automation cue",
+            "Status",
+            "Notes",
+        ]
+        if screenshot_headers != expected_screenshot_headers:
+            fail(f"{display_path(workbook_path)} Screenshot Register headers changed unexpectedly: {screenshot_headers}")
+        screenshot_values = {cell.value for row in screenshot_register.iter_rows() for cell in row}
+        if "File path or link" in screenshot_values:
+            fail(f"{display_path(workbook_path)} Screenshot Register should not expose local file path/link columns")
         found_ecommerce_block = False
         for start, end in event_blocks(ws):
             block_name = str(ws.cell(start, 1).value or "")
@@ -1099,13 +1171,6 @@ def check_event_matrix(workbook_path: Path) -> None:
                     break
             if any(name in {"purchase", "refund"} for name in event_names) and "transaction_id" not in rows:
                 fail(f"{display_path(workbook_path)} purchase/refund block {block_name} is missing transaction_id")
-
-        allowed_statuses = {"OK", "KO", "Cannot test", None, ""}
-        for col in range(4, ws.max_column + 1, 2):
-            for row in range(6, ws.max_row + 1):
-                value = ws.cell(row, col).value
-                if value not in allowed_statuses:
-                    fail(f"{display_path(workbook_path)} has invalid test status {value!r} at {ws.cell(row, col).coordinate}")
 
         if not found_ecommerce_block:
             fail(f"{display_path(workbook_path)} does not contain an ecommerce block")
@@ -1136,6 +1201,8 @@ def check_no_release_only_files_folder() -> None:
     for path in ROOT.rglob("*"):
         if ".git" in path.parts or path.name.startswith("~$"):
             continue
+        if any(part in {"deliverables", "generated", "release", "tracking-plan-corpus-analysis"} for part in path.parts):
+            continue
         rel = display_path(path)
         if any(pattern.search(rel) for pattern in BANNED_PROJECT_PATTERNS):
             all_path_findings.append(rel)
@@ -1158,6 +1225,8 @@ def check_confidential_patterns() -> None:
     findings: list[str] = []
     for path in ROOT.rglob("*"):
         if ".git" in path.parts or not path.is_file() or path.name.startswith("~$"):
+            continue
+        if any(part in {"deliverables", "generated", "release", "tracking-plan-corpus-analysis"} for part in path.parts):
             continue
         suffix = path.suffix.lower()
         if suffix in TEXT_SUFFIXES or path.name in TEXT_SUFFIXES:

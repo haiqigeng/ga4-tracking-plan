@@ -32,6 +32,13 @@ Read `references/01-skill/purpose.md` for the product objective,
   needs before listing events.
 - Ask whether the user has a tracking-plan template, spreadsheet, naming
   convention, GTM/GA4 documentation, or previous plan to follow.
+- Set `execution_context.execution_mode` before drafting: use
+  `client_template_adaptation` when the user provides an existing tracking
+  plan, dev spec, recette plan, event inventory, or workbook template; use
+  `greenfield_best_practice` when no usable client structure exists.
+- Preserve client templates through `execution_context.template_policy` when
+  requested or implied. Format compliance does not mean measurement compliance:
+  keep independent web-analyst judgement on event quality.
 - Map website coverage before event selection when the request covers a whole
   website or broad journey set. Use sitemap, robots.txt, navigation,
   representative templates, existing client files, and Playwright/browser
@@ -40,7 +47,8 @@ Read `references/01-skill/purpose.md` for the product objective,
 - Use Piano Analytics rules only when Piano is requested or clearly in scope.
 - Always check current official documentation for standard, recommended,
   ecommerce, SDK, dataLayer, and platform-native decisions when browsing is
-  available.
+  available. Record per-event and per-parameter `official_verification` in
+  structured plans.
 - Keep GA4, Piano, and other platform schemas separate. Do not translate one
   platform's event names into another unless the official model supports it.
 - Treat Universal Analytics, GAU, GA3, GA360, UA Enhanced Ecommerce, and UA
@@ -56,7 +64,10 @@ Read `references/01-skill/purpose.md` for the product objective,
 - Make proposed events and parameters work together around the business goal and
   potential analysis needs, not as isolated tracking ideas.
 - Keep ecommerce events in official GA4 ecommerce format and separate from
-  non-ecommerce interaction events.
+  non-ecommerce interaction events. Use canonical ecommerce parameter profiles
+  for parameter order and scope consistency.
+- Mark `collection_strategy` and duplicate-risk decisions for events that may
+  be automatic, enhanced measurement, or manually collected.
 - Do not silently include personal, sensitive, or user-provided data. Ordinary
   GA4 event parameters should avoid direct PII. When enhanced conversions,
   user-provided data, media matching, CRM/vendor matching, or server-side
@@ -122,19 +133,24 @@ Use scripts as deterministic gates or transformers:
 `scripts/validate_tracking_plan.py` for structured plan linting,
 `scripts/generate_tracking_plan_workbook.py` for XLSX output,
 `scripts/export_tracking_plan_csv.py` for long-format CSV,
+`scripts/discover_site_journeys.py` for first-pass website URL and journey
+discovery,
+`scripts/annotate_screenshot.py` for rectangle-only interaction screenshot
+callouts,
 `scripts/analyze_tracking_plan_corpus.ps1` for privacy-safe historical-plan
 inventory, and `scripts/ecommerce_matrix.py` as the internal ecommerce matrix
 helper used by the validator and exporters.
 
 ## Workflow
 
-1. **Confirm scope and template**. Identify platform, concerned pages or
-   journeys, URL/route, existing template or naming convention, and whether the
-   user wants XLSX, JSON, CSV, or review only.
+1. **Confirm scope, mode, and template**. Identify platform, concerned pages or
+   journeys, URL/route, existing template or naming convention, delivery format,
+   `execution_mode`, input artifact inventory, and template preservation policy.
 2. **Map website and journey coverage**. For broad website requests, build a
    concise coverage map from sitemap, robots.txt, navigation, representative
    page templates, existing client files, and browser/Playwright exploration
-   when dynamic journeys cannot be inferred reliably.
+   when dynamic journeys cannot be inferred reliably. Use
+   `scripts/discover_site_journeys.py` as a first-pass helper when useful.
 3. **Collect or infer the measurement brief**. Capture journey name, scope,
    expected actions, business goal, analysis needs, success signals, available
    data, implementation context, constraints, priority, and open questions.
@@ -145,18 +161,33 @@ helper used by the validator and exporters.
    selected event families, excluded event families, custom-event acceptance,
    and scalability notes.
 6. **Choose official-first events**. Prefer GA4 native/recommended/ecommerce
-   events or Piano standard families when semantics fit. Explain custom events.
+   events or Piano standard families when semantics fit. Record
+   `official_verification`; explain custom events.
 7. **Design parameters**. Reuse parameter families, define value rules, examples,
    custom definition needs, cardinality, privacy sensitivity, and reporting
-   purpose.
-8. **Build the plan**. Keep journey-related events grouped and easy to scan.
-   For reusable plans, follow `references/03-rules/tracking-plan-schema.json`.
-9. **Generate outputs when needed**. Use the workbook generator for XLSX and the
-   CSV exporter for long-format review.
-10. **Validate**. Run the relevant commands in
+   purpose. Record official verification for official parameters and use
+   `custom_item_parameter` for non-official item-scoped fields.
+8. **Draft the plan and Event Matrix**. Keep journey-related events grouped and
+   easy to scan. Add collection strategy, duplicate-risk, ecommerce parameter
+   profile fields, and enough trigger/component context to decide screenshot
+   needs. For reusable plans, follow
+   `references/03-rules/tracking-plan-schema.json`.
+9. **Prepare screenshot evidence**. Generate the Screenshot Register from the
+   event draft before final workbook generation. Link rows to events, routes,
+   components, capture objectives, and automation cues. Do not force a strict
+   one-screenshot-per-event rule: one screenshot may support several events,
+   some backend/gated events may have no useful screenshot, and some
+   interaction events may need later before/after evidence in the recette
+   phase. Capture representative screenshots when useful; keep passive
+   render/state evidence unannotated and use rectangle-only callouts for click,
+   form, filter, menu, CTA, or other interaction targets.
+10. **Generate outputs when needed**. Use the workbook generator for XLSX and the
+   CSV exporter for long-format review. Embed selected screenshot previews in
+   the Screenshot Register when captured evidence is available.
+11. **Validate**. Run the relevant commands in
    `references/02-commands/validation-commands.md`. Apply
    `references/01-skill/acceptance-criteria.md` before delivery.
-11. **Stop at the boundary**. Recommend next steps for implementation, QA,
+12. **Stop at the boundary**. Recommend next steps for implementation, QA,
     privacy/legal review, or owner clarification, but do not implement unless
     explicitly asked.
 
@@ -171,20 +202,37 @@ sheet structure stable unless the user asks for a different workbook:
 - `02 Parameter Reference`: variable dictionary and value rules;
 - `03 Event Matrix`: main tracking plan, grouped by journey and compatible
   event family;
-- `04 Screenshot Register`: evidence register for pages and interactions;
-- `05 QA Cases`: manual recette checks and validation status.
+- `04 Screenshot Register`: capture requirements, visual evidence, and
+  automation cues for later recette; do not use it as a local file-path index;
+  annotate screenshots with a red target rectangle or equivalent callout only
+  for click, form submit, CTA, filter, menu, or other interaction events; keep
+  passive render/state evidence such as `page_view`, `view_item_list`,
+  `view_item`, and checkout-step render screenshots unannotated unless the
+  capture is explicitly documenting a click target; prefer a rectangle-only
+  callout in workbook thumbnails because the event row already provides the
+  label;
+- `05 QA Cases`: lightweight recette preparation when included.
 
 Do not add planning rationale, template provenance, audience summaries, or
 internal reasoning to visible workbook tabs. Put deeper rationale in the
 structured plan when needed.
 
+Keep the Event Matrix analyst-facing. Do not expose internal `event_id`,
+`screenshot_id`, `qa_id`, or tracking-row identifiers in the Event Matrix.
+Use the row label `event` for the pushed dataLayer event value. Use
+`event_name` only when referring to the GA4 event name or GA4 payload setting.
+
+When the user provides a client template, preserve sheet names, column order,
+critical colors, frozen panes, and protected sections as much as practical.
+Record the preservation policy and template diff in structured JSON; do not add
+dense new visible tabs unless the user asks.
+
 ## Approval Boundary
 
-Provide a lightweight validation plan and one QA case per testable event when
-producing JSON or XLSX. Each QA case should include stable `event_id` and
-`qa_id`, reproduction steps, expected dataLayer or SDK behavior, expected
-network payload, DebugView expectation, status placeholder, and evidence
-placeholder.
+Provide lightweight validation guidance when producing JSON or XLSX, but keep
+QA execution and QA-specific identifiers for the dedicated QA/recette phase.
+If structured JSON needs internal IDs for machine validation, keep them out of
+analyst-facing workbook rows.
 
 Do not create GTM tags, dataLayer code, server-side tagging, or QA automation
 unless the user explicitly asks for the next phase.

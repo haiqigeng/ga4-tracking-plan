@@ -9,7 +9,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-from ecommerce_matrix import EVENT_PARAMETERS_BY_EVENT, OFFICIAL_ITEM_PARAMETERS
+from ecommerce_matrix import (
+    ECOMMERCE_PARAMETERS_BY_PROFILE,
+    ECOMMERCE_PROFILE_BY_EVENT,
+    EVENT_PARAMETERS_BY_EVENT,
+    OFFICIAL_ITEM_PARAMETERS,
+)
 
 
 ECOMMERCE_EVENTS = {
@@ -160,6 +165,43 @@ CUSTOM_PARAMETER_CLASSIFICATIONS = {
     "custom_user_property",
     "piano_custom_property",
 }
+OFFICIAL_VERIFICATION_CLASSES = {
+    "automatic",
+    "enhanced_measurement",
+    "recommended",
+    "recommended_ecommerce",
+    "piano_standard",
+    "piano_sales_insights",
+    "piano_av_insights",
+}
+OFFICIAL_PARAMETER_CLASSES = {
+    "ga4_auto_collected_parameter",
+    "ga4_native_parameter",
+    "ga4_recommended_parameter",
+    "ga4_ecommerce_parameter",
+    "ga4_ecommerce_item_parameter",
+    "piano_page_property",
+    "piano_click_property",
+    "piano_product_property",
+    "piano_cart_property",
+    "piano_transaction_property",
+    "piano_av_property",
+    "piano_conversion_property",
+}
+POTENTIAL_DUPLICATE_EVENTS = {
+    "page_view",
+    "scroll",
+    "click",
+    "file_download",
+    "form_start",
+    "form_submit",
+    "video_start",
+    "video_progress",
+    "video_complete",
+    "search",
+}
+MANUAL_COLLECTION_SOURCES = {"manual_gtm", "data_layer", "gtag", "sdk", "server_side"}
+WEAK_TEMPLATE_REASON_RE = re.compile(r"^(n/a|none|no|not applicable|tbd|same)$", re.I)
 NON_CONVERSION_MEASUREMENT_ROLES = {"context", "diagnostic"}
 OFFICIAL_SOURCE_DOMAINS = {
     "ga4": ("developers.google.com/analytics", "support.google.com/analytics"),
@@ -885,6 +927,66 @@ def check_business_question(value: Any, path: str, issues: list[Issue]) -> None:
         )
 
 
+def check_execution_context(plan: dict[str, Any], issues: list[Issue]) -> None:
+    context = plan.get("execution_context", {})
+    if not isinstance(context, dict):
+        return
+    mode = str(context.get("execution_mode", ""))
+    template_policy = context.get("template_policy", {})
+    artifacts = context.get("input_artifact_inventory", [])
+    if not isinstance(template_policy, dict):
+        return
+
+    artifact_types = {
+        str(artifact.get("artifact_type", ""))
+        for artifact in artifacts
+        if isinstance(artifact, dict)
+    }
+    policy_mode = str(template_policy.get("mode", ""))
+    if mode == "client_template_adaptation":
+        if policy_mode not in {"strict_client_template", "hybrid_preserve_client_structure"}:
+            add_issue(
+                issues,
+                "error",
+                "CLIENT_TEMPLATE_POLICY_MISSING",
+                "$.execution_context.template_policy.mode",
+                "Client-template adaptation must use strict_client_template or hybrid_preserve_client_structure.",
+            )
+        if not (artifact_types & {"template_workbook", "client_tracking_plan", "tracking_plan_dev_doc", "tracking_plan_recette", "event_inventory"}):
+            add_issue(
+                issues,
+                "error",
+                "CLIENT_TEMPLATE_ARTIFACT_MISSING",
+                "$.execution_context.input_artifact_inventory",
+                "Client-template adaptation needs a client template, tracking plan, dev doc, recette plan, or event inventory artifact.",
+            )
+        if template_policy.get("template_diff_required") and not context.get("template_diff_summary"):
+            add_issue(
+                issues,
+                "warning",
+                "TEMPLATE_DIFF_SUMMARY_MISSING",
+                "$.execution_context.template_diff_summary",
+                "Strict or hybrid client-template work should include a concise template diff summary.",
+            )
+    if mode == "greenfield_best_practice" and policy_mode != "default_skill_template":
+        add_issue(
+            issues,
+            "warning",
+            "GREENFIELD_TEMPLATE_POLICY",
+            "$.execution_context.template_policy.mode",
+            "Greenfield best-practice mode should normally use default_skill_template.",
+        )
+    preservation = template_policy.get("preservation_requirements", [])
+    if policy_mode in {"strict_client_template", "hybrid_preserve_client_structure"} and not preservation:
+        add_issue(
+            issues,
+            "error",
+            "TEMPLATE_PRESERVATION_REQUIREMENTS_MISSING",
+            "$.execution_context.template_policy.preservation_requirements",
+            "Client-template modes need explicit preservation requirements for sheets, columns, order, colors, or protected areas.",
+        )
+
+
 def check_measurement_alignment(plan: dict[str, Any], issues: list[Issue]) -> None:
     briefs = [brief for brief in plan.get("measurement_brief", []) if isinstance(brief, dict)]
     events = [event for event in plan.get("events", []) if isinstance(event, dict)]
@@ -1054,12 +1156,15 @@ def check_website_coverage_map(plan: dict[str, Any], issues: list[Issue]) -> Non
     }
 
     covered_journey_ids: set[str] = set()
+    included_coverage_ids: set[str] = set()
     for index, item in enumerate(coverage.get("journeys_covered", []) if isinstance(coverage.get("journeys_covered", []), list) else []):
         if not isinstance(item, dict):
             continue
         journey_id = str(item.get("journey_id", ""))
         if journey_id:
             covered_journey_ids.add(journey_id)
+            if item.get("tracking_plan_decision") == "included":
+                included_coverage_ids.add(journey_id)
             if journey_id not in journey_ids:
                 add_issue(
                     issues,
@@ -1088,6 +1193,43 @@ def check_website_coverage_map(plan: dict[str, Any], issues: list[Issue]) -> Non
                         f"Included journeys need non-empty {field} so analysts and future QA can understand coverage.",
                     )
 
+    coverage_gap_text = " ".join(
+        " ".join(str(value) for value in gap.values())
+        for gap in coverage.get("coverage_gaps", [])
+        if isinstance(gap, dict)
+    ).lower()
+    for index, discovered in enumerate(coverage.get("journeys_discovered", []) if isinstance(coverage.get("journeys_discovered", []), list) else []):
+        if not isinstance(discovered, dict):
+            continue
+        journey_id = str(discovered.get("journey_id", ""))
+        decision = str(discovered.get("decision", ""))
+        if decision == "include_in_plan" and journey_id not in journey_ids:
+            add_issue(
+                issues,
+                "error",
+                "DISCOVERED_JOURNEY_NOT_IN_MEASUREMENT_BRIEF",
+                f"$.website_coverage_map.journeys_discovered[{index}].journey_id",
+                f"Discovered journey '{journey_id}' is marked include_in_plan but is missing from measurement_brief.",
+            )
+        if decision == "include_in_plan" and journey_id not in included_coverage_ids:
+            add_issue(
+                issues,
+                "error",
+                "DISCOVERED_JOURNEY_NOT_COVERED",
+                f"$.website_coverage_map.journeys_discovered[{index}].journey_id",
+                f"Discovered journey '{journey_id}' is marked include_in_plan but has no included coverage entry.",
+            )
+        if decision == "needs_discovery":
+            marker_text = f"{journey_id} {discovered.get('journey_name', '')}".lower()
+            if not any(part and part in coverage_gap_text for part in marker_text.split()):
+                add_issue(
+                    issues,
+                    "error",
+                    "DISCOVERED_JOURNEY_GAP_MISSING",
+                    f"$.website_coverage_map.journeys_discovered[{index}].decision",
+                    f"Discovered journey '{journey_id}' needs discovery but no matching coverage gap explains the risk.",
+                )
+
     for brief_index, brief in enumerate(plan.get("measurement_brief", []) if isinstance(plan.get("measurement_brief", []), list) else []):
         if not isinstance(brief, dict):
             continue
@@ -1108,6 +1250,55 @@ def check_website_coverage_map(plan: dict[str, Any], issues: list[Issue]) -> Non
             "WHOLE_SITE_COVERAGE_SOURCE_MISSING",
             "$.website_coverage_map.sources_checked",
             "Whole-site plans need at least one structural source such as sitemap, navigation, URL list, page templates, browser exploration, Playwright, or existing tracking files.",
+        )
+    if coverage.get("site_scope") == "whole_site" and not coverage.get("journeys_discovered"):
+        add_issue(
+            issues,
+            "error",
+            "WHOLE_SITE_DISCOVERED_JOURNEYS_MISSING",
+            "$.website_coverage_map.journeys_discovered",
+            "Whole-site plans must list discovered journeys and include/exclude/needs-discovery decisions.",
+        )
+
+
+def check_official_verification(
+    verification: Any,
+    platform: str,
+    path: str,
+    issues: list[Issue],
+    *,
+    required: bool,
+) -> None:
+    if not isinstance(verification, dict):
+        if required:
+            add_issue(issues, "error", "OFFICIAL_VERIFICATION_MISSING", path, "Official-first choices need source URL, checked date, and scope note.")
+        return
+    status = str(verification.get("status", ""))
+    source_url = str(verification.get("source_url", "")).lower()
+    scope_note = str(verification.get("scope_note", "")).strip()
+    if required and status != "verified":
+        add_issue(
+            issues,
+            "error",
+            "OFFICIAL_VERIFICATION_NOT_VERIFIED",
+            f"{path}.status",
+            "Official/native/recommended/platform-standard fields must be marked verified against official documentation.",
+        )
+    if required and platform in OFFICIAL_SOURCE_DOMAINS and not any(domain in source_url for domain in OFFICIAL_SOURCE_DOMAINS[platform]):
+        add_issue(
+            issues,
+            "error",
+            "OFFICIAL_VERIFICATION_SOURCE_INVALID",
+            f"{path}.source_url",
+            f"Official verification for {platform} must cite an official source domain.",
+        )
+    if required and len(scope_note.split()) < 3:
+        add_issue(
+            issues,
+            "error",
+            "OFFICIAL_VERIFICATION_SCOPE_WEAK",
+            f"{path}.scope_note",
+            "Official verification must state event, item, property, or implementation scope clearly.",
         )
 
 
@@ -1158,6 +1349,51 @@ def check_event(
         add_issue(issues, "error", "PRIMARY_PLATFORM_MISSING", f"{base}.primary_platform", "Every event needs primary_platform for platform-specific QA and mapping.")
     if not str(event.get("official_match", "")).strip():
         add_issue(issues, "error", "OFFICIAL_MATCH_MISSING", f"{base}.official_match", "Every event needs official_match describing the official event match or custom rationale.")
+    check_official_verification(
+        event.get("official_verification"),
+        str(event.get("primary_platform", "")),
+        f"{base}.official_verification",
+        issues,
+        required=classification in OFFICIAL_VERIFICATION_CLASSES,
+    )
+    collection_strategy = event.get("collection_strategy", {})
+    if isinstance(collection_strategy, dict):
+        collection_source = str(collection_strategy.get("collection_source", ""))
+        duplicate_risk = collection_strategy.get("duplicate_risk", {})
+        if classification == "automatic" and collection_source != "ga4_automatic":
+            add_issue(
+                issues,
+                "warning",
+                "AUTOMATIC_COLLECTION_SOURCE_MISMATCH",
+                f"{base}.collection_strategy.collection_source",
+                "GA4 automatic events should normally use collection_source='ga4_automatic'.",
+            )
+        if classification == "enhanced_measurement" and collection_source != "ga4_enhanced_measurement":
+            add_issue(
+                issues,
+                "warning",
+                "ENHANCED_COLLECTION_SOURCE_MISMATCH",
+                f"{base}.collection_strategy.collection_source",
+                "GA4 enhanced-measurement events should normally use collection_source='ga4_enhanced_measurement'.",
+            )
+        if str(event_name) in POTENTIAL_DUPLICATE_EVENTS and collection_source in MANUAL_COLLECTION_SOURCES:
+            if not isinstance(duplicate_risk, dict) or duplicate_risk.get("level") == "low":
+                add_issue(
+                    issues,
+                    "warning",
+                    "ENHANCED_MEASUREMENT_DUPLICATE_RISK_UNDERSTATED",
+                    f"{base}.collection_strategy.duplicate_risk.level",
+                    f"Manual collection of '{event_name}' needs a medium/high duplicate-risk decision unless native collection is explicitly disabled or insufficient.",
+                )
+            reason_text = " ".join(str(duplicate_risk.get(key, "")) for key in ["reason", "dedupe_rule"]) if isinstance(duplicate_risk, dict) else ""
+            if len(reason_text.split()) < 8:
+                add_issue(
+                    issues,
+                    "error",
+                    "DUPLICATE_RISK_DECISION_WEAK",
+                    f"{base}.collection_strategy.duplicate_risk",
+                    "Manual collection of automatic/enhanced-measurement candidates needs a concrete duplicate-risk reason and dedupe rule.",
+                )
     page_or_component = str(event.get("page_or_component", "")).strip()
     if page_or_component.lower().rstrip(".") in WEAK_COMPONENT_CONTEXTS or len(page_or_component.split()) < 2:
         add_issue(
@@ -1271,6 +1507,40 @@ def check_event(
         add_issue(issues, "error", "INVALID_ECOMMERCE_EVENT", f"{base}.event_name", f"'{event_name}' is not an official GA4 ecommerce event.")
 
     if classification == "recommended_ecommerce":
+        profile = event.get("parameter_profile")
+        expected_profile = ECOMMERCE_PROFILE_BY_EVENT.get(str(event_name))
+        if not isinstance(profile, dict):
+            add_issue(issues, "error", "ECOMMERCE_PARAMETER_PROFILE_MISSING", f"{base}.parameter_profile", "Ecommerce events need a canonical parameter profile.")
+        else:
+            profile_id = profile.get("profile_id")
+            if expected_profile and profile_id != expected_profile:
+                add_issue(
+                    issues,
+                    "error",
+                    "ECOMMERCE_PARAMETER_PROFILE_MISMATCH",
+                    f"{base}.parameter_profile.profile_id",
+                    f"{event_name} should use parameter profile '{expected_profile}'.",
+                )
+            canonical = profile.get("canonical_parameter_order", [])
+            expected_order = ECOMMERCE_PARAMETERS_BY_PROFILE.get(str(profile_id), [])
+            if expected_order and canonical != expected_order:
+                add_issue(
+                    issues,
+                    "error",
+                    "ECOMMERCE_PARAMETER_PROFILE_ORDER",
+                    f"{base}.parameter_profile.canonical_parameter_order",
+                    "Ecommerce parameter profile must use the canonical order for the profile.",
+                )
+            ordered_event_parameters = [parameter for parameter in event.get("parameters", []) if parameter in canonical]
+            canonical_present = [parameter for parameter in canonical if parameter in event.get("parameters", [])]
+            if ordered_event_parameters != canonical_present:
+                add_issue(
+                    issues,
+                    "warning",
+                    "ECOMMERCE_EVENT_PARAMETER_ORDER",
+                    f"{base}.parameters",
+                    "Ecommerce event parameters should follow the canonical profile order to keep the Event Matrix readable.",
+                )
         official_event_parameters = EVENT_PARAMETERS_BY_EVENT.get(event_name, set())
         for name in payload_parameters:
             metadata = parameter_lookup.get(name)
@@ -1396,6 +1666,7 @@ def validate_plan_data(plan: dict[str, Any], schema_path: Path | None = None) ->
 
     check_duplicates([event.get("event_id", "") for event in events if isinstance(event, dict)], "event_id", "$.events", issues)
     check_duplicates([case.get("qa_id", "") for case in qa_cases if isinstance(case, dict)], "qa_id", "$.qa_cases", issues)
+    check_execution_context(plan, issues)
     check_measurement_alignment(plan, issues)
     check_measurement_strategy(plan, issues)
     check_website_coverage_map(plan, issues)
@@ -1435,6 +1706,14 @@ def validate_plan_data(plan: dict[str, Any], schema_path: Path | None = None) ->
         check_pii_name(name, f"$.parameters[{index}].parameter_name", issues)
         check_legacy_ua_field(name, f"$.parameters[{index}].parameter_name", issues)
         classification = param.get("classification")
+        parameter_platform = "piano_analytics" if str(classification).startswith("piano_") else "ga4"
+        check_official_verification(
+            param.get("official_verification"),
+            parameter_platform,
+            f"$.parameters[{index}].official_verification",
+            issues,
+            required=classification in OFFICIAL_PARAMETER_CLASSES,
+        )
         if should_lint_ga4_parameter_name(name, param):
             check_ga4_name(name, f"$.parameters[{index}].parameter_name", "parameter", issues)
             if name in GA4_RESERVED_PARAMETER_NAMES and classification not in {

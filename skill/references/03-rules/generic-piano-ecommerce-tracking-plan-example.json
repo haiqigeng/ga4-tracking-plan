@@ -1,9 +1,40 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "plan_id": "generic_piano_ecommerce_sales_insights",
   "analytics_platforms": [
     "piano_analytics"
   ],
+  "execution_context": {
+    "execution_mode": "greenfield_best_practice",
+    "mode_reason": "Generic Piano fixture validates platform-native schema behavior without client-specific artifacts.",
+    "input_artifact_inventory": [
+      {
+        "artifact_type": "user_brief",
+        "artifact_ref": "generic Piano fixture brief",
+        "role": "Define example scope and assumptions",
+        "template_relevance": "not_template",
+        "confidentiality_status": "generic"
+      }
+    ],
+    "template_policy": {
+      "mode": "default_skill_template",
+      "template_source": "canonical JSON fixture",
+      "preservation_requirements": [
+        "Keep structured JSON fields stable for validation."
+      ],
+      "allowed_changes": [
+        "Generate default workbook when needed."
+      ],
+      "template_diff_required": false
+    },
+    "template_diff_summary": {
+      "status": "not_needed",
+      "summary": "No client workbook template is used in this generic fixture.",
+      "columns_added": [],
+      "columns_removed": [],
+      "style_or_structure_changes": []
+    }
+  },
   "document": {
     "title": "Generic Piano Analytics ecommerce tracking plan",
     "version": "v0.1",
@@ -205,7 +236,33 @@
     "playwright_recommendation": {
       "status": "optional",
       "reason": "Useful for a real ecommerce checkout, but not required for this static Sales Insights fixture."
-    }
+    },
+    "journeys_discovered": [
+      {
+        "journey_id": "ecommerce_purchase_journey",
+        "journey_name": "Ecommerce add-to-cart and purchase",
+        "source_refs": [
+          "Generic Piano ecommerce fixture brief",
+          "Representative product and confirmation templates"
+        ],
+        "representative_urls": [
+          "https://example.com/product/*",
+          "https://example.com/checkout/confirmation"
+        ],
+        "page_templates": [
+          "product_page",
+          "checkout_confirmation"
+        ],
+        "key_interactions": [
+          "add product to cart",
+          "create cart",
+          "complete checkout",
+          "display purchased products"
+        ],
+        "decision": "include_in_plan",
+        "decision_reason": "Search, listing, account, support, and refund journeys are outside this fixture."
+      }
+    ]
   },
   "events": [
     {
@@ -303,7 +360,21 @@
         "debugview_expectation": "product.add_to_cart appears once after the add-to-cart action.",
         "status": "not_started"
       },
-      "implementation_notes": "Do not replace this Sales Insights event with a generic click event when product data is available."
+      "implementation_notes": "Do not replace this Sales Insights event with a generic click event when product data is available.",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano Sales Insights event and property scope checked for product.add_to_cart."
+      },
+      "collection_strategy": {
+        "collection_source": "piano_sdk",
+        "duplicate_risk": {
+          "level": "low",
+          "reason": "Piano event is collected through the Piano SDK for this platform-specific fixture.",
+          "dedupe_rule": "Keep Piano SDK calls separate from GA4 dataLayer events."
+        }
+      }
     },
     {
       "event_id": "EVT-PIANO-CART-CREATION",
@@ -394,7 +465,21 @@
         "debugview_expectation": "cart.creation appears once when the first cart is created.",
         "status": "not_started"
       },
-      "implementation_notes": "Pair with product.add_to_cart only when the cart is newly created."
+      "implementation_notes": "Pair with product.add_to_cart only when the cart is newly created.",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano Sales Insights event and property scope checked for cart.creation."
+      },
+      "collection_strategy": {
+        "collection_source": "piano_sdk",
+        "duplicate_risk": {
+          "level": "low",
+          "reason": "Piano event is collected through the Piano SDK for this platform-specific fixture.",
+          "dedupe_rule": "Keep Piano SDK calls separate from GA4 dataLayer events."
+        }
+      }
     },
     {
       "event_id": "EVT-PIANO-TRANSACTION-CONFIRMATION",
@@ -492,7 +577,21 @@
         "debugview_expectation": "transaction.confirmation appears once on the confirmation page.",
         "status": "not_started"
       },
-      "implementation_notes": "Keep this as the transaction-level confirmation event; product-level purchased details belong in product.purchased."
+      "implementation_notes": "Keep this as the transaction-level confirmation event; product-level purchased details belong in product.purchased.",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano Sales Insights event and property scope checked for transaction.confirmation."
+      },
+      "collection_strategy": {
+        "collection_source": "piano_sdk",
+        "duplicate_risk": {
+          "level": "low",
+          "reason": "Piano event is collected through the Piano SDK for this platform-specific fixture.",
+          "dedupe_rule": "Keep Piano SDK calls separate from GA4 dataLayer events."
+        }
+      }
     },
     {
       "event_id": "EVT-PIANO-PRODUCT-PURCHASED",
@@ -589,7 +688,21 @@
         "debugview_expectation": "product.purchased appears with the transaction_id that matches transaction.confirmation.",
         "status": "not_started"
       },
-      "implementation_notes": "For multiple products, repeat this event per product line or follow the client's agreed Piano Sales Insights batching pattern."
+      "implementation_notes": "For multiple products, repeat this event per product line or follow the client's agreed Piano Sales Insights batching pattern.",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano Sales Insights event and property scope checked for product.purchased."
+      },
+      "collection_strategy": {
+        "collection_source": "piano_sdk",
+        "duplicate_risk": {
+          "level": "low",
+          "reason": "Piano event is collected through the Piano SDK for this platform-specific fixture.",
+          "dedupe_rule": "Keep Piano SDK calls separate from GA4 dataLayer events."
+        }
+      }
     }
   ],
   "parameters": [
@@ -609,7 +722,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "medium",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for product_id."
+      }
     },
     {
       "parameter_name": "cart_id",
@@ -627,7 +746,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "medium",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for cart_id."
+      }
     },
     {
       "parameter_name": "transaction_id",
@@ -645,7 +770,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "medium",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for transaction_id."
+      }
     },
     {
       "parameter_name": "product",
@@ -663,7 +794,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "medium",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for product."
+      }
     },
     {
       "parameter_name": "product_variant",
@@ -684,7 +821,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "low",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for product_variant."
+      }
     },
     {
       "parameter_name": "product_pricetaxincluded",
@@ -702,7 +845,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "medium",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for product_pricetaxincluded."
+      }
     },
     {
       "parameter_name": "product_quantity",
@@ -720,7 +869,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "low",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for product_quantity."
+      }
     },
     {
       "parameter_name": "product_cartcreation",
@@ -741,7 +896,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "low",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for product_cartcreation."
+      }
     },
     {
       "parameter_name": "cart_currency",
@@ -763,7 +924,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "low",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for cart_currency."
+      }
     },
     {
       "parameter_name": "cart_turnovertaxincluded",
@@ -781,7 +948,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "medium",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for cart_turnovertaxincluded."
+      }
     },
     {
       "parameter_name": "cart_quantity",
@@ -799,7 +972,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "low",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for cart_quantity."
+      }
     },
     {
       "parameter_name": "cart_nbdistinctproduct",
@@ -817,7 +996,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "low",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for cart_nbdistinctproduct."
+      }
     },
     {
       "parameter_name": "payment_mode",
@@ -840,7 +1025,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "low",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/sales-insights/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for payment_mode."
+      }
     }
   ],
   "custom_definitions": [],

@@ -1,4 +1,4 @@
 interface:
   display_name: "GA4 Web Analyst"
   short_description: "Act as a web analyst to design GA4-first tracking plans"
-  default_prompt: "Use $ga4-tracking-plan as a web analyst to map website/journey coverage and create a GA4 tracking plan for these pages and journeys."
+  default_prompt: "Use $ga4-tracking-plan as a web analyst to choose the mode/template policy, map website/journey coverage, and create a GA4 tracking plan for these pages and journeys."

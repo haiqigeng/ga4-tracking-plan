@@ -45,6 +45,22 @@ Do not group ecommerce events together just because they are in the same journey
 
 If a block becomes too dense, split it rather than hiding parameters. Keep rows in a stable official-first order so analysts can scan the same parameter in the same position across compatible events.
 
+## Canonical Parameter Profiles
+
+Use `parameter_profile` for every GA4 ecommerce event in structured plans:
+
+- `promotion_profile`: `view_promotion`, `select_promotion`
+- `list_profile`: `view_item_list`, `select_item`
+- `item_detail_profile`: `view_item`
+- `cart_profile`: `add_to_cart`, `remove_from_cart`, `view_cart`
+- `checkout_profile`: `begin_checkout`, `add_shipping_info`, `add_payment_info`
+- `transaction_profile`: `purchase`
+- `refund_profile`: `refund`
+
+The profile records the canonical parameter order used by
+`scripts/ecommerce_matrix.py`. Do not reorder related ecommerce parameters per
+event unless the exception is explicit and useful for implementation.
+
 ## Official-First Row Order
 
 Use a stable order inside each family:

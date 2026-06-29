@@ -1,9 +1,40 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "plan_id": "generic_piano_content_page",
   "analytics_platforms": [
     "piano_analytics"
   ],
+  "execution_context": {
+    "execution_mode": "greenfield_best_practice",
+    "mode_reason": "Generic Piano fixture validates platform-native schema behavior without client-specific artifacts.",
+    "input_artifact_inventory": [
+      {
+        "artifact_type": "user_brief",
+        "artifact_ref": "generic Piano fixture brief",
+        "role": "Define example scope and assumptions",
+        "template_relevance": "not_template",
+        "confidentiality_status": "generic"
+      }
+    ],
+    "template_policy": {
+      "mode": "default_skill_template",
+      "template_source": "canonical JSON fixture",
+      "preservation_requirements": [
+        "Keep structured JSON fields stable for validation."
+      ],
+      "allowed_changes": [
+        "Generate default workbook when needed."
+      ],
+      "template_diff_required": false
+    },
+    "template_diff_summary": {
+      "status": "not_needed",
+      "summary": "No client workbook template is used in this generic fixture.",
+      "columns_added": [],
+      "columns_removed": [],
+      "style_or_structure_changes": []
+    }
+  },
   "document": {
     "title": "Generic Piano Analytics content page tracking plan",
     "version": "v0.1",
@@ -162,7 +193,29 @@
     "playwright_recommendation": {
       "status": "not_needed",
       "reason": "The fixture validates a single content page journey with no dynamic discovery requirement."
-    }
+    },
+    "journeys_discovered": [
+      {
+        "journey_id": "content_page_engagement",
+        "journey_name": "Content page engagement",
+        "source_refs": [
+          "Generic Piano content fixture brief",
+          "Representative content page template"
+        ],
+        "representative_urls": [
+          "https://example.com/article"
+        ],
+        "page_templates": [
+          "content_page"
+        ],
+        "key_interactions": [
+          "content page display",
+          "internal navigation click"
+        ],
+        "decision": "include_in_plan",
+        "decision_reason": "Subscription, search, media, and download journeys are outside this fixture."
+      }
+    ]
   },
   "events": [
     {
@@ -245,7 +298,21 @@
         "debugview_expectation": "page.display appears once with the expected page taxonomy.",
         "status": "not_started"
       },
-      "implementation_notes": "Do not translate this event to GA4 page_view unless GA4 is also in scope as a separate platform mapping."
+      "implementation_notes": "Do not translate this event to GA4 page_view unless GA4 is also in scope as a separate platform mapping.",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/standard-events/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano event and property scope checked for page.display."
+      },
+      "collection_strategy": {
+        "collection_source": "piano_sdk",
+        "duplicate_risk": {
+          "level": "low",
+          "reason": "Piano event is collected through the Piano SDK for this platform-specific fixture.",
+          "dedupe_rule": "Keep Piano SDK calls separate from GA4 dataLayer events."
+        }
+      }
     },
     {
       "event_id": "EVT-PIANO-CLICK-NAVIGATION",
@@ -328,7 +395,21 @@
         "debugview_expectation": "click.navigation appears after the internal navigation click.",
         "status": "not_started"
       },
-      "implementation_notes": "Use click.action instead if the interaction performs an action without navigating."
+      "implementation_notes": "Use click.action instead if the interaction performs an action without navigating.",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/standard-events/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano event and property scope checked for click.navigation."
+      },
+      "collection_strategy": {
+        "collection_source": "piano_sdk",
+        "duplicate_risk": {
+          "level": "low",
+          "reason": "Piano event is collected through the Piano SDK for this platform-specific fixture.",
+          "dedupe_rule": "Keep Piano SDK calls separate from GA4 dataLayer events."
+        }
+      }
     }
   ],
   "parameters": [
@@ -348,7 +429,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "medium",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/standard-events/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for page."
+      }
     },
     {
       "parameter_name": "page_chapter1",
@@ -370,7 +457,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "low",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/standard-events/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for page_chapter1."
+      }
     },
     {
       "parameter_name": "page_chapter2",
@@ -388,7 +481,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "low",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/standard-events/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for page_chapter2."
+      }
     },
     {
       "parameter_name": "click",
@@ -406,7 +505,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "medium",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/standard-events/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for click."
+      }
     },
     {
       "parameter_name": "click_chapter1",
@@ -428,7 +533,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "low",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/standard-events/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for click_chapter1."
+      }
     },
     {
       "parameter_name": "click_chapter2",
@@ -446,7 +557,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "low",
       "pii_risk": "low",
-      "consent_dependency": "analytics consent"
+      "consent_dependency": "analytics consent",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.piano.io/analytics/data-collection/how-to-send-events/standard-events/",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official Piano property scope checked for click_chapter2."
+      }
     }
   ],
   "custom_definitions": [],

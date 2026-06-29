@@ -117,6 +117,32 @@ ECOMMERCE_PARAMETERS_BY_GROUP = {
     ],
 }
 
+ECOMMERCE_PROFILE_BY_EVENT = {
+    "view_promotion": "promotion_profile",
+    "select_promotion": "promotion_profile",
+    "view_item_list": "list_profile",
+    "select_item": "list_profile",
+    "view_item": "item_detail_profile",
+    "add_to_cart": "cart_profile",
+    "remove_from_cart": "cart_profile",
+    "view_cart": "cart_profile",
+    "begin_checkout": "checkout_profile",
+    "add_shipping_info": "checkout_profile",
+    "add_payment_info": "checkout_profile",
+    "purchase": "transaction_profile",
+    "refund": "refund_profile",
+}
+
+ECOMMERCE_PARAMETERS_BY_PROFILE = {
+    "promotion_profile": ECOMMERCE_PARAMETERS_BY_GROUP["Ecommerce promotions"],
+    "list_profile": ECOMMERCE_PARAMETERS_BY_GROUP["Ecommerce product lists"],
+    "item_detail_profile": ECOMMERCE_PARAMETERS_BY_GROUP["Ecommerce product detail"],
+    "cart_profile": ECOMMERCE_PARAMETERS_BY_GROUP["Ecommerce cart"],
+    "checkout_profile": ECOMMERCE_PARAMETERS_BY_GROUP["Ecommerce checkout"],
+    "transaction_profile": ECOMMERCE_PARAMETERS_BY_GROUP["Ecommerce transactions"],
+    "refund_profile": ECOMMERCE_PARAMETERS_BY_GROUP["Ecommerce transactions"],
+}
+
 EVENT_PARAMETERS_BY_EVENT = {
     "view_promotion": {"currency", "promotion_id", "promotion_name", "creative_name", "creative_slot", "items"},
     "select_promotion": {"currency", "promotion_id", "promotion_name", "creative_name", "creative_slot", "items"},
@@ -265,8 +291,16 @@ def scope_rule(parameter: str) -> str:
 
 def ordered_parameters_for_events(events: list[dict[str, Any]]) -> list[str]:
     if events and all(is_ecommerce_event(event) for event in events):
-        group = ecommerce_group(str(events[0].get("event_name", "")))
-        ordered = list(ECOMMERCE_PARAMETERS_BY_GROUP.get(group, ECOMMERCE_PARAMETERS_BY_GROUP["Ecommerce other"]))
+        profile = None
+        if len(events) == 1:
+            event_profile = events[0].get("parameter_profile", {})
+            if isinstance(event_profile, dict):
+                profile = event_profile.get("profile_id")
+        if profile in ECOMMERCE_PARAMETERS_BY_PROFILE:
+            ordered = list(ECOMMERCE_PARAMETERS_BY_PROFILE[profile])
+        else:
+            group = ecommerce_group(str(events[0].get("event_name", "")))
+            ordered = list(ECOMMERCE_PARAMETERS_BY_GROUP.get(group, ECOMMERCE_PARAMETERS_BY_GROUP["Ecommerce other"]))
     else:
         ordered = []
 

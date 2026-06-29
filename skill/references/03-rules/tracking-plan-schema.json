@@ -9,6 +9,7 @@
     "schema_version",
     "plan_id",
     "analytics_platforms",
+    "execution_context",
     "document",
     "measurement_brief",
     "measurement_strategy",
@@ -37,6 +38,9 @@
         "$ref": "#/$defs/analyticsPlatform"
       },
       "uniqueItems": true
+    },
+    "execution_context": {
+      "$ref": "#/$defs/executionContext"
     },
     "document": {
       "$ref": "#/$defs/document"
@@ -109,6 +113,165 @@
     }
   },
   "$defs": {
+    "executionContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "execution_mode",
+        "mode_reason",
+        "input_artifact_inventory",
+        "template_policy"
+      ],
+      "properties": {
+        "execution_mode": {
+          "enum": [
+            "client_template_adaptation",
+            "greenfield_best_practice",
+            "existing_plan_review",
+            "event_recommendation",
+            "template_only"
+          ]
+        },
+        "mode_reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input_artifact_inventory": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/inputArtifact"
+          }
+        },
+        "template_policy": {
+          "$ref": "#/$defs/templatePolicy"
+        },
+        "template_diff_summary": {
+          "$ref": "#/$defs/templateDiffSummary"
+        }
+      }
+    },
+    "inputArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_type",
+        "artifact_ref",
+        "role",
+        "template_relevance",
+        "confidentiality_status"
+      ],
+      "properties": {
+        "artifact_type": {
+          "enum": [
+            "website_url",
+            "sitemap",
+            "robots_txt",
+            "client_tracking_plan",
+            "tracking_plan_dev_doc",
+            "tracking_plan_recette",
+            "event_inventory",
+            "template_workbook",
+            "screenshots",
+            "user_brief",
+            "analytics_export",
+            "search_console_export",
+            "site_discovery_json",
+            "other"
+          ]
+        },
+        "artifact_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "template_relevance": {
+          "enum": [
+            "source_template",
+            "client_criteria",
+            "site_discovery",
+            "evidence",
+            "not_template"
+          ]
+        },
+        "confidentiality_status": {
+          "enum": [
+            "generic",
+            "client_provided",
+            "public_url",
+            "anonymized",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "templatePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "template_source",
+        "preservation_requirements",
+        "allowed_changes",
+        "template_diff_required"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "strict_client_template",
+            "default_skill_template",
+            "hybrid_preserve_client_structure",
+            "review_only",
+            "not_applicable"
+          ]
+        },
+        "template_source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preservation_requirements": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "allowed_changes": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "template_diff_required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "templateDiffSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "summary"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_needed",
+            "not_started",
+            "completed",
+            "blocked"
+          ]
+        },
+        "summary": {
+          "type": "string"
+        },
+        "columns_added": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "columns_removed": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "style_or_structure_changes": {
+          "$ref": "#/$defs/stringArray"
+        }
+      }
+    },
     "document": {
       "type": "object",
       "additionalProperties": false,
@@ -284,6 +447,7 @@
         "coverage_summary",
         "sources_checked",
         "journeys_covered",
+        "journeys_discovered",
         "coverage_gaps",
         "playwright_recommendation"
       ],
@@ -314,6 +478,12 @@
           "minItems": 1,
           "items": {
             "$ref": "#/$defs/journeyCoverage"
+          }
+        },
+        "journeys_discovered": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/discoveredJourney"
           }
         },
         "coverage_gaps": {
@@ -447,6 +617,54 @@
         }
       }
     },
+    "discoveredJourney": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "journey_id",
+        "journey_name",
+        "source_refs",
+        "representative_urls",
+        "page_templates",
+        "key_interactions",
+        "decision",
+        "decision_reason"
+      ],
+      "properties": {
+        "journey_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "journey_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_refs": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "representative_urls": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "page_templates": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "key_interactions": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "decision": {
+          "enum": [
+            "include_in_plan",
+            "exclude_low_value",
+            "out_of_scope",
+            "needs_discovery"
+          ]
+        },
+        "decision_reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "coverageGap": {
       "type": "object",
       "additionalProperties": false,
@@ -456,6 +674,9 @@
         "recommended_next_step"
       ],
       "properties": {
+        "journey_id": {
+          "type": "string"
+        },
         "gap": {
           "type": "string",
           "minLength": 1
@@ -619,12 +840,14 @@
         "business_event_family",
         "primary_platform",
         "official_match",
+        "official_verification",
         "page_url_pattern",
         "page_type",
         "page_or_component",
         "business_question",
         "trigger",
         "data_dependencies",
+        "collection_strategy",
         "key_event",
         "priority",
         "parameters",
@@ -675,6 +898,9 @@
           "type": "string",
           "minLength": 1
         },
+        "official_verification": {
+          "$ref": "#/$defs/officialVerification"
+        },
         "page_url_pattern": {
           "type": "string",
           "minLength": 1
@@ -698,6 +924,9 @@
         "data_dependencies": {
           "$ref": "#/$defs/stringArray"
         },
+        "collection_strategy": {
+          "$ref": "#/$defs/collectionStrategy"
+        },
         "key_event": {
           "type": "boolean"
         },
@@ -712,6 +941,9 @@
         },
         "ga4_payload": {
           "$ref": "#/$defs/ga4Payload"
+        },
+        "parameter_profile": {
+          "$ref": "#/$defs/parameterProfile"
         },
         "platform_mappings": {
           "type": "array",
@@ -732,6 +964,124 @@
           "$ref": "#/$defs/qa"
         },
         "implementation_notes": {
+          "type": "string"
+        }
+      }
+    },
+    "officialVerification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "source_url",
+        "checked_date",
+        "scope_note"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "verified",
+            "unverified",
+            "not_applicable"
+          ]
+        },
+        "source_url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checked_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "scope_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "collectionStrategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "collection_source",
+        "duplicate_risk"
+      ],
+      "properties": {
+        "collection_source": {
+          "enum": [
+            "ga4_automatic",
+            "ga4_enhanced_measurement",
+            "manual_gtm",
+            "data_layer",
+            "gtag",
+            "sdk",
+            "server_side",
+            "piano_sdk",
+            "unknown"
+          ]
+        },
+        "duplicate_risk": {
+          "$ref": "#/$defs/duplicateRisk"
+        }
+      }
+    },
+    "duplicateRisk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "level",
+        "reason",
+        "dedupe_rule"
+      ],
+      "properties": {
+        "level": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dedupe_rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "parameterProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "profile_source",
+        "canonical_parameter_order",
+        "exception_reason"
+      ],
+      "properties": {
+        "profile_id": {
+          "enum": [
+            "promotion_profile",
+            "list_profile",
+            "item_detail_profile",
+            "cart_profile",
+            "checkout_profile",
+            "transaction_profile",
+            "refund_profile",
+            "non_ecommerce_profile",
+            "platform_native_profile"
+          ]
+        },
+        "profile_source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonical_parameter_order": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "exception_reason": {
           "type": "string"
         }
       }
@@ -962,6 +1312,7 @@
         "example_value",
         "allowed_values",
         "source",
+        "official_verification",
         "register_custom_definition",
         "cardinality_risk",
         "pii_risk",
@@ -1019,6 +1370,9 @@
         "source": {
           "type": "string",
           "minLength": 1
+        },
+        "official_verification": {
+          "$ref": "#/$defs/officialVerification"
         },
         "register_custom_definition": {
           "type": "boolean"
@@ -1248,6 +1602,7 @@
         "ga4_ecommerce_parameter",
         "ga4_ecommerce_item_parameter",
         "custom_event_parameter",
+        "custom_item_parameter",
         "custom_user_property",
         "gtm_builtin_variable",
         "data_layer_variable",

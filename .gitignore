@@ -12,5 +12,6 @@ __pycache__/
 .venv/
 dist/
 generated/
+deliverables/
 release/
 tracking-plan-corpus-analysis/

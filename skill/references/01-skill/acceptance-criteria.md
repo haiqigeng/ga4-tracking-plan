@@ -7,6 +7,7 @@ Use this file to decide whether a tracking plan is good enough to deliver.
 A complete tracking plan must show:
 
 - scope, source evidence, assumptions, and open questions;
+- execution mode, input artifacts, and template policy;
 - website or journey coverage evidence when the request covers a broad site,
   multi-journey scope, or greenfield plan;
 - journey-level measurement logic tied to business goals and analysis needs;
@@ -14,8 +15,13 @@ A complete tracking plan must show:
 - macro conversions, micro conversions, diagnostic events, and context events
   separated by role but connected to the same journey model;
 - official GA4 events used when their meaning fits the action;
+- official event and parameter choices verified with source URL, checked date,
+  and scope note in structured plans;
+- collection source and duplicate-risk decisions for automatic, enhanced,
+  manual, SDK, or server-side events;
 - GA4 ecommerce events isolated from non-ecommerce events and documented with
-  official ecommerce event and item parameters;
+  official ecommerce event and item parameters plus canonical parameter
+  profiles;
 - custom events justified by business or diagnostic value, with official
   alternatives considered;
 - parameters reused consistently across events when they represent the same
@@ -23,6 +29,12 @@ A complete tracking plan must show:
 - controlled values normalized and useful for reporting;
 - not-tracked decisions for noisy, duplicate, sensitive, unavailable, or
   non-actionable interactions;
+- Screenshot Register rows generated from the event draft when screenshot
+  evidence is part of the delivery, with capture objective, automation cue, and
+  status rather than local file-path dependence;
+- representative screenshot previews for important page states or interaction
+  targets when captured evidence is useful for implementation review or future
+  recette;
 - QA cases linked to the same journey and event structure;
 - next step that names the required approval, evidence, implementation, or QA.
 
@@ -71,6 +83,12 @@ Mark the deliverable incomplete or blocked when:
 - parameters have no reporting purpose or value rules;
 - sensitive data is hidden inside generic fields;
 - QA cases are missing for testable events;
+- screenshot evidence is requested or useful but not linked back to event rows,
+  capture objectives, and future recette cues;
 - historical or Universal Analytics schema is copied into a GA4 plan.
 - a whole-site plan has no explicit coverage map, source list, or uncovered
   journey assumptions.
+- client-template mode has no template preservation policy or template diff
+  expectation.
+- manual tracking duplicates automatic or enhanced measurement without a dedupe
+  decision.

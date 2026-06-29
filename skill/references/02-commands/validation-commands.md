@@ -26,7 +26,21 @@ python scripts/validate_tracking_plan.py path\to\tracking-plan.json --warnings-a
 
 The validator checks structure, journey alignment, event classifications,
 official GA4 and Piano rules, ecommerce parameter scope, custom-event
-justification, privacy-sensitive field names, and QA links.
+justification, execution mode, template policy, website coverage decisions,
+official verification, collection source, duplicate-risk decisions,
+privacy-sensitive field names, and QA links.
+
+## Website Discovery Helper
+
+Run when a broad website scope needs first-pass URL and journey evidence:
+
+```powershell
+python scripts/discover_site_journeys.py https://www.example.com/ --output path\to\site_discovery.json
+```
+
+The output is a privacy-safe discovery aid. It does not replace Playwright or
+manual browser exploration for dynamic checkout, filters, account, forms,
+modals, or SPA routes.
 
 ## Workbook And CSV Checks
 

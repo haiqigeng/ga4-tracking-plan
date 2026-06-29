@@ -1,9 +1,47 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "plan_id": "generic_ecommerce_homepage",
   "analytics_platforms": [
     "ga4"
   ],
+  "execution_context": {
+    "execution_mode": "greenfield_best_practice",
+    "mode_reason": "Generic fixture uses the integrated default GA4 tracking plan template without client-specific artifacts.",
+    "input_artifact_inventory": [
+      {
+        "artifact_type": "user_brief",
+        "artifact_ref": "generic fixture brief",
+        "role": "Define example scope and assumptions",
+        "template_relevance": "not_template",
+        "confidentiality_status": "generic"
+      },
+      {
+        "artifact_type": "template_workbook",
+        "artifact_ref": "assets/ga4_tracking_plan_template.xlsx",
+        "role": "Default output template",
+        "template_relevance": "source_template",
+        "confidentiality_status": "generic"
+      }
+    ],
+    "template_policy": {
+      "mode": "default_skill_template",
+      "template_source": "assets/ga4_tracking_plan_template.xlsx",
+      "preservation_requirements": [
+        "Keep default six-sheet workbook structure stable."
+      ],
+      "allowed_changes": [
+        "Populate rows and QA placeholders from the structured plan."
+      ],
+      "template_diff_required": false
+    },
+    "template_diff_summary": {
+      "status": "not_needed",
+      "summary": "Default skill template used without client-template adaptation.",
+      "columns_added": [],
+      "columns_removed": [],
+      "style_or_structure_changes": []
+    }
+  },
   "document": {
     "title": "Generic GA4 ecommerce homepage tracking plan",
     "version": "v0.1",
@@ -245,7 +283,32 @@
     "playwright_recommendation": {
       "status": "not_needed",
       "reason": "The fixture validates a selected homepage template, not a dynamic whole-site crawl."
-    }
+    },
+    "journeys_discovered": [
+      {
+        "journey_id": "homepage_discovery",
+        "journey_name": "Homepage discovery",
+        "source_refs": [
+          "Generic fixture brief",
+          "Representative homepage template"
+        ],
+        "representative_urls": [
+          "https://example.com/"
+        ],
+        "page_templates": [
+          "homepage"
+        ],
+        "key_interactions": [
+          "homepage page view",
+          "promotion impression and click",
+          "site search",
+          "content or navigation selection",
+          "account access intent"
+        ],
+        "decision": "include_in_plan",
+        "decision_reason": "Cart, checkout, and product-listing journeys are intentionally outside this fixture."
+      }
+    ]
   },
   "events": [
     {
@@ -345,7 +408,21 @@
         "debugview_expectation": "One homepage page_view appears for the initial load.",
         "status": "not_started"
       },
-      "implementation_notes": "Avoid duplicate page_view if enhanced measurement already sends the correct event."
+      "implementation_notes": "Avoid duplicate page_view if enhanced measurement already sends the correct event.",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 event semantics and required parameter scope checked for page_view."
+      },
+      "collection_strategy": {
+        "collection_source": "ga4_automatic",
+        "duplicate_risk": {
+          "level": "medium",
+          "reason": "GA4 may collect this natively depending on stream settings.",
+          "dedupe_rule": "Do not add a manual GTM duplicate unless native collection is disabled or insufficient."
+        }
+      }
     },
     {
       "event_id": "EVT-HOME-PROMO-VIEW",
@@ -459,7 +536,56 @@
         "debugview_expectation": "view_promotion appears once per qualified promotion impression.",
         "status": "not_started"
       },
-      "implementation_notes": "Use one consolidated view_promotion definition and list allowed promotion values rather than one event per banner."
+      "implementation_notes": "Use one consolidated view_promotion definition and list allowed promotion values rather than one event per banner.",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 ecommerce event and event-level parameter scope checked for view_promotion."
+      },
+      "collection_strategy": {
+        "collection_source": "data_layer",
+        "duplicate_risk": {
+          "level": "low",
+          "reason": "Manual dataLayer collection is scoped to this explicit business interaction.",
+          "dedupe_rule": "Fire once per qualifying user action and avoid parallel automatic or enhanced-measurement collection."
+        }
+      },
+      "parameter_profile": {
+        "profile_id": "promotion_profile",
+        "profile_source": "skill/scripts/ecommerce_matrix.py official GA4 ecommerce profile",
+        "canonical_parameter_order": [
+          "currency",
+          "promotion_id",
+          "promotion_name",
+          "creative_name",
+          "creative_slot",
+          "items",
+          "items[].item_id",
+          "items[].item_name",
+          "items[].affiliation",
+          "items[].coupon",
+          "items[].discount",
+          "items[].index",
+          "items[].item_brand",
+          "items[].item_category",
+          "items[].item_category2",
+          "items[].item_category3",
+          "items[].item_category4",
+          "items[].item_category5",
+          "items[].item_list_id",
+          "items[].item_list_name",
+          "items[].item_variant",
+          "items[].location_id",
+          "items[].price",
+          "items[].quantity",
+          "items[].creative_name",
+          "items[].creative_slot",
+          "items[].promotion_id",
+          "items[].promotion_name"
+        ],
+        "exception_reason": ""
+      }
     },
     {
       "event_id": "EVT-HOME-PROMO-SELECT",
@@ -556,7 +682,56 @@
         "debugview_expectation": "select_promotion appears after the user click.",
         "status": "not_started"
       },
-      "implementation_notes": "Keep this as an ecommerce promotion event, not a generic click event."
+      "implementation_notes": "Keep this as an ecommerce promotion event, not a generic click event.",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 ecommerce event and event-level parameter scope checked for select_promotion."
+      },
+      "collection_strategy": {
+        "collection_source": "data_layer",
+        "duplicate_risk": {
+          "level": "low",
+          "reason": "Manual dataLayer collection is scoped to this explicit business interaction.",
+          "dedupe_rule": "Fire once per qualifying user action and avoid parallel automatic or enhanced-measurement collection."
+        }
+      },
+      "parameter_profile": {
+        "profile_id": "promotion_profile",
+        "profile_source": "skill/scripts/ecommerce_matrix.py official GA4 ecommerce profile",
+        "canonical_parameter_order": [
+          "currency",
+          "promotion_id",
+          "promotion_name",
+          "creative_name",
+          "creative_slot",
+          "items",
+          "items[].item_id",
+          "items[].item_name",
+          "items[].affiliation",
+          "items[].coupon",
+          "items[].discount",
+          "items[].index",
+          "items[].item_brand",
+          "items[].item_category",
+          "items[].item_category2",
+          "items[].item_category3",
+          "items[].item_category4",
+          "items[].item_category5",
+          "items[].item_list_id",
+          "items[].item_list_name",
+          "items[].item_variant",
+          "items[].location_id",
+          "items[].price",
+          "items[].quantity",
+          "items[].creative_name",
+          "items[].creative_slot",
+          "items[].promotion_id",
+          "items[].promotion_name"
+        ],
+        "exception_reason": ""
+      }
     },
     {
       "event_id": "EVT-HOME-SEARCH",
@@ -631,7 +806,21 @@
         "debugview_expectation": "search appears with search_term.",
         "status": "not_started"
       },
-      "implementation_notes": "Use the official recommended search event instead of a custom search_submit event."
+      "implementation_notes": "Use the official recommended search event instead of a custom search_submit event.",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 event semantics and required parameter scope checked for search."
+      },
+      "collection_strategy": {
+        "collection_source": "data_layer",
+        "duplicate_risk": {
+          "level": "medium",
+          "reason": "Site-search can be configured through enhanced measurement or manual dataLayer tracking.",
+          "dedupe_rule": "Use this dataLayer search event only when enhanced measurement site-search is disabled or insufficient for required parameters."
+        }
+      }
     },
     {
       "event_id": "EVT-HOME-CONTENT-SELECT",
@@ -717,7 +906,21 @@
         "debugview_expectation": "select_content appears with normalized controlled values.",
         "status": "not_started"
       },
-      "implementation_notes": "Do not create one custom event per homepage link when this consolidated event is sufficient."
+      "implementation_notes": "Do not create one custom event per homepage link when this consolidated event is sufficient.",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 event semantics and required parameter scope checked for select_content."
+      },
+      "collection_strategy": {
+        "collection_source": "data_layer",
+        "duplicate_risk": {
+          "level": "low",
+          "reason": "Manual dataLayer collection is scoped to this explicit business interaction.",
+          "dedupe_rule": "Fire once per qualifying user action and avoid parallel automatic or enhanced-measurement collection."
+        }
+      }
     },
     {
       "event_id": "EVT-HOME-ACCOUNT-ACCESS",
@@ -798,7 +1001,21 @@
         "debugview_expectation": "account_access_intent appears only on account entry click, not on successful login.",
         "status": "not_started"
       },
-      "implementation_notes": "This is custom because the official login event should represent successful authentication, not an account-link click."
+      "implementation_notes": "This is custom because the official login event should represent successful authentication, not an account-link click.",
+      "official_verification": {
+        "status": "not_applicable",
+        "source_url": "https://support.google.com/analytics/answer/13316687",
+        "checked_date": "2026-06-29",
+        "scope_note": "Custom GA4 event; official alternatives are documented in custom_event_acceptance."
+      },
+      "collection_strategy": {
+        "collection_source": "data_layer",
+        "duplicate_risk": {
+          "level": "low",
+          "reason": "Manual dataLayer collection is scoped to this explicit business interaction.",
+          "dedupe_rule": "Fire once per qualifying user action and avoid parallel automatic or enhanced-measurement collection."
+        }
+      }
     }
   ],
   "parameters": [
@@ -818,7 +1035,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "medium",
       "pii_risk": "medium",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 event parameter scope checked for page_location."
+      }
     },
     {
       "parameter_name": "page_title",
@@ -836,7 +1059,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "medium",
       "pii_risk": "low",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 event parameter scope checked for page_title."
+      }
     },
     {
       "parameter_name": "page_referrer",
@@ -854,7 +1083,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "medium",
       "pii_risk": "medium",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 event parameter scope checked for page_referrer."
+      }
     },
     {
       "parameter_name": "page_data.template",
@@ -879,7 +1114,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "low",
       "pii_risk": "low",
-      "consent_dependency": ""
+      "consent_dependency": "",
+      "official_verification": {
+        "status": "not_applicable",
+        "source_url": "https://developers.google.com/tag-platform/tag-manager/datalayer",
+        "checked_date": "2026-06-29",
+        "scope_note": "Implementation variable page_data.template; not a GA4 reporting parameter by itself."
+      }
     },
     {
       "parameter_name": "promotion_id",
@@ -897,7 +1138,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "medium",
       "pii_risk": "low",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 ecommerce event parameter scope checked for promotion_id."
+      }
     },
     {
       "parameter_name": "promotion_name",
@@ -915,7 +1162,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "medium",
       "pii_risk": "low",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 ecommerce event parameter scope checked for promotion_name."
+      }
     },
     {
       "parameter_name": "creative_name",
@@ -933,7 +1186,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "medium",
       "pii_risk": "low",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 ecommerce event parameter scope checked for creative_name."
+      }
     },
     {
       "parameter_name": "creative_slot",
@@ -951,7 +1210,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "low",
       "pii_risk": "low",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 ecommerce event parameter scope checked for creative_slot."
+      }
     },
     {
       "parameter_name": "items",
@@ -969,7 +1234,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "medium",
       "pii_risk": "low",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 ecommerce event parameter scope checked for items."
+      }
     },
     {
       "parameter_name": "items[].item_id",
@@ -987,7 +1258,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "high",
       "pii_risk": "low",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/item-scoped-ecommerce",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 item-scoped ecommerce parameter scope checked for items[].item_id."
+      }
     },
     {
       "parameter_name": "items[].item_name",
@@ -1005,7 +1282,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "high",
       "pii_risk": "low",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/item-scoped-ecommerce",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 item-scoped ecommerce parameter scope checked for items[].item_name."
+      }
     },
     {
       "parameter_name": "search_term",
@@ -1023,7 +1306,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "high",
       "pii_risk": "medium",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 event parameter scope checked for search_term."
+      }
     },
     {
       "parameter_name": "content_type",
@@ -1045,7 +1334,13 @@
       "register_custom_definition": true,
       "cardinality_risk": "low",
       "pii_risk": "low",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 event parameter scope checked for content_type."
+      }
     },
     {
       "parameter_name": "content_id",
@@ -1063,7 +1358,13 @@
       "register_custom_definition": true,
       "cardinality_risk": "medium",
       "pii_risk": "low",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 event parameter scope checked for content_id."
+      }
     },
     {
       "parameter_name": "content_name",
@@ -1081,7 +1382,13 @@
       "register_custom_definition": true,
       "cardinality_risk": "medium",
       "pii_risk": "low",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
+        "checked_date": "2026-06-29",
+        "scope_note": "Official GA4 event parameter scope checked for content_name."
+      }
     },
     {
       "parameter_name": "cta_location",
@@ -1105,7 +1412,13 @@
       "register_custom_definition": true,
       "cardinality_risk": "low",
       "pii_risk": "low",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "not_applicable",
+        "source_url": "https://support.google.com/analytics/answer/13316687",
+        "checked_date": "2026-06-29",
+        "scope_note": "Custom analytics parameter cta_location; governed by GA4 naming and registration rules."
+      }
     },
     {
       "parameter_name": "link_url",
@@ -1123,7 +1436,13 @@
       "register_custom_definition": false,
       "cardinality_risk": "high",
       "pii_risk": "medium",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "not_applicable",
+        "source_url": "https://support.google.com/analytics/answer/13316687",
+        "checked_date": "2026-06-29",
+        "scope_note": "Custom analytics parameter link_url; governed by GA4 naming and registration rules."
+      }
     },
     {
       "parameter_name": "cta_text",
@@ -1141,7 +1460,13 @@
       "register_custom_definition": true,
       "cardinality_risk": "medium",
       "pii_risk": "low",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "not_applicable",
+        "source_url": "https://support.google.com/analytics/answer/13316687",
+        "checked_date": "2026-06-29",
+        "scope_note": "Custom analytics parameter cta_text; governed by GA4 naming and registration rules."
+      }
     },
     {
       "parameter_name": "login_status",
@@ -1163,7 +1488,13 @@
       "register_custom_definition": true,
       "cardinality_risk": "low",
       "pii_risk": "low",
-      "consent_dependency": "analytics_storage"
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "not_applicable",
+        "source_url": "https://support.google.com/analytics/answer/13316687",
+        "checked_date": "2026-06-29",
+        "scope_note": "Custom analytics parameter login_status; governed by GA4 naming and registration rules."
+      }
     }
   ],
   "custom_definitions": [

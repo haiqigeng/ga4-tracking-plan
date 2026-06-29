@@ -54,9 +54,12 @@ Avoid custom tracking for:
 
 Design each testable event so a later testing skill can use the plan directly:
 
-- stable `event_id` and `qa_id`
 - trigger description and reproduction steps
 - expected dataLayer or SDK call
 - expected network event name and key parameters/properties
 - screenshot or evidence placeholder
-- status placeholder using `OK`, `KO`, or `Cannot test` in workbook outputs
+- status placeholder using `OK`, `KO`, or `Cannot test` only in QA/recette
+  outputs, not in the analyst-facing Event Matrix
+
+Do not expose QA-only identifiers such as `event_id`, `screenshot_id`, or
+`qa_id` in the tracking-plan Event Matrix.

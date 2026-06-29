@@ -7,9 +7,11 @@ Codex skill package for creating GA4-first tracking plans that are useful in rea
 ## What It Helps With
 
 - Understand the pages, journeys, coverage sources, business goals, expected actions, and analysis needs before listing events.
+- Choose the correct execution mode: client template adaptation or greenfield best-practice planning.
 - Prefer official GA4 automatic, enhanced-measurement, recommended, and ecommerce events when they fit.
 - Design custom events only when they answer a clear business or diagnostic question.
 - Keep ecommerce events separate and aligned with the official GA4 ecommerce format.
+- Record official verification, collection source, duplicate-risk, and ecommerce parameter profile decisions in structured plans.
 - Keep parameter names, controlled values, and QA IDs stable enough to scale to future pages and journeys.
 - Produce a tracking plan that web analysts, developers, media teams, QA, and stakeholders can read without extra explanation.
 
@@ -25,6 +27,8 @@ Codex skill package for creating GA4-first tracking plans that are useful in rea
 - `scripts/generate_tracking_plan_workbook.py` - Generates an XLSX tracking plan from a structured plan file
 - `scripts/validate_tracking_plan.py` - Checks a structured plan file before workbook generation
 - `scripts/export_tracking_plan_csv.py` - Exports a long-format CSV for review or comparison
+- `scripts/discover_site_journeys.py` - Creates a privacy-safe first-pass website discovery JSON from robots, sitemap, static links, forms, and inferred journeys
+- `scripts/annotate_screenshot.py` - Adds rectangle-only red callouts to screenshots for click, form, CTA, filter, menu, or other interaction evidence
 - `scripts/analyze_tracking_plan_corpus.ps1` - Creates a privacy-safe summary of historical tracking-plan files on Windows
 - `scripts/validate_package.py` - Runs package checks before publishing changes
 
@@ -32,7 +36,7 @@ Codex skill package for creating GA4-first tracking plans that are useful in rea
 
 The skill starts from business context, analysis needs, concerned pages or journeys, website coverage evidence, and reusable measurement decisions. GA4 remains the default and strictest supported output path. Piano Analytics is supported through dedicated platform guidance when requested.
 
-XLSX is the primary delivery format. The workbook should stay readable: lean overview, clear GTM protocol, practical parameter reference, grouped event matrix, screenshot register, and QA cases.
+XLSX is the primary delivery format. The workbook should stay readable: lean overview, clear GTM protocol, practical parameter reference, grouped event matrix, and compact evidence or QA-preparation tabs when useful.
 
 The skill is intentionally scoped to tracking-plan creation and review. GTM implementation, dataLayer development, server-side tagging, and automated QA are separate follow-up phases.
 
@@ -40,10 +44,12 @@ The expected behavior is close to a real web analyst:
 
 - understand the business model, journey role, macro conversions, micro conversions, and diagnostic needs before proposing events
 - map whole-site or broad journey coverage from sitemap, navigation, representative templates, existing client files, and browser or Playwright exploration when needed
+- generate Screenshot Register rows from the event draft, then capture selective evidence previews before final workbook delivery when useful
+- preserve client templates when the mode requires it, while still challenging weak existing events
 - use official GA4 events and parameters when their meaning fits the action
 - justify every custom event with its analysis need, official alternatives, reusable parameters, privacy checks, and QA expectations
-- keep the visible workbook focused on what humans need to build, review, and test the plan
-- design event families, naming, controlled values, and QA IDs that can scale to future pages, journeys, markets, and test automation
+- keep the visible workbook focused on what humans need to build and review the plan
+- design event families, naming, and controlled values that can scale to future pages, journeys, markets, and later QA automation
 
 The included GA4 event scenario library helps map common website scenarios to automatic, enhanced-measurement, recommended, ecommerce, and typical custom events with expected parameters and dataLayer patterns.
 
@@ -55,7 +61,7 @@ Ecommerce events are handled as a stricter case: they should stay in ecommerce-o
 
 ## Structured Plan Format
 
-Reusable or QA-ready plans should follow `skill/references/03-rules/tracking-plan-schema.json`. This format keeps the website coverage map, measurement brief, strategy, scalability notes, events, parameters, key events, not-tracked decisions, documentation sources, assumptions, and QA cases in one consistent structure.
+Reusable or QA-ready plans should follow `skill/references/03-rules/tracking-plan-schema.json`. This format keeps the execution context, template policy, website coverage map, measurement brief, strategy, scalability notes, events, parameters, official verification, collection strategy, ecommerce profiles, key events, not-tracked decisions, documentation sources, assumptions, and QA cases in one consistent structure.
 
 Example files are included for reference:
 
@@ -76,6 +82,18 @@ To validate a structured plan and export a long-format CSV:
 ```text
 python scripts/validate_tracking_plan.py skill/references/03-rules/generic-tracking-plan-example.json
 python scripts/export_tracking_plan_csv.py skill/references/03-rules/generic-tracking-plan-example.json --output generated_tracking_plan.csv
+```
+
+To create a first-pass website discovery JSON:
+
+```text
+python scripts/discover_site_journeys.py https://www.example.com/ --output site_discovery.json
+```
+
+To annotate an interaction screenshot before embedding it in a workbook:
+
+```text
+python scripts/annotate_screenshot.py source.png annotated.png --box x1,y1,x2,y2
 ```
 
 The validator checks the structure, event classifications, GA4 ecommerce rules, parameter value rules, privacy risks, custom-event justification, official documentation coverage, and QA links.
