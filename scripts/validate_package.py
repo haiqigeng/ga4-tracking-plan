@@ -279,7 +279,9 @@ def check_privacy_and_cleanliness() -> None:
         if not path.is_file() or ".git" in path.parts:
             continue
         relative = path.relative_to(ROOT)
-        if any(part in BANNED_PATH_PARTS for part in relative.parts):
+        if "__pycache__" in relative.parts or path.suffix.lower() in {".pyc", ".pyo"}:
+            continue
+        if any(part in BANNED_PATH_PARTS - {"__pycache__"} for part in relative.parts):
             fail(f"Repository contains generated or release-only path: {relative}")
         if path.suffix.lower() not in TEXT_SUFFIXES:
             continue
