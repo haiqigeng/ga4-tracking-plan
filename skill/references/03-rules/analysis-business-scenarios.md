@@ -20,11 +20,11 @@ Use this reference when the user gives a website, page, user journey, or limited
    browser or Playwright exploration when dynamic journeys matter.
 3. Translate visible actions into business questions before choosing events.
 4. Separate macro conversions, micro conversions, and diagnostic signals.
-5. Prefer platform-native events where semantics fit.
+5. Prefer GA4 official events where semantics fit.
 6. Use `decision-custom-events.md` before accepting custom events.
-7. Use `library-parameters.json` to choose reusable parameters and value rules, then verify official parameters in current platform docs.
+7. Use `library-parameters.json` to choose reusable parameters and value rules, then verify official parameters in current Google documentation.
 8. Consolidate repeated interactions into one reusable event with controlled values.
-9. Design event families, parameter names, and QA identifiers so the plan can scale to future pages, markets, components, and journey variants.
+9. Design event families and parameter names so the plan can scale to future pages, markets, components, and journey variants.
 10. Reject or deprioritize low-signal tracking that creates maintenance cost without analysis value.
 
 When information is missing, continue with assumptions instead of stalling. Flag assumptions in the plan.
@@ -40,7 +40,7 @@ When information is missing, continue with assumptions instead of stalling. Flag
 | Form or quote journey | Lead funnel completion and drop-off | Use form_start/form_submit when sufficient; use generate_lead for valid success; use custom step/error events for multi-step forms and validation friction. |
 | Account/login area | Authentication success and account intent | Use login for successful login; custom account_access_intent only for pre-login entry clicks when needed. Never send account identifiers. |
 | Content/support page | Content usefulness and support deflection | Use page_view, scroll/download/video when native collection fits; use select_content or custom helpful/contact/chat events when tied to support outcomes. |
-| Media player | Consumption and player friction | Use GA4 enhanced measurement for supported YouTube embeds or Piano AV Insights when Piano is in scope; custom media only when native support does not fit. |
+| Media player | Consumption and player friction | Use GA4 enhanced measurement for supported YouTube embeds; use custom media events only when native support does not fit. |
 
 ## Scenario Playbook
 
@@ -50,7 +50,7 @@ When information is missing, continue with assumptions instead of stalling. Flag
 | Lead generation | generate_lead; sign_up when account creation is the outcome | form_start, form_submit, begin_quote, form_step_submit, calculator_complete | form_step_view, form_error, contact_intent, chat_start | Sending raw form values, error text, phone/email, or every field focus. |
 | Booking/reservation | purchase for paid booking; generate_lead for request/appointment | search, select_item, begin_checkout, appointment_start, appointment_booked | booking_step_view, booking_error, availability_filter_apply | Custom purchase-like events when official ecommerce purchase fits. |
 | SaaS/product-led | sign_up, login, purchase/subscribe when paid | pricing_plan_select, tutorial_begin, tutorial_complete, feature_use | upgrade_intent, invite_sent, workspace_created | Tracking every dashboard click with no product KPI. |
-| Publisher/content | subscribe/sign_up, share, newsletter success | page_view, scroll, select_content, video events, file_download | newsletter_signup_intent, content_feedback, paywall_view | Duplicate scroll/video tracking when enhanced measurement is enough. |
+| Publisher/content | purchase for a paid subscription; sign_up for completed registration | page_view, scroll, select_content, share, video events, file_download | newsletter_signup_intent, content_feedback, paywall_view | Duplicate scroll/video tracking when enhanced measurement is enough. |
 | Support/service | generate_lead or contact success when applicable | search, select_content, file_download, login, contact_intent, chat_start | support_article_helpful, claim_intent, account_access_intent | Sending claim descriptions, policy numbers, chat text, or free-text queries without scrubbing. |
 | Marketplace/classifieds | generate_lead, purchase, contact seller success | search, view_item_list, select_item, view_item, filter_apply, seller_contact_intent | listing_map_interaction, save_listing, alert_signup | Tracking raw addresses or seller/buyer personal identifiers. |
 | Finance/insurance | generate_lead, begin_checkout/purchase if online sale is real | begin_quote, calculator_start, calculator_complete, form_step_submit | quote_error, eligibility_error, document_download | Sensitive personal, financial, health, or claim data in analytics. |
@@ -61,15 +61,15 @@ Create a custom event only when all answers are clear:
 
 - What business question does it answer?
 - Which decision, report, audience, or optimization action will use it?
-- Why does no platform-native event fit?
-- Which official automatic, enhanced-measurement, recommended, ecommerce, or platform-standard event was considered and rejected?
+- Why does no GA4 official event fit?
+- Which automatic, enhanced-measurement, recommended, or ecommerce event was considered and rejected?
 - What page, component, or journey step triggers it?
 - Which controlled values are needed, and are they finite enough for reporting?
 - Which values must stay raw because they are official IDs, numeric amounts, ISO codes, or platform-required fields?
-- Does it need registration as a GA4 custom dimension/metric or Piano Data Model property?
+- Does it need registration as a GA4 custom dimension or metric?
 - Is cardinality acceptable?
 - Is PII impossible or explicitly scrubbed?
-- Can QA reproduce the event and verify it in the dataLayer/SDK call and network request?
+- Can a developer identify the trigger, source data, dataLayer push, and GA4 payload unambiguously?
 
 In machine-readable plans, write this decision into `official_match`. A weak rationale such as "track click" is not enough; use wording like "custom GA4 event: pre-login account-entry intent; official `login` only applies after successful authentication."
 
@@ -108,7 +108,7 @@ Split events when:
 - ecommerce required parameters differ
 - success and intent must be separated
 - one interaction is a macro conversion and the other is diagnostic
-- QA reproduction or data availability is materially different
+- trigger behavior or data availability is materially different
 
 ## Approval Readiness
 
@@ -119,6 +119,6 @@ A tracking plan is ready for human review when:
 - ecommerce blocks use official parameter names and required fields
 - every controlled value uses a clear rule
 - parameter names and controlled values can support future similar pages or journey variants
-- custom definitions or Data Model properties are listed
+- required GA4 custom dimensions or metrics are identified
 - risky fields are flagged
-- each testable event has a QA case and screenshot placeholder
+- each event has an explicit screenshot-evidence, skip, or not-needed decision

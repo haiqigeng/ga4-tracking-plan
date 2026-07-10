@@ -2626,6 +2626,139 @@
         "required": "No",
         "example": "2500",
         "description": "The monetary value of the conversion, such as first payment amount or contract value. Required if currency is set."
+      },
+      {
+        "name": "items",
+        "type": "Array<Item>",
+        "required": "No",
+        "example": "",
+        "description": "The items associated with the event."
+      },
+      {
+        "name": "item_id",
+        "type": "string",
+        "required": "Yes*",
+        "example": "SKU_12345",
+        "description": "The ID of the item. *One of item_id or item_name is required."
+      },
+      {
+        "name": "item_name",
+        "type": "string",
+        "required": "Yes*",
+        "example": "Stan and Friends Tee",
+        "description": "The name of the item. *One of item_id or item_name is required."
+      },
+      {
+        "name": "affiliation",
+        "type": "string",
+        "required": "No",
+        "example": "Google Store",
+        "description": "A product affiliation to designate a supplying company or brick and mortar store location. Note: affiliation is only available at the item-scope."
+      },
+      {
+        "name": "coupon",
+        "type": "string",
+        "required": "No",
+        "example": "SUMMER_FUN",
+        "description": "The coupon name/code associated with the item. Event-level and item-level coupon parameters are independent."
+      },
+      {
+        "name": "discount",
+        "type": "number",
+        "required": "No",
+        "example": "2.22",
+        "description": "The unit monetary discount value associated with the item."
+      },
+      {
+        "name": "index",
+        "type": "number",
+        "required": "No",
+        "example": "5",
+        "description": "The index/position of the item in a list."
+      },
+      {
+        "name": "item_brand",
+        "type": "string",
+        "required": "No",
+        "example": "Google",
+        "description": "The brand of the item."
+      },
+      {
+        "name": "item_category",
+        "type": "string",
+        "required": "No",
+        "example": "Apparel",
+        "description": "The category of the item. If used as part of a category hierarchy or taxonomy then this will be the first category."
+      },
+      {
+        "name": "item_category2",
+        "type": "string",
+        "required": "No",
+        "example": "Adult",
+        "description": "The second category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category3",
+        "type": "string",
+        "required": "No",
+        "example": "Shirts",
+        "description": "The third category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category4",
+        "type": "string",
+        "required": "No",
+        "example": "Crew",
+        "description": "The fourth category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category5",
+        "type": "string",
+        "required": "No",
+        "example": "Short sleeve",
+        "description": "The fifth category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_list_id",
+        "type": "string",
+        "required": "No",
+        "example": "related_products",
+        "description": "The ID of the list in which the item was presented to the user. If set, event-level item_list_id is ignored. If not set, event-level item_list_id is used, if present."
+      },
+      {
+        "name": "item_list_name",
+        "type": "string",
+        "required": "No",
+        "example": "Related products",
+        "description": "The name of the list in which the item was presented to the user. If set, event-level item_list_name is ignored. If not set, event-level item_list_name is used, if present."
+      },
+      {
+        "name": "item_variant",
+        "type": "string",
+        "required": "No",
+        "example": "green",
+        "description": "The item variant or unique code or description for additional item details/options."
+      },
+      {
+        "name": "location_id",
+        "type": "string",
+        "required": "No",
+        "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
+        "description": "The physical location associated with the item (e.g. the physical store location). It's recommended to use the Google Place ID that corresponds to the associated item. A custom location ID can also be used. Note: location_id is only available at the item-scope."
+      },
+      {
+        "name": "price",
+        "type": "number",
+        "required": "No",
+        "example": "10.01",
+        "description": "The monetary unit price of the item, in units of the specified currency parameter. If a discount applies to the item, set price to the discounted unit price and specify the unit price discount in the discount parameter."
+      },
+      {
+        "name": "quantity",
+        "type": "number",
+        "required": "No",
+        "example": "3",
+        "description": "Item quantity. If not set, quantity is set to 1."
       }
     ]
   },
@@ -2654,6 +2787,139 @@
         "required": "No",
         "example": "Never responded",
         "description": "The reason the lead was unconverted."
+      },
+      {
+        "name": "items",
+        "type": "Array<Item>",
+        "required": "No",
+        "example": "",
+        "description": "The items associated with the event."
+      },
+      {
+        "name": "item_id",
+        "type": "string",
+        "required": "Yes*",
+        "example": "SKU_12345",
+        "description": "The ID of the item. *One of item_id or item_name is required."
+      },
+      {
+        "name": "item_name",
+        "type": "string",
+        "required": "Yes*",
+        "example": "Stan and Friends Tee",
+        "description": "The name of the item. *One of item_id or item_name is required."
+      },
+      {
+        "name": "affiliation",
+        "type": "string",
+        "required": "No",
+        "example": "Google Store",
+        "description": "A product affiliation to designate a supplying company or brick and mortar store location. Note: affiliation is only available at the item-scope."
+      },
+      {
+        "name": "coupon",
+        "type": "string",
+        "required": "No",
+        "example": "SUMMER_FUN",
+        "description": "The coupon name/code associated with the item. Event-level and item-level coupon parameters are independent."
+      },
+      {
+        "name": "discount",
+        "type": "number",
+        "required": "No",
+        "example": "2.22",
+        "description": "The unit monetary discount value associated with the item."
+      },
+      {
+        "name": "index",
+        "type": "number",
+        "required": "No",
+        "example": "5",
+        "description": "The index/position of the item in a list."
+      },
+      {
+        "name": "item_brand",
+        "type": "string",
+        "required": "No",
+        "example": "Google",
+        "description": "The brand of the item."
+      },
+      {
+        "name": "item_category",
+        "type": "string",
+        "required": "No",
+        "example": "Apparel",
+        "description": "The category of the item. If used as part of a category hierarchy or taxonomy then this will be the first category."
+      },
+      {
+        "name": "item_category2",
+        "type": "string",
+        "required": "No",
+        "example": "Adult",
+        "description": "The second category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category3",
+        "type": "string",
+        "required": "No",
+        "example": "Shirts",
+        "description": "The third category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category4",
+        "type": "string",
+        "required": "No",
+        "example": "Crew",
+        "description": "The fourth category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category5",
+        "type": "string",
+        "required": "No",
+        "example": "Short sleeve",
+        "description": "The fifth category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_list_id",
+        "type": "string",
+        "required": "No",
+        "example": "related_products",
+        "description": "The ID of the list in which the item was presented to the user. If set, event-level item_list_id is ignored. If not set, event-level item_list_id is used, if present."
+      },
+      {
+        "name": "item_list_name",
+        "type": "string",
+        "required": "No",
+        "example": "Related products",
+        "description": "The name of the list in which the item was presented to the user. If set, event-level item_list_name is ignored. If not set, event-level item_list_name is used, if present."
+      },
+      {
+        "name": "item_variant",
+        "type": "string",
+        "required": "No",
+        "example": "green",
+        "description": "The item variant or unique code or description for additional item details/options."
+      },
+      {
+        "name": "location_id",
+        "type": "string",
+        "required": "No",
+        "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
+        "description": "The physical location associated with the item (e.g. the physical store location). It's recommended to use the Google Place ID that corresponds to the associated item. A custom location ID can also be used. Note: location_id is only available at the item-scope."
+      },
+      {
+        "name": "price",
+        "type": "number",
+        "required": "No",
+        "example": "10.01",
+        "description": "The monetary unit price of the item, in units of the specified currency parameter. If a discount applies to the item, set price to the discounted unit price and specify the unit price discount in the discount parameter."
+      },
+      {
+        "name": "quantity",
+        "type": "number",
+        "required": "No",
+        "example": "3",
+        "description": "Item quantity. If not set, quantity is set to 1."
       }
     ]
   },
@@ -2682,6 +2948,139 @@
         "required": "No",
         "example": "Not looking to buy",
         "description": "The reason a lead was marked as disqualified."
+      },
+      {
+        "name": "items",
+        "type": "Array<Item>",
+        "required": "No",
+        "example": "",
+        "description": "The items associated with the event."
+      },
+      {
+        "name": "item_id",
+        "type": "string",
+        "required": "Yes*",
+        "example": "SKU_12345",
+        "description": "The ID of the item. *One of item_id or item_name is required."
+      },
+      {
+        "name": "item_name",
+        "type": "string",
+        "required": "Yes*",
+        "example": "Stan and Friends Tee",
+        "description": "The name of the item. *One of item_id or item_name is required."
+      },
+      {
+        "name": "affiliation",
+        "type": "string",
+        "required": "No",
+        "example": "Google Store",
+        "description": "A product affiliation to designate a supplying company or brick and mortar store location. Note: affiliation is only available at the item-scope."
+      },
+      {
+        "name": "coupon",
+        "type": "string",
+        "required": "No",
+        "example": "SUMMER_FUN",
+        "description": "The coupon name/code associated with the item. Event-level and item-level coupon parameters are independent."
+      },
+      {
+        "name": "discount",
+        "type": "number",
+        "required": "No",
+        "example": "2.22",
+        "description": "The unit monetary discount value associated with the item."
+      },
+      {
+        "name": "index",
+        "type": "number",
+        "required": "No",
+        "example": "5",
+        "description": "The index/position of the item in a list."
+      },
+      {
+        "name": "item_brand",
+        "type": "string",
+        "required": "No",
+        "example": "Google",
+        "description": "The brand of the item."
+      },
+      {
+        "name": "item_category",
+        "type": "string",
+        "required": "No",
+        "example": "Apparel",
+        "description": "The category of the item. If used as part of a category hierarchy or taxonomy then this will be the first category."
+      },
+      {
+        "name": "item_category2",
+        "type": "string",
+        "required": "No",
+        "example": "Adult",
+        "description": "The second category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category3",
+        "type": "string",
+        "required": "No",
+        "example": "Shirts",
+        "description": "The third category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category4",
+        "type": "string",
+        "required": "No",
+        "example": "Crew",
+        "description": "The fourth category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category5",
+        "type": "string",
+        "required": "No",
+        "example": "Short sleeve",
+        "description": "The fifth category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_list_id",
+        "type": "string",
+        "required": "No",
+        "example": "related_products",
+        "description": "The ID of the list in which the item was presented to the user. If set, event-level item_list_id is ignored. If not set, event-level item_list_id is used, if present."
+      },
+      {
+        "name": "item_list_name",
+        "type": "string",
+        "required": "No",
+        "example": "Related products",
+        "description": "The name of the list in which the item was presented to the user. If set, event-level item_list_name is ignored. If not set, event-level item_list_name is used, if present."
+      },
+      {
+        "name": "item_variant",
+        "type": "string",
+        "required": "No",
+        "example": "green",
+        "description": "The item variant or unique code or description for additional item details/options."
+      },
+      {
+        "name": "location_id",
+        "type": "string",
+        "required": "No",
+        "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
+        "description": "The physical location associated with the item (e.g. the physical store location). It's recommended to use the Google Place ID that corresponds to the associated item. A custom location ID can also be used. Note: location_id is only available at the item-scope."
+      },
+      {
+        "name": "price",
+        "type": "number",
+        "required": "No",
+        "example": "10.01",
+        "description": "The monetary unit price of the item, in units of the specified currency parameter. If a discount applies to the item, set price to the discounted unit price and specify the unit price discount in the discount parameter."
+      },
+      {
+        "name": "quantity",
+        "type": "number",
+        "required": "No",
+        "example": "3",
+        "description": "Item quantity. If not set, quantity is set to 1."
       }
     ]
   },
@@ -2710,6 +3109,139 @@
         "required": "No",
         "example": "Trade show",
         "description": "The source of the lead."
+      },
+      {
+        "name": "items",
+        "type": "Array<Item>",
+        "required": "No",
+        "example": "",
+        "description": "The items associated with the event."
+      },
+      {
+        "name": "item_id",
+        "type": "string",
+        "required": "Yes*",
+        "example": "SKU_12345",
+        "description": "The ID of the item. *One of item_id or item_name is required."
+      },
+      {
+        "name": "item_name",
+        "type": "string",
+        "required": "Yes*",
+        "example": "Stan and Friends Tee",
+        "description": "The name of the item. *One of item_id or item_name is required."
+      },
+      {
+        "name": "affiliation",
+        "type": "string",
+        "required": "No",
+        "example": "Google Store",
+        "description": "A product affiliation to designate a supplying company or brick and mortar store location. Note: affiliation is only available at the item-scope."
+      },
+      {
+        "name": "coupon",
+        "type": "string",
+        "required": "No",
+        "example": "SUMMER_FUN",
+        "description": "The coupon name/code associated with the item. Event-level and item-level coupon parameters are independent."
+      },
+      {
+        "name": "discount",
+        "type": "number",
+        "required": "No",
+        "example": "2.22",
+        "description": "The unit monetary discount value associated with the item."
+      },
+      {
+        "name": "index",
+        "type": "number",
+        "required": "No",
+        "example": "5",
+        "description": "The index/position of the item in a list."
+      },
+      {
+        "name": "item_brand",
+        "type": "string",
+        "required": "No",
+        "example": "Google",
+        "description": "The brand of the item."
+      },
+      {
+        "name": "item_category",
+        "type": "string",
+        "required": "No",
+        "example": "Apparel",
+        "description": "The category of the item. If used as part of a category hierarchy or taxonomy then this will be the first category."
+      },
+      {
+        "name": "item_category2",
+        "type": "string",
+        "required": "No",
+        "example": "Adult",
+        "description": "The second category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category3",
+        "type": "string",
+        "required": "No",
+        "example": "Shirts",
+        "description": "The third category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category4",
+        "type": "string",
+        "required": "No",
+        "example": "Crew",
+        "description": "The fourth category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category5",
+        "type": "string",
+        "required": "No",
+        "example": "Short sleeve",
+        "description": "The fifth category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_list_id",
+        "type": "string",
+        "required": "No",
+        "example": "related_products",
+        "description": "The ID of the list in which the item was presented to the user. If set, event-level item_list_id is ignored. If not set, event-level item_list_id is used, if present."
+      },
+      {
+        "name": "item_list_name",
+        "type": "string",
+        "required": "No",
+        "example": "Related products",
+        "description": "The name of the list in which the item was presented to the user. If set, event-level item_list_name is ignored. If not set, event-level item_list_name is used, if present."
+      },
+      {
+        "name": "item_variant",
+        "type": "string",
+        "required": "No",
+        "example": "green",
+        "description": "The item variant or unique code or description for additional item details/options."
+      },
+      {
+        "name": "location_id",
+        "type": "string",
+        "required": "No",
+        "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
+        "description": "The physical location associated with the item (e.g. the physical store location). It's recommended to use the Google Place ID that corresponds to the associated item. A custom location ID can also be used. Note: location_id is only available at the item-scope."
+      },
+      {
+        "name": "price",
+        "type": "number",
+        "required": "No",
+        "example": "10.01",
+        "description": "The monetary unit price of the item, in units of the specified currency parameter. If a discount applies to the item, set price to the discounted unit price and specify the unit price discount in the discount parameter."
+      },
+      {
+        "name": "quantity",
+        "type": "number",
+        "required": "No",
+        "example": "3",
+        "description": "Item quantity. If not set, quantity is set to 1."
       }
     ]
   },
@@ -2731,6 +3263,139 @@
         "required": "Yes*",
         "example": "30.03",
         "description": "The monetary value of the event. * value is typically required for meaningful reporting. If you mark the event as a key event then it's recommended you set value. * currency is required if you set value."
+      },
+      {
+        "name": "items",
+        "type": "Array<Item>",
+        "required": "No",
+        "example": "",
+        "description": "The items associated with the event."
+      },
+      {
+        "name": "item_id",
+        "type": "string",
+        "required": "Yes*",
+        "example": "SKU_12345",
+        "description": "The ID of the item. *One of item_id or item_name is required."
+      },
+      {
+        "name": "item_name",
+        "type": "string",
+        "required": "Yes*",
+        "example": "Stan and Friends Tee",
+        "description": "The name of the item. *One of item_id or item_name is required."
+      },
+      {
+        "name": "affiliation",
+        "type": "string",
+        "required": "No",
+        "example": "Google Store",
+        "description": "A product affiliation to designate a supplying company or brick and mortar store location. Note: affiliation is only available at the item-scope."
+      },
+      {
+        "name": "coupon",
+        "type": "string",
+        "required": "No",
+        "example": "SUMMER_FUN",
+        "description": "The coupon name/code associated with the item. Event-level and item-level coupon parameters are independent."
+      },
+      {
+        "name": "discount",
+        "type": "number",
+        "required": "No",
+        "example": "2.22",
+        "description": "The unit monetary discount value associated with the item."
+      },
+      {
+        "name": "index",
+        "type": "number",
+        "required": "No",
+        "example": "5",
+        "description": "The index/position of the item in a list."
+      },
+      {
+        "name": "item_brand",
+        "type": "string",
+        "required": "No",
+        "example": "Google",
+        "description": "The brand of the item."
+      },
+      {
+        "name": "item_category",
+        "type": "string",
+        "required": "No",
+        "example": "Apparel",
+        "description": "The category of the item. If used as part of a category hierarchy or taxonomy then this will be the first category."
+      },
+      {
+        "name": "item_category2",
+        "type": "string",
+        "required": "No",
+        "example": "Adult",
+        "description": "The second category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category3",
+        "type": "string",
+        "required": "No",
+        "example": "Shirts",
+        "description": "The third category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category4",
+        "type": "string",
+        "required": "No",
+        "example": "Crew",
+        "description": "The fourth category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category5",
+        "type": "string",
+        "required": "No",
+        "example": "Short sleeve",
+        "description": "The fifth category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_list_id",
+        "type": "string",
+        "required": "No",
+        "example": "related_products",
+        "description": "The ID of the list in which the item was presented to the user. If set, event-level item_list_id is ignored. If not set, event-level item_list_id is used, if present."
+      },
+      {
+        "name": "item_list_name",
+        "type": "string",
+        "required": "No",
+        "example": "Related products",
+        "description": "The name of the list in which the item was presented to the user. If set, event-level item_list_name is ignored. If not set, event-level item_list_name is used, if present."
+      },
+      {
+        "name": "item_variant",
+        "type": "string",
+        "required": "No",
+        "example": "green",
+        "description": "The item variant or unique code or description for additional item details/options."
+      },
+      {
+        "name": "location_id",
+        "type": "string",
+        "required": "No",
+        "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
+        "description": "The physical location associated with the item (e.g. the physical store location). It's recommended to use the Google Place ID that corresponds to the associated item. A custom location ID can also be used. Note: location_id is only available at the item-scope."
+      },
+      {
+        "name": "price",
+        "type": "number",
+        "required": "No",
+        "example": "10.01",
+        "description": "The monetary unit price of the item, in units of the specified currency parameter. If a discount applies to the item, set price to the discounted unit price and specify the unit price discount in the discount parameter."
+      },
+      {
+        "name": "quantity",
+        "type": "number",
+        "required": "No",
+        "example": "3",
+        "description": "Item quantity. If not set, quantity is set to 1."
       }
     ]
   },
@@ -2759,6 +3424,139 @@
         "required": "No",
         "example": "Started conversations",
         "description": "The status of the lead."
+      },
+      {
+        "name": "items",
+        "type": "Array<Item>",
+        "required": "No",
+        "example": "",
+        "description": "The items associated with the event."
+      },
+      {
+        "name": "item_id",
+        "type": "string",
+        "required": "Yes*",
+        "example": "SKU_12345",
+        "description": "The ID of the item. *One of item_id or item_name is required."
+      },
+      {
+        "name": "item_name",
+        "type": "string",
+        "required": "Yes*",
+        "example": "Stan and Friends Tee",
+        "description": "The name of the item. *One of item_id or item_name is required."
+      },
+      {
+        "name": "affiliation",
+        "type": "string",
+        "required": "No",
+        "example": "Google Store",
+        "description": "A product affiliation to designate a supplying company or brick and mortar store location. Note: affiliation is only available at the item-scope."
+      },
+      {
+        "name": "coupon",
+        "type": "string",
+        "required": "No",
+        "example": "SUMMER_FUN",
+        "description": "The coupon name/code associated with the item. Event-level and item-level coupon parameters are independent."
+      },
+      {
+        "name": "discount",
+        "type": "number",
+        "required": "No",
+        "example": "2.22",
+        "description": "The unit monetary discount value associated with the item."
+      },
+      {
+        "name": "index",
+        "type": "number",
+        "required": "No",
+        "example": "5",
+        "description": "The index/position of the item in a list."
+      },
+      {
+        "name": "item_brand",
+        "type": "string",
+        "required": "No",
+        "example": "Google",
+        "description": "The brand of the item."
+      },
+      {
+        "name": "item_category",
+        "type": "string",
+        "required": "No",
+        "example": "Apparel",
+        "description": "The category of the item. If used as part of a category hierarchy or taxonomy then this will be the first category."
+      },
+      {
+        "name": "item_category2",
+        "type": "string",
+        "required": "No",
+        "example": "Adult",
+        "description": "The second category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category3",
+        "type": "string",
+        "required": "No",
+        "example": "Shirts",
+        "description": "The third category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category4",
+        "type": "string",
+        "required": "No",
+        "example": "Crew",
+        "description": "The fourth category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_category5",
+        "type": "string",
+        "required": "No",
+        "example": "Short sleeve",
+        "description": "The fifth category hierarchy or additional taxonomy for the item."
+      },
+      {
+        "name": "item_list_id",
+        "type": "string",
+        "required": "No",
+        "example": "related_products",
+        "description": "The ID of the list in which the item was presented to the user. If set, event-level item_list_id is ignored. If not set, event-level item_list_id is used, if present."
+      },
+      {
+        "name": "item_list_name",
+        "type": "string",
+        "required": "No",
+        "example": "Related products",
+        "description": "The name of the list in which the item was presented to the user. If set, event-level item_list_name is ignored. If not set, event-level item_list_name is used, if present."
+      },
+      {
+        "name": "item_variant",
+        "type": "string",
+        "required": "No",
+        "example": "green",
+        "description": "The item variant or unique code or description for additional item details/options."
+      },
+      {
+        "name": "location_id",
+        "type": "string",
+        "required": "No",
+        "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
+        "description": "The physical location associated with the item (e.g. the physical store location). It's recommended to use the Google Place ID that corresponds to the associated item. A custom location ID can also be used. Note: location_id is only available at the item-scope."
+      },
+      {
+        "name": "price",
+        "type": "number",
+        "required": "No",
+        "example": "10.01",
+        "description": "The monetary unit price of the item, in units of the specified currency parameter. If a discount applies to the item, set price to the discounted unit price and specify the unit price discount in the discount parameter."
+      },
+      {
+        "name": "quantity",
+        "type": "number",
+        "required": "No",
+        "example": "3",
+        "description": "Item quantity. If not set, quantity is set to 1."
       }
     ]
   }

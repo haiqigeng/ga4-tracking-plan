@@ -1,19 +1,15 @@
 # Non-Goals
 
-Use this file to avoid expanding the skill beyond its intended responsibility.
-
 The skill is not:
 
-- a GTM implementation skill;
-- a dataLayer coding skill;
-- a server-side tagging setup skill;
-- an automated QA or recette runner;
+- a tracking-plan generator for another analytics platform;
+- a GTM container audit or cleanup skill;
+- a GTM, dataLayer, or server-side implementation skill;
+- a runtime QA, DebugView, network-testing, or recette skill;
 - a legal or privacy approval substitute;
-- a tool for copying historical tracking plans blindly;
-- a Universal Analytics migration tool that preserves UA fields;
-- a tool for generating as many events as possible;
-- a tool that sends direct PII in ordinary GA4 event parameters;
-- a tool that publishes GTM containers, GA4 changes, or vendor-platform changes.
+- a tool for copying historical or Universal Analytics schemas;
+- a tool for maximizing event count;
+- a tool for sending direct PII as ordinary GA4 parameters;
+- an authority to publish GTM, GA4, or vendor-platform changes.
 
-When a request falls outside these boundaries, record the blocker, owner, or
-external work needed.
+Record the required owner or next phase when work falls outside these boundaries.

@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-
 ECOMMERCE_GROUP_BY_EVENT = {
     "view_promotion": "Ecommerce promotions",
     "select_promotion": "Ecommerce promotions",

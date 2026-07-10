@@ -16,7 +16,7 @@ Use this reference for internal search, category listing pages, filters, sorting
 | Scenario | Prefer event | Classification | Notes |
 |---|---|---|---|
 | Search submitted | `search` | recommended | Requires `search_term`; scrub PII |
-| Search results viewed | `view_search_results` or `page_view` with search context | custom or automatic | Use custom only when page_view cannot carry result context |
+| Search results viewed | `view_search_results` or `page_view` with search context | enhanced_measurement or automatic | Use enhanced measurement when configured query parameters identify the results page |
 | Product list viewed | `view_item_list` | recommended_ecommerce | Requires `items`; list metadata recommended |
 | Product selected | `select_item` | recommended_ecommerce | Requires clicked item data |
 | Non-product content selected | `select_content` | recommended | Use `content_type` and `content_id` |
@@ -49,9 +49,9 @@ dataLayer.push({
 });
 ```
 
-## QA Contract
+## Implementation Notes
 
-- Test one successful search, one zero-result search if relevant, and one PII-like input to confirm scrubbing.
-- For ecommerce listings, verify item array completeness and list metadata.
-- For filters and sorting, verify value normalization and confirm repeated UI changes do not create duplicate noise.
-- For autocomplete, locator, or live-search modules, verify the event fires only on the agreed stable moment and not for each intermediate typed character.
+- Define successful and zero-result search behavior when both matter.
+- For ecommerce listings, specify complete item arrays and list metadata.
+- Normalize filter and sort values and avoid duplicate events from repeated UI changes.
+- For autocomplete, locator, or live-search modules, fire only at the agreed stable moment and not for each intermediate character.

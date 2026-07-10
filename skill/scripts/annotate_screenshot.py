@@ -5,7 +5,6 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-
 RED = (230, 0, 35, 255)
 
 

@@ -11,6 +11,7 @@ ruff check .
 python -m compileall -q scripts skill/scripts tests
 python -m unittest discover -s tests
 python scripts/validate_package.py
+python scripts/check_official_catalog.py --offline
 git diff --check
 git status --short
 ```
@@ -27,11 +28,11 @@ python scripts/validate_tracking_plan.py path\to\tracking-plan.json
 python scripts/validate_tracking_plan.py path\to\tracking-plan.json --warnings-as-errors
 ```
 
-The validator checks structure, journey alignment, event classifications,
-official GA4 and Piano rules, ecommerce parameter scope, custom-event
-justification, execution mode, template policy, website coverage decisions,
-official verification, collection source, duplicate-risk decisions,
-privacy-sensitive field names, and QA links.
+The validator checks structure, journey alignment, analyst purpose, evidence
+confidence, GA4 classifications, ecommerce scope, custom-event justification,
+parameter availability and ownership, template policy, website coverage,
+official verification, collection source, duplicate risk, screenshot mapping,
+privacy-sensitive names, and legacy Universal Analytics fields.
 
 ## Website Discovery Helper
 
@@ -56,8 +57,16 @@ python scripts/discover_site_journeys_playwright.py https://www.example.com/ --o
 ```
 
 The Playwright helper samples rendered pages without submitting forms, logging
-in, placing orders, or mutating live state. Mark credential-gated journeys as
+in, placing orders, or mutating live state. Mark credential-gated evidence as
 skipped or blocked unless approved test access is available.
+
+## Contract Migration
+
+Migrate an older v1 plan to the GA4-only v2 contract:
+
+```powershell
+python scripts/migrate_tracking_plan.py old-plan.json --output plan-v2.json
+```
 
 ## Workbook And CSV Checks
 

@@ -52,10 +52,10 @@ dataLayer.push({
 });
 ```
 
-## QA Contract
+## Implementation Notes
 
-- Confirm enhanced measurement events are not duplicated by custom tracking.
-- Confirm login/signup events fire only after success.
-- Confirm account/support events contain no email, phone, customer number, message text, or ticket details.
-- Attach screenshots showing the content or support action context without personal information.
-- Confirm custom resource-library events are not duplicates of enhanced `file_download`, outbound `click`, or supported video events.
+- Do not duplicate enhanced measurement with custom tracking.
+- Fire login and signup events only after success.
+- Keep email, phone, customer number, message text, and ticket details out of account/support events.
+- Use screenshots that show the content or action context without personal information.
+- Do not duplicate enhanced `file_download`, outbound `click`, or supported video events with custom resource-library events.

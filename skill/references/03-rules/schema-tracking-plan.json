@@ -1,14 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/HQ-Guillaume/ga4-tracking-plan/schema/schema-tracking-plan.json",
-  "title": "Analytics tracking plan contract",
-  "description": "Canonical machine-readable structure for tracking plans produced by the skill. GA4 remains the default platform, with optional platform mappings for Piano Analytics and later QA automation.",
+  "title": "GA4 tracking plan contract",
+  "description": "Canonical GA4-only structure for analyst-readable, implementation-ready tracking plans.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schema_version",
     "plan_id",
-    "analytics_platforms",
     "execution_context",
     "document",
     "measurement_brief",
@@ -16,12 +15,10 @@
     "website_coverage_map",
     "events",
     "parameters",
-    "custom_definitions",
-    "key_events",
+    "screenshot_evidence",
     "not_tracked",
     "assumptions",
-    "documentation_sources_checked",
-    "qa_cases"
+    "documentation_sources_checked"
   ],
   "properties": {
     "schema_version": {
@@ -31,13 +28,6 @@
     "plan_id": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9_\\-]{2,80}$"
-    },
-    "analytics_platforms": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/analyticsPlatform"
-      },
-      "uniqueItems": true
     },
     "execution_context": {
       "$ref": "#/$defs/executionContext"
@@ -72,18 +62,6 @@
         "$ref": "#/$defs/parameter"
       }
     },
-    "custom_definitions": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/customDefinition"
-      }
-    },
-    "key_events": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/keyEvent"
-      }
-    },
     "not_tracked": {
       "type": "array",
       "items": {
@@ -104,11 +82,11 @@
         "$ref": "#/$defs/documentationSource"
       }
     },
-    "qa_cases": {
+    "screenshot_evidence": {
       "type": "array",
       "minItems": 1,
       "items": {
-        "$ref": "#/$defs/qaCase"
+        "$ref": "#/$defs/screenshotEvidence"
       }
     }
   },
@@ -168,7 +146,7 @@
             "robots_txt",
             "client_tracking_plan",
             "tracking_plan_dev_doc",
-            "tracking_plan_recette",
+            "tracking_plan_review",
             "event_inventory",
             "template_workbook",
             "screenshots",
@@ -278,10 +256,8 @@
       "required": [
         "title",
         "version",
-        "status",
         "owner",
-        "created_date",
-        "template_source"
+        "publish_date"
       ],
       "properties": {
         "title": {
@@ -292,28 +268,17 @@
           "type": "string",
           "minLength": 1
         },
-        "status": {
-          "enum": [
-            "draft",
-            "ready_for_review",
-            "approved",
-            "deprecated"
-          ]
-        },
         "owner": {
-          "type": "string",
-          "minLength": 1
-        },
-        "created_date": {
-          "type": "string",
-          "format": "date"
-        },
-        "template_source": {
           "type": "string",
           "minLength": 1
         },
         "notes": {
           "type": "string"
+        },
+        "publish_date": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Publication date in YYYY-MM-DD format, or TBD while the plan remains unpublished."
         }
       }
     },
@@ -750,7 +715,6 @@
       "required": [
         "family_id",
         "family_name",
-        "analytics_platform",
         "events_or_actions",
         "reason",
         "official_sources_considered"
@@ -763,9 +727,6 @@
         "family_name": {
           "type": "string",
           "minLength": 1
-        },
-        "analytics_platform": {
-          "$ref": "#/$defs/analyticsPlatform"
         },
         "events_or_actions": {
           "$ref": "#/$defs/stringArray"
@@ -838,7 +799,6 @@
         "classification",
         "measurement_role",
         "business_event_family",
-        "primary_platform",
         "official_match",
         "official_verification",
         "page_url_pattern",
@@ -852,7 +812,8 @@
         "priority",
         "parameters",
         "privacy",
-        "qa"
+        "analysis_use",
+        "evidence_basis"
       ],
       "properties": {
         "event_id": {
@@ -873,11 +834,7 @@
             "enhanced_measurement",
             "recommended",
             "recommended_ecommerce",
-            "custom",
-            "piano_standard",
-            "piano_sales_insights",
-            "piano_av_insights",
-            "piano_custom"
+            "custom"
           ]
         },
         "measurement_role": {
@@ -887,14 +844,7 @@
           "type": "string",
           "minLength": 1
         },
-        "primary_platform": {
-          "$ref": "#/$defs/analyticsPlatform"
-        },
         "official_match": {
-          "type": "string",
-          "minLength": 1
-        },
-        "official_ga4_match": {
           "type": "string",
           "minLength": 1
         },
@@ -945,26 +895,18 @@
         "parameter_profile": {
           "$ref": "#/$defs/parameterProfile"
         },
-        "platform_mappings": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/platformMapping"
-          }
-        },
-        "implementation_payloads": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/implementationPayload"
-          }
-        },
         "privacy": {
           "$ref": "#/$defs/privacy"
         },
-        "qa": {
-          "$ref": "#/$defs/qa"
-        },
         "implementation_notes": {
           "type": "string"
+        },
+        "analysis_use": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_basis": {
+          "$ref": "#/$defs/evidenceBasis"
         }
       }
     },
@@ -1016,7 +958,6 @@
             "gtag",
             "sdk",
             "server_side",
-            "piano_sdk",
             "unknown"
           ]
         },
@@ -1140,91 +1081,6 @@
         }
       }
     },
-    "platformMapping": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "platform",
-        "event_name",
-        "classification",
-        "official_match",
-        "parameters_or_properties",
-        "implementation_notes",
-        "documentation_source"
-      ],
-      "properties": {
-        "platform": {
-          "$ref": "#/$defs/analyticsPlatform"
-        },
-        "event_name": {
-          "type": "string",
-          "minLength": 1
-        },
-        "classification": {
-          "type": "string",
-          "minLength": 1
-        },
-        "official_match": {
-          "type": "string",
-          "minLength": 1
-        },
-        "parameters_or_properties": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/anyJsonValue"
-          }
-        },
-        "items_or_products": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": {
-              "$ref": "#/$defs/anyJsonValue"
-            }
-          }
-        },
-        "implementation_notes": {
-          "type": "string"
-        },
-        "documentation_source": {
-          "type": "string",
-          "minLength": 1
-        }
-      }
-    },
-    "implementationPayload": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "platform",
-        "method",
-        "event_name",
-        "payload",
-        "notes"
-      ],
-      "properties": {
-        "platform": {
-          "$ref": "#/$defs/analyticsPlatform"
-        },
-        "method": {
-          "type": "string",
-          "minLength": 1
-        },
-        "event_name": {
-          "type": "string",
-          "minLength": 1
-        },
-        "payload": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/anyJsonValue"
-          }
-        },
-        "notes": {
-          "type": "string"
-        }
-      }
-    },
     "privacy": {
       "type": "object",
       "additionalProperties": false,
@@ -1258,44 +1114,6 @@
         }
       }
     },
-    "qa": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "qa_id",
-        "methods",
-        "steps",
-        "expected_data_layer",
-        "expected_network",
-        "debugview_expectation",
-        "status"
-      ],
-      "properties": {
-        "qa_id": {
-          "type": "string",
-          "pattern": "^QA-[A-Z0-9_\\-]{2,80}$"
-        },
-        "methods": {
-          "$ref": "#/$defs/stringArray"
-        },
-        "steps": {
-          "$ref": "#/$defs/stringArray"
-        },
-        "expected_data_layer": {
-          "$ref": "#/$defs/stringArray"
-        },
-        "expected_network": {
-          "$ref": "#/$defs/stringArray"
-        },
-        "debugview_expectation": {
-          "type": "string",
-          "minLength": 1
-        },
-        "status": {
-          "$ref": "#/$defs/qaStatus"
-        }
-      }
-    },
     "parameter": {
       "type": "object",
       "additionalProperties": false,
@@ -1316,7 +1134,9 @@
         "register_custom_definition",
         "cardinality_risk",
         "pii_risk",
-        "consent_dependency"
+        "consent_dependency",
+        "availability",
+        "data_owner"
       ],
       "properties": {
         "parameter_name": {
@@ -1393,72 +1213,20 @@
         },
         "consent_dependency": {
           "type": "string"
-        }
-      }
-    },
-    "customDefinition": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "parameter_name",
-        "display_name",
-        "scope",
-        "registration_type",
-        "reason",
-        "priority"
-      ],
-      "properties": {
-        "parameter_name": {
-          "type": "string",
-          "minLength": 1
         },
-        "display_name": {
-          "type": "string",
-          "minLength": 1
-        },
-        "scope": {
+        "availability": {
           "enum": [
-            "event",
-            "item",
-            "user"
+            "observed",
+            "confirmed_available",
+            "requires_development",
+            "requires_backend",
+            "to_confirm",
+            "unavailable"
           ]
         },
-        "registration_type": {
-          "enum": [
-            "custom_dimension",
-            "custom_metric",
-            "user_property",
-            "piano_data_model_property"
-          ]
-        },
-        "reason": {
+        "data_owner": {
           "type": "string",
           "minLength": 1
-        },
-        "priority": {
-          "$ref": "#/$defs/priority"
-        }
-      }
-    },
-    "keyEvent": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "event_name",
-        "reason",
-        "conditions"
-      ],
-      "properties": {
-        "event_name": {
-          "type": "string",
-          "minLength": 1
-        },
-        "reason": {
-          "type": "string",
-          "minLength": 1
-        },
-        "conditions": {
-          "type": "string"
         }
       }
     },
@@ -1512,58 +1280,6 @@
         }
       }
     },
-    "qaCase": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "qa_id",
-        "event_id",
-        "event_name",
-        "methods",
-        "steps",
-        "expected_data_layer",
-        "expected_network",
-        "debugview_expectation",
-        "status",
-        "evidence"
-      ],
-      "properties": {
-        "qa_id": {
-          "type": "string",
-          "pattern": "^QA-[A-Z0-9_\\-]{2,80}$"
-        },
-        "event_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "event_name": {
-          "type": "string",
-          "minLength": 1
-        },
-        "methods": {
-          "$ref": "#/$defs/stringArray"
-        },
-        "steps": {
-          "$ref": "#/$defs/stringArray"
-        },
-        "expected_data_layer": {
-          "$ref": "#/$defs/stringArray"
-        },
-        "expected_network": {
-          "$ref": "#/$defs/stringArray"
-        },
-        "debugview_expectation": {
-          "type": "string",
-          "minLength": 1
-        },
-        "status": {
-          "$ref": "#/$defs/qaStatus"
-        },
-        "evidence": {
-          "type": "string"
-        }
-      }
-    },
     "priority": {
       "enum": [
         "must",
@@ -1579,21 +1295,6 @@
         "context"
       ]
     },
-    "qaStatus": {
-      "enum": [
-        "not_started",
-        "OK",
-        "KO",
-        "Cannot test"
-      ]
-    },
-    "analyticsPlatform": {
-      "enum": [
-        "ga4",
-        "piano_analytics",
-        "other"
-      ]
-    },
     "parameterClassification": {
       "enum": [
         "ga4_auto_collected_parameter",
@@ -1604,19 +1305,8 @@
         "custom_event_parameter",
         "custom_item_parameter",
         "custom_user_property",
-        "gtm_builtin_variable",
         "data_layer_variable",
-        "custom_javascript_variable",
-        "dom_selector_variable",
-        "server_variable",
-        "piano_page_property",
-        "piano_click_property",
-        "piano_product_property",
-        "piano_cart_property",
-        "piano_transaction_property",
-        "piano_av_property",
-        "piano_conversion_property",
-        "piano_custom_property"
+        "implementation_variable"
       ]
     },
     "stringArray": {
@@ -1649,6 +1339,159 @@
           "type": "object"
         }
       ]
+    },
+    "evidenceBasis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "source_refs",
+        "confidence"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "observed",
+            "confirmed",
+            "inferred",
+            "recommended",
+            "unavailable"
+          ]
+        },
+        "source_refs": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        }
+      }
+    },
+    "cropRectangle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "x": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "y": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "annotationRectangle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x1",
+        "y1",
+        "x2",
+        "y2"
+      ],
+      "properties": {
+        "x1": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "y1": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "x2": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "y2": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "screenshotEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "event_ids",
+        "file_name",
+        "page_or_component",
+        "url_or_route",
+        "capture_objective",
+        "status",
+        "shared_reason",
+        "notes"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "pattern": "^EVIDENCE-[A-Z0-9-]{2,80}$"
+        },
+        "event_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "file_name": {
+          "type": "string"
+        },
+        "page_or_component": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url_or_route": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capture_objective": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "capture_required",
+            "captured",
+            "shared_evidence",
+            "skip_allowed",
+            "not_needed",
+            "blocked"
+          ]
+        },
+        "shared_reason": {
+          "type": "string"
+        },
+        "crop": {
+          "$ref": "#/$defs/cropRectangle"
+        },
+        "annotation": {
+          "$ref": "#/$defs/annotationRectangle"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
     }
   }
 }

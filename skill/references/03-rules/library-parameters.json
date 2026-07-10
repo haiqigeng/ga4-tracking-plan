@@ -1,8 +1,8 @@
 {
-  "scope": "Generic parameter proposition library for GA4-first tracking plans, with Piano properties kept separate when Piano is requested.",
+  "scope": "Generic parameter proposition library for GA4 web tracking plans.",
   "policy": [
     "Use official GA4 parameters and item parameters when the event is official or ecommerce.",
-    "Use custom parameters only when they answer a concrete analysis, segmentation, QA, or optimization need.",
+    "Use custom parameters only when they answer a concrete analysis, segmentation, implementation, or optimization need.",
     "Use lowercase ASCII snake_case for controlled values and remove accents.",
     "Do not use Universal Analytics fields such as eventCategory, eventAction, eventLabel, nonInteraction, dimension1, or metric1.",
     "Do not send PII, contact-derived identifiers, free text, account IDs, addresses, or sensitive user input."
@@ -542,6 +542,5 @@
         }
       ]
     }
-  ],
-  "piano_note": "For Piano Analytics, use Piano Data Model property names from official Piano documentation and keep them separate from GA4 parameters. Do not reuse this GA4 library as Piano property authority."
+  ]
 }

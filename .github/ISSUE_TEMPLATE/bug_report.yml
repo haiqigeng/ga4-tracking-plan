@@ -23,9 +23,9 @@ body:
       label: Platform scope
       options:
         - GA4
-        - Piano Analytics
-        - Cross-platform
-        - Unknown
+        - GA4 ecommerce
+        - Workbook or screenshot output
+        - Validation or migration
     validations:
       required: true
   - type: textarea

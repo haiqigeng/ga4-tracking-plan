@@ -8,7 +8,7 @@ Use this reference whenever a plan includes GA4 ecommerce events or an ecommerce
 - Use event-level `currency` whenever `value` is sent.
 - Set every ecommerce parameter that the implementation reliably has, even when the parameter is optional.
 - Use `items` for product/item context. Each item needs one of `items[].item_id` or `items[].item_name`.
-- `items[].quantity` is optional and GA4 defaults it to `1` when omitted, but tracking plans should still display the intended quantity so analysts and recette agents do not confuse omission with absence.
+- `items[].quantity` is optional and GA4 defaults it to `1` when omitted, but tracking plans should still display the intended quantity so analysts and developers do not confuse omission with absence.
 - `items[].affiliation` and `items[].location_id` are item-scoped only.
 - Event-level and item-level `coupon` are independent. Use item-level `items[].coupon` for item-specific coupons or discounts.
 - `item_list_id`, `item_list_name`, `promotion_id`, `promotion_name`, `creative_name`, and `creative_slot` can have event-level and item-level forms. If item-level values are set, they override event-level values. If item-level values are not set, GA4 uses event-level values when present.

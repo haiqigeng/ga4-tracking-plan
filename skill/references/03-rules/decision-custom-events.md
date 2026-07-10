@@ -1,6 +1,6 @@
 # Custom Event Decision Matrix
 
-Use this reference before proposing custom events. A custom event is acceptable only when official GA4 automatic, enhanced-measurement, recommended, ecommerce, or Piano standard events do not answer the analysis need cleanly.
+Use this reference before proposing custom events. A custom event is acceptable only when GA4 automatic, enhanced-measurement, recommended, or ecommerce events do not answer the analysis need cleanly.
 
 ## Decision Rules
 
@@ -9,7 +9,7 @@ Use this reference before proposing custom events. A custom event is acceptable 
 3. Use the official event when its meaning matches the action.
 4. Consolidate repeated same-name interactions with controlled parameters.
 5. Create a custom event only when the action has a distinct business or diagnostic meaning.
-6. Define required parameters, value rules, reporting registration needs, privacy risk, and QA steps.
+6. Define required parameters, value rules, reporting registration needs, privacy risk, and implementation expectations.
 
 ## GA4 Official-First Replacements
 
@@ -26,7 +26,7 @@ Use this reference before proposing custom events. A custom event is acceptable 
 | Form starts/submits | `form_start`, `form_submit` when semantics fit | Multi-step lead quality, validation, or funnel diagnostics require custom step/error events. |
 | Valid lead submitted | `generate_lead` | The action is only a pre-lead intent or incomplete form step. |
 | Login or signup success | `login`, `sign_up` | The event is pre-login entry intent, account-area CTA click, or account failure diagnostic. |
-| File download or outbound click | Enhanced measurement `file_download` or outbound `click` | Enhanced measurement is unavailable, insufficiently scoped, or duplicate-safe custom QA is required. |
+| File download or outbound click | Enhanced measurement `file_download` or outbound `click` | Enhanced measurement is unavailable, insufficiently scoped, or a distinct business action requires deliberate manual collection. |
 | Video engagement | Enhanced measurement video events for supported embeds | The player is unsupported, non-YouTube, or needs domain-specific media diagnostics. |
 | Content item selected | `select_content` | The action is a richer business intent with its own funnel role. |
 
@@ -78,4 +78,4 @@ For each custom event, document:
 - required parameters and value rules
 - custom dimensions or metrics to register
 - privacy/cardinality risk
-- QA reproduction and expected network payload
+- reproducible trigger, required source data, and expected GA4 payload

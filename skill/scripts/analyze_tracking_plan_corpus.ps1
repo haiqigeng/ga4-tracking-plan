@@ -153,14 +153,12 @@ function Get-PatternMatches {
     $defs = [ordered]@{
         ga4 = @("ga4", "google analytics 4", "\bevent_name\b", "\bview_item\b", "\bselect_item\b", "\badd_to_cart\b", "\bbegin_checkout\b", "\bpurchase\b", "\bitems\[\]\b", "\bitem_id\b", "\bsearch_term\b", "gtag\('event", "\bg-[a-z0-9]+")
         universal_analytics_legacy = @("universal analytics", "\bga3\b", "\bgau\b", "\bga360\b", "eventcategory", "event category", "eventaction", "event action", "eventlabel", "event label", "noninteraction", "enhanced ecommerce", "ua-[0-9]+", "dimension[0-9]+", "metric[0-9]+")
-        piano = @("\bpiano\b", "\bat internet\b", "\batinternet\b", "\bsmarttag\b", "pa\.sendevent", "page\.display", "click\.action", "click\.navigation", "click\.download", "product\.display", "transaction\.confirmation", "site_level2")
         gtm_datalayer = @("\bgtm\b", "gtm-[a-z0-9]+", "datalayer", "datalayer\.push", "\becommerce\b")
         ecommerce = @("ecommerce", "e-commerce", "product", "produit", "cart", "panier", "checkout", "paiement", "purchase", "transaction", "add_to_cart", "remove_from_cart", "view_item", "select_item", "item_list")
         lead_generation = @("lead", "formulaire", "\bform\b", "devis", "quote", "callback", "rappel", "appointment", "rdv", "contact")
         search_listing = @("search", "recherche", "filter", "filtre", "sort", "\btri\b", "listing", "plp", "category", "categorie", "result")
         account_support_content = @("login", "connexion", "signup", "inscription", "account", "compte", "espace", "faq", "support", "download", "telecharg", "newsletter", "article", "video")
         donation_nonprofit = @("don", "donation", "adhesion", "benevole", "petition", "newsletter")
-        qa_recette = @("recette", "recettage", "\bqa\b", "\btest\b", "debugview", "preview", "\bok\b", "\bko\b", "cannot test", "a tester", "status", "statut")
         screenshots = @("screenshot", "screen shot", "capture", "capture d.ecran", "visuel", "maquette")
         pii_risk_terms = @("email", "e-mail", "mail", "phone", "telephone", "téléphone", "prenom", "prénom", "\bnom\b", "lastname", "firstname", "adresse", "address", "postal", "customer_id", "user_id", "client_id")
     }
@@ -195,7 +193,6 @@ function Classify-Platform {
 
     $platforms = New-Object System.Collections.Generic.List[string]
     if ($Signals["ga4"] -gt 0) { [void]$platforms.Add("ga4") }
-    if ($Signals["piano"] -gt 0) { [void]$platforms.Add("piano") }
     if ($Signals["universal_analytics_legacy"] -gt 0) { [void]$platforms.Add("universal_analytics_legacy") }
     if ($platforms.Count -eq 0 -and $Signals["gtm_datalayer"] -gt 0) { [void]$platforms.Add("gtm_unknown_analytics") }
     if ($platforms.Count -eq 0) { [void]$platforms.Add("unknown") }
@@ -248,7 +245,7 @@ foreach ($file in $files) {
             $aggregate.platform_counts[$platform]++
         }
 
-        foreach ($scenario in @("ecommerce", "lead_generation", "search_listing", "account_support_content", "donation_nonprofit", "qa_recette")) {
+        foreach ($scenario in @("ecommerce", "lead_generation", "search_listing", "account_support_content", "donation_nonprofit")) {
             if ($signals[$scenario] -gt 0) {
                 if (-not $aggregate.scenario_counts.Contains($scenario)) { $aggregate.scenario_counts[$scenario] = 0 }
                 $aggregate.scenario_counts[$scenario]++

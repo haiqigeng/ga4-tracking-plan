@@ -16,9 +16,9 @@ body:
       label: Platform scope
       options:
         - GA4
-        - Piano Analytics
-        - Cross-platform
-        - Generic workflow
+        - GA4 ecommerce
+        - Workbook or screenshot output
+        - Validation or migration
     validations:
       required: true
   - type: textarea
@@ -39,6 +39,6 @@ body:
     id: ga4_docs
     attributes:
       label: Official documentation
-      description: Link to official GA4 or Piano docs if the request concerns native events, parameters, properties, ecommerce, or SDK behavior.
+      description: Link to official Google documentation if the request concerns GA4 events, parameters, ecommerce, or collection behavior.
     validations:
       required: false

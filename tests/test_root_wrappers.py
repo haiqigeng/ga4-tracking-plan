@@ -3,14 +3,16 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 WRAPPERS = [
     "annotate_screenshot.py",
+    "check_official_catalog.py",
     "discover_site_journeys.py",
     "discover_site_journeys_playwright.py",
+    "diff_tracking_plans.py",
     "export_tracking_plan_csv.py",
     "generate_tracking_plan_workbook.py",
+    "migrate_tracking_plan.py",
     "validate_tracking_plan.py",
 ]
 

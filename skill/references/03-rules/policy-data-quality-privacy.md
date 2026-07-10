@@ -21,15 +21,15 @@ Use this reference during every tracking-plan review, regardless of scenario.
 
 - Every event must answer a business or diagnostic question.
 - A business question should describe the analysis need or decision, not the implementation action. Reject weak wording such as "track click", "track page view", or "which link was clicked?" unless it is rewritten with a business purpose.
-- Every machine-readable event must include `primary_platform` and `official_match`; custom events must explain why the official platform events are insufficient.
+- Every event must include `official_match`; custom events must explain why GA4 official events are insufficient.
 - Macro conversions must be separated from micro conversions and diagnostic events.
 - Ecommerce events must not be mixed with interaction-only parameters unless those custom item/event parameters are intentionally documented.
-- Optional parameters should be included only when they improve analysis or QA.
+- Optional parameters should be included only when they improve analysis or implementation clarity.
 - Events intentionally not tracked should be listed with a reason.
 
-## AI Agent Usage
+## Reusable Package Safety
 
 - Keep generated outputs human-readable first and machine-readable second.
-- Use the canonical JSON contract for repeatable generation, QA automation, and future conversion to other formats.
+- Use the canonical JSON contract for repeatable validation and conversion to human formats.
 - Never commit client-specific plans, screenshots, test outputs, URLs, or credentials into the generic skill repository.
 - Keep examples generic with `example.com`, placeholder IDs, and non-sensitive sample values.

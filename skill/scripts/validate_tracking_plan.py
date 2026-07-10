@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 from collections import Counter, defaultdict
+from datetime import date
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -13,7 +14,6 @@ from ecommerce_matrix import (
     EVENT_PARAMETERS_BY_EVENT,
     OFFICIAL_ITEM_PARAMETERS,
 )
-
 from tracking_plan_validation_catalogs import (
     CUSTOM_CLASSIFICATIONS,
     CUSTOM_PARAMETER_CLASSIFICATIONS,
@@ -29,7 +29,6 @@ from tracking_plan_validation_catalogs import (
     OFFICIAL_PARAMETER_CLASSES,
     OFFICIAL_SOURCE_DOMAINS,
     OFFICIAL_VERIFICATION_CLASSES,
-    PIANO_CLASSIFICATIONS,
     POTENTIAL_DUPLICATE_EVENTS,
     REPORTING_PURPOSE_RE,
     TRANSACTION_EVENTS,
@@ -44,16 +43,13 @@ from tracking_plan_validation_catalogs import (
     default_schema_path,
     load_ga4_catalog,
     load_json,
-    load_piano_event_catalog,
 )
 from tracking_plan_validation_events import (
     check_custom_event_rationale,
     check_ga4_event_shape,
     check_ga4_name,
     check_legacy_ua_field,
-    check_piano_event_shape,
     check_pii_name,
-    check_platform_mapping,
     is_ga4_event,
     should_lint_ga4_parameter_name,
 )
@@ -122,15 +118,6 @@ def check_duplicates(values: list[str], label: str, path: str, issues: list[Issu
         if value and count > 1:
             add_issue(issues, "error", "DUPLICATE_ID", path, f"{label} '{value}' appears {count} times.")
 
-
-
-def expected_network_mentions_event(expected_network: Any, event_name: str) -> bool:
-    if not event_name or not isinstance(expected_network, list):
-        return False
-    text = " ".join(str(entry) for entry in expected_network)
-    return event_name in text
-
-
 def check_business_question(value: Any, path: str, issues: list[Issue]) -> None:
     question = str(value or "").strip()
     if not question:
@@ -171,13 +158,13 @@ def check_execution_context(plan: dict[str, Any], issues: list[Issue]) -> None:
                 "$.execution_context.template_policy.mode",
                 "Client-template adaptation must use strict_client_template or hybrid_preserve_client_structure.",
             )
-        if not (artifact_types & {"template_workbook", "client_tracking_plan", "tracking_plan_dev_doc", "tracking_plan_recette", "event_inventory"}):
+        if not (artifact_types & {"template_workbook", "client_tracking_plan", "tracking_plan_dev_doc", "tracking_plan_review", "event_inventory"}):
             add_issue(
                 issues,
                 "error",
                 "CLIENT_TEMPLATE_ARTIFACT_MISSING",
                 "$.execution_context.input_artifact_inventory",
-                "Client-template adaptation needs a client template, tracking plan, dev doc, recette plan, or event inventory artifact.",
+                "Client-template adaptation needs a client template, tracking plan, development document, review plan, or event inventory artifact.",
             )
         if template_policy.get("template_diff_required") and not context.get("template_diff_summary"):
             add_issue(
@@ -259,7 +246,6 @@ def check_measurement_strategy(plan: dict[str, Any], issues: list[Issue]) -> Non
     if not isinstance(strategy, dict):
         return
 
-    platforms = set(plan.get("analytics_platforms", []) if isinstance(plan.get("analytics_platforms", []), list) else [])
     journey_ids = {
         str(brief.get("journey_id", ""))
         for brief in plan.get("measurement_brief", [])
@@ -293,15 +279,6 @@ def check_measurement_strategy(plan: dict[str, Any], issues: list[Issue]) -> Non
     for index, family in enumerate(selected_families if isinstance(selected_families, list) else []):
         if not isinstance(family, dict):
             continue
-        platform = str(family.get("analytics_platform", ""))
-        if platforms and platform not in platforms and platform != "other":
-            add_issue(
-                issues,
-                "error",
-                "STRATEGY_PLATFORM_OUT_OF_SCOPE",
-                f"$.measurement_strategy.selected_event_families[{index}].analytics_platform",
-                f"Selected event family platform '{platform}' is not listed in analytics_platforms.",
-            )
         reason = str(family.get("reason", "")).strip()
         if len(reason.split()) < 6:
             add_issue(
@@ -409,7 +386,7 @@ def check_website_coverage_map(plan: dict[str, Any], issues: list[Issue]) -> Non
                         "error",
                         "COVERAGE_INCLUDED_EVIDENCE_MISSING",
                         f"$.website_coverage_map.journeys_covered[{index}].{field}",
-                        f"Included journeys need non-empty {field} so analysts and future QA can understand coverage.",
+                        f"Included journeys need non-empty {field} so analysts and developers can understand coverage.",
                     )
 
     coverage_gap_text = " ".join(
@@ -495,6 +472,7 @@ def check_official_verification(
     status = str(verification.get("status", ""))
     source_url = str(verification.get("source_url", "")).lower()
     scope_note = str(verification.get("scope_note", "")).strip()
+    checked_date = str(verification.get("checked_date", ""))
     if required and status != "verified":
         add_issue(
             issues,
@@ -519,6 +497,21 @@ def check_official_verification(
             f"{path}.scope_note",
             "Official verification must state event, item, property, or implementation scope clearly.",
         )
+    if required and checked_date:
+        try:
+            age_days = (date.today() - date.fromisoformat(checked_date)).days
+        except ValueError:
+            return
+        if age_days < 0:
+            add_issue(issues, "error", "OFFICIAL_VERIFICATION_DATE_FUTURE", f"{path}.checked_date", "Official verification date cannot be in the future.")
+        elif age_days > 180:
+            add_issue(
+                issues,
+                "warning",
+                "OFFICIAL_VERIFICATION_STALE",
+                f"{path}.checked_date",
+                "Official verification is more than 180 days old and should be refreshed before approval.",
+            )
 
 
 def check_not_tracked_decisions(plan: dict[str, Any], issues: list[Issue]) -> None:
@@ -545,12 +538,58 @@ def check_not_tracked_decisions(plan: dict[str, Any], issues: list[Issue]) -> No
             )
 
 
+def check_screenshot_evidence(plan: dict[str, Any], issues: list[Issue]) -> None:
+    events = [event for event in plan.get("events", []) if isinstance(event, dict)]
+    event_ids = {str(event.get("event_id", "")) for event in events}
+    evidence_rows = [row for row in plan.get("screenshot_evidence", []) if isinstance(row, dict)]
+    check_duplicates(
+        [str(row.get("evidence_id", "")) for row in evidence_rows],
+        "evidence_id",
+        "$.screenshot_evidence",
+        issues,
+    )
+
+    covered: Counter[str] = Counter()
+    file_usage: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
+    for index, row in enumerate(evidence_rows):
+        base = f"$.screenshot_evidence[{index}]"
+        related = [str(value) for value in row.get("event_ids", [])]
+        for event_id in related:
+            if event_id not in event_ids:
+                add_issue(issues, "error", "SCREENSHOT_EVENT_UNKNOWN", f"{base}.event_ids", f"Screenshot evidence references unknown event_id '{event_id}'.")
+            covered[event_id] += 1
+        status = str(row.get("status", ""))
+        file_name = str(row.get("file_name", "")).strip()
+        if status in {"captured", "shared_evidence"} and not file_name:
+            add_issue(issues, "error", "SCREENSHOT_FILE_MISSING", f"{base}.file_name", f"Screenshot status '{status}' requires an explicit evidence file name.")
+        if status == "shared_evidence" and len(related) < 2:
+            add_issue(issues, "error", "SCREENSHOT_SHARED_WITH_ONE_EVENT", f"{base}.event_ids", "shared_evidence must reference at least two events.")
+        if status == "shared_evidence" and len(str(row.get("shared_reason", "")).split()) < 4:
+            add_issue(issues, "error", "SCREENSHOT_SHARED_REASON_WEAK", f"{base}.shared_reason", "Shared screenshot evidence needs a clear reason describing the common page state or interaction.")
+        if file_name:
+            file_usage[file_name.lower()].append(row)
+
+    for event_id in sorted(event_ids):
+        if covered[event_id] == 0:
+            add_issue(issues, "error", "SCREENSHOT_EVENT_MISSING", "$.screenshot_evidence", f"Event '{event_id}' needs a screenshot-evidence row or an explicit skip/not-needed decision.")
+
+    for file_name, rows in file_usage.items():
+        related_events = {event_id for row in rows for event_id in row.get("event_ids", [])}
+        if len(rows) > 1 and len(related_events) > 1 and not all(row.get("status") == "shared_evidence" for row in rows):
+            add_issue(
+                issues,
+                "warning",
+                "SCREENSHOT_REUSE_NOT_EXPLICIT",
+                "$.screenshot_evidence",
+                f"Screenshot '{file_name}' is reused across events without one explicit shared_evidence row.",
+            )
+
+
 def check_event(
     event: dict[str, Any],
     index: int,
     parameter_lookup: dict[str, dict[str, Any]],
     ga4_catalog: dict[str, Any],
-    piano_catalog: dict[str, dict[str, Any]],
     issues: list[Issue],
 ) -> None:
     base = f"$.events[{index}]"
@@ -564,13 +603,11 @@ def check_event(
 
     check_legacy_ua_field(str(event_name), f"{base}.event_name", issues)
 
-    if not event.get("primary_platform"):
-        add_issue(issues, "error", "PRIMARY_PLATFORM_MISSING", f"{base}.primary_platform", "Every event needs primary_platform for platform-specific QA and mapping.")
     if not str(event.get("official_match", "")).strip():
         add_issue(issues, "error", "OFFICIAL_MATCH_MISSING", f"{base}.official_match", "Every event needs official_match describing the official event match or custom rationale.")
     check_official_verification(
         event.get("official_verification"),
-        str(event.get("primary_platform", "")),
+        "ga4",
         f"{base}.official_verification",
         issues,
         required=classification in OFFICIAL_VERIFICATION_CLASSES,
@@ -669,6 +706,12 @@ def check_event(
             "Macro conversions should normally use priority='must'.",
         )
     check_business_question(event.get("business_question"), f"{base}.business_question", issues)
+    analysis_use = str(event.get("analysis_use", "")).strip()
+    if len(analysis_use.split()) < 5:
+        add_issue(issues, "error", "EVENT_ANALYSIS_USE_WEAK", f"{base}.analysis_use", "Each event needs a concrete reporting, optimization, or business-decision use.")
+    evidence_basis = event.get("evidence_basis", {})
+    if isinstance(evidence_basis, dict) and not evidence_basis.get("source_refs"):
+        add_issue(issues, "error", "EVENT_EVIDENCE_SOURCE_MISSING", f"{base}.evidence_basis.source_refs", "Event evidence must identify the website, brief, client file, or analyst inference it is based on.")
 
     for parameter in parameters:
         check_pii_name(str(parameter), f"{base}.parameters", issues)
@@ -802,22 +845,6 @@ def check_event(
     if privacy.get("cardinality_risk") == "high" and not HIGH_CARDINALITY_GOVERNANCE_RE.search(cardinality_notes):
         add_issue(issues, "warning", "HIGH_CARDINALITY_RISK", f"{base}.privacy.cardinality_risk", "High-cardinality fields should not be registered as reporting dimensions unless justified.")
 
-    qa = event.get("qa", {})
-    if not qa.get("qa_id"):
-        add_issue(issues, "error", "EVENT_QA_MISSING", f"{base}.qa.qa_id", "Every testable event needs a stable qa_id.")
-    if not qa.get("expected_data_layer"):
-        add_issue(issues, "warning", "EXPECTED_DATALAYER_MISSING", f"{base}.qa.expected_data_layer", "QA should include expected dataLayer keys or note why none apply.")
-    if not qa.get("expected_network"):
-        add_issue(issues, "warning", "EXPECTED_NETWORK_MISSING", f"{base}.qa.expected_network", "QA should include expected GA4/network event and key parameters.")
-    elif not expected_network_mentions_event(qa.get("expected_network"), str(event_name)):
-        add_issue(
-            issues,
-            "error",
-            "QA_EXPECTED_NETWORK_EVENT_NAME_MISSING",
-            f"{base}.qa.expected_network",
-            f"Event QA expected_network must mention the expected event name '{event_name}'.",
-        )
-
     if classification in GA4_CLASSIFICATIONS and classification != "automatic" and not ga4_payload:
         add_issue(
             issues,
@@ -827,34 +854,8 @@ def check_event(
             "GA4 recommended, ecommerce, and custom events should include a ga4_payload example unless the event is intentionally automatic-only.",
         )
 
-    if event.get("primary_platform") and event.get("platform_mappings"):
-        mapped_platforms = {mapping.get("platform") for mapping in event.get("platform_mappings", []) if isinstance(mapping, dict)}
-        if event.get("primary_platform") not in mapped_platforms and event.get("primary_platform") != "ga4":
-            add_issue(
-                issues,
-                "warning",
-                "PRIMARY_PLATFORM_MAPPING_MISSING",
-                f"{base}.platform_mappings",
-                f"primary_platform is {event.get('primary_platform')} but no matching platform mapping is listed.",
-            )
-
-    for payload_index, payload in enumerate(event.get("implementation_payloads", [])):
-        if not isinstance(payload, dict):
-            continue
-        check_legacy_ua_field(str(payload.get("event_name", "")), f"{base}.implementation_payloads[{payload_index}].event_name", issues)
-        payload_data = payload.get("payload", {})
-        if isinstance(payload_data, dict):
-            for key in payload_data:
-                check_pii_name(str(key), f"{base}.implementation_payloads[{payload_index}].payload.{key}", issues)
-                check_legacy_ua_field(str(key), f"{base}.implementation_payloads[{payload_index}].payload.{key}", issues)
-
-    check_piano_event_shape(event, index, piano_catalog, issues)
     check_ga4_event_shape(event, index, ga4_catalog, issues)
     check_custom_event_rationale(event, index, issues)
-
-    for mapping_index, mapping in enumerate(event.get("platform_mappings", [])):
-        if isinstance(mapping, dict):
-            check_platform_mapping(event, index, mapping, mapping_index, piano_catalog, issues)
 
 
 def validate_plan_data(plan: dict[str, Any], schema_path: Path | None = None) -> list[Issue]:
@@ -865,42 +866,22 @@ def validate_plan_data(plan: dict[str, Any], schema_path: Path | None = None) ->
     parameters = plan.get("parameters", [])
     parameter_lookup = {param.get("parameter_name", ""): param for param in parameters if isinstance(param, dict)}
     ga4_catalog = load_ga4_catalog()
-    piano_catalog = load_piano_event_catalog()
     events = plan.get("events", [])
-    qa_cases = plan.get("qa_cases", [])
-    custom_definitions = plan.get("custom_definitions", [])
     documentation_sources = plan.get("documentation_sources_checked", [])
-    registered_item_custom_dimensions = {
-        definition.get("parameter_name")
-        for definition in custom_definitions
-        if isinstance(definition, dict)
-        and definition.get("scope") == "item"
-        and definition.get("registration_type") == "custom_dimension"
-    }
-    custom_definition_keys = {
-        (definition.get("parameter_name"), definition.get("scope"))
-        for definition in custom_definitions
-        if isinstance(definition, dict)
-    }
 
     check_duplicates([event.get("event_id", "") for event in events if isinstance(event, dict)], "event_id", "$.events", issues)
-    check_duplicates([case.get("qa_id", "") for case in qa_cases if isinstance(case, dict)], "qa_id", "$.qa_cases", issues)
     check_execution_context(plan, issues)
     check_measurement_alignment(plan, issues)
     check_measurement_strategy(plan, issues)
     check_website_coverage_map(plan, issues)
     check_not_tracked_decisions(plan, issues)
+    check_screenshot_evidence(plan, issues)
     source_urls = [
         str(source.get("url", "")).lower()
         for source in documentation_sources
         if isinstance(source, dict) and source.get("source_type") == "official"
     ]
     has_ga4_events = any(isinstance(event, dict) and is_ga4_event(event) for event in events)
-    has_piano_events = any(
-        isinstance(event, dict)
-        and (event.get("primary_platform") == "piano_analytics" or event.get("classification") in PIANO_CLASSIFICATIONS)
-        for event in events
-    )
     if has_ga4_events and not any(any(domain in url for domain in OFFICIAL_SOURCE_DOMAINS["ga4"]) for url in source_urls):
         add_issue(
             issues,
@@ -909,15 +890,6 @@ def validate_plan_data(plan: dict[str, Any], schema_path: Path | None = None) ->
             "$.documentation_sources_checked",
             "GA4 plans must cite at least one official Google Analytics documentation source.",
         )
-    if has_piano_events and not any(any(domain in url for domain in OFFICIAL_SOURCE_DOMAINS["piano_analytics"]) for url in source_urls):
-        add_issue(
-            issues,
-            "error",
-            "PIANO_OFFICIAL_SOURCE_MISSING",
-            "$.documentation_sources_checked",
-            "Piano Analytics plans must cite at least one official Piano documentation source.",
-        )
-
     for index, param in enumerate(parameters):
         if not isinstance(param, dict):
             continue
@@ -925,10 +897,9 @@ def validate_plan_data(plan: dict[str, Any], schema_path: Path | None = None) ->
         check_pii_name(name, f"$.parameters[{index}].parameter_name", issues)
         check_legacy_ua_field(name, f"$.parameters[{index}].parameter_name", issues)
         classification = param.get("classification")
-        parameter_platform = "piano_analytics" if str(classification).startswith("piano_") else "ga4"
         check_official_verification(
             param.get("official_verification"),
-            parameter_platform,
+            "ga4",
             f"$.parameters[{index}].official_verification",
             issues,
             required=classification in OFFICIAL_PARAMETER_CLASSES,
@@ -960,8 +931,6 @@ def validate_plan_data(plan: dict[str, Any], schema_path: Path | None = None) ->
                     add_issue(issues, "warning", "CUSTOM_ITEM_PARAMETER_CLASSIFICATION", f"$.parameters[{index}].classification", f"'{name}' is item-scoped and non-official; use custom_item_parameter.")
                 if param.get("scope") != "item":
                     add_issue(issues, "error", "CUSTOM_ITEM_PARAMETER_SCOPE", f"$.parameters[{index}].scope", f"'{name}' must use item scope.")
-                if param.get("register_custom_definition") and name not in registered_item_custom_dimensions:
-                    add_issue(issues, "warning", "CUSTOM_ITEM_DIMENSION_MISSING", "$.custom_definitions", f"'{name}' is marked for registration but no matching item-scoped custom dimension is listed.")
         if param.get("pii_risk") == "high":
             add_issue(issues, "error", "HIGH_PII_RISK", f"$.parameters[{index}].pii_risk", f"Parameter '{name}' has high PII risk.")
         if param.get("cardinality_risk") == "high" and param.get("register_custom_definition"):
@@ -994,84 +963,19 @@ def validate_plan_data(plan: dict[str, Any], schema_path: Path | None = None) ->
                 f"$.parameters[{index}].value_rules",
                 f"Custom parameter '{name}' needs concrete value rules or controlled values.",
             )
-        if param.get("register_custom_definition") and (name, param.get("scope")) not in custom_definition_keys:
+        availability = str(param.get("availability", ""))
+        if availability in {"requires_development", "requires_backend", "to_confirm", "unavailable"} and len(str(param.get("data_owner", "")).split()) < 2:
             add_issue(
                 issues,
                 "error",
-                "CUSTOM_DEFINITION_MISSING",
-                "$.custom_definitions",
-                f"Parameter '{name}' is marked for custom definition/Data Model registration but no matching custom_definitions row exists.",
+                "PARAMETER_DATA_OWNER_MISSING",
+                f"$.parameters[{index}].data_owner",
+                f"Parameter '{name}' needs a clear owner because its availability is '{availability}'.",
             )
-        if classification == "piano_custom_property" and param.get("register_custom_definition"):
-            matching_definitions = [
-                definition
-                for definition in custom_definitions
-                if isinstance(definition, dict)
-                and definition.get("parameter_name") == name
-                and definition.get("scope") == param.get("scope")
-            ]
-            if not any(definition.get("registration_type") == "piano_data_model_property" for definition in matching_definitions):
-                add_issue(
-                    issues,
-                    "error",
-                    "PIANO_DATA_MODEL_DEFINITION_MISSING",
-                    "$.custom_definitions",
-                    f"Piano custom property '{name}' is marked for registration but no Piano Data Model property row is listed.",
-                )
 
     for index, event in enumerate(events):
         if isinstance(event, dict):
-            check_event(event, index, parameter_lookup, ga4_catalog, piano_catalog, issues)
-
-    events_by_id = {event.get("event_id"): event for event in events if isinstance(event, dict)}
-    events_by_name = {event.get("event_name"): event for event in events if isinstance(event, dict)}
-    event_qa_ids = {event.get("qa", {}).get("qa_id") for event in events if isinstance(event, dict)}
-    qa_case_ids = {case.get("qa_id") for case in qa_cases if isinstance(case, dict)}
-    for event_id, event in events_by_id.items():
-        if event and event.get("qa", {}).get("qa_id") not in qa_case_ids:
-            add_issue(issues, "warning", "QA_CASE_MISSING", "$.qa_cases", f"Event '{event_id}' has no matching qa_cases entry.")
-    for index, case in enumerate(qa_cases):
-        if not isinstance(case, dict):
-            continue
-        event_id = case.get("event_id")
-        event = events_by_id.get(event_id)
-        if not event:
-            add_issue(issues, "error", "QA_EVENT_NOT_FOUND", f"$.qa_cases[{index}].event_id", f"QA case references unknown event_id '{event_id}'.")
-            continue
-        if case.get("event_name") != event.get("event_name"):
-            add_issue(issues, "error", "QA_EVENT_NAME_MISMATCH", f"$.qa_cases[{index}].event_name", "QA case event_name does not match the referenced event.")
-        if case.get("qa_id") not in event_qa_ids:
-            add_issue(issues, "warning", "QA_ID_NOT_ON_EVENT", f"$.qa_cases[{index}].qa_id", "QA case qa_id is not referenced by an event qa block.")
-        if not expected_network_mentions_event(case.get("expected_network"), str(case.get("event_name", ""))):
-            add_issue(
-                issues,
-                "error",
-                "QA_EXPECTED_NETWORK_EVENT_NAME_MISSING",
-                f"$.qa_cases[{index}].expected_network",
-                f"Top-level QA expected_network must mention the expected event name '{case.get('event_name')}'.",
-            )
-
-    for index, key_event in enumerate(plan.get("key_events", []) if isinstance(plan.get("key_events", []), list) else []):
-        if not isinstance(key_event, dict):
-            continue
-        event = events_by_name.get(key_event.get("event_name"))
-        if not event:
-            add_issue(
-                issues,
-                "error",
-                "KEY_EVENT_NOT_FOUND",
-                f"$.key_events[{index}].event_name",
-                f"Key event '{key_event.get('event_name')}' is not defined in events.",
-            )
-            continue
-        if event.get("measurement_role") in NON_CONVERSION_MEASUREMENT_ROLES:
-            add_issue(
-                issues,
-                "error",
-                "KEY_EVENT_ROLE_INVALID",
-                f"$.key_events[{index}].event_name",
-                f"Key event '{key_event.get('event_name')}' points to a {event.get('measurement_role')} event.",
-            )
+            check_event(event, index, parameter_lookup, ga4_catalog, issues)
 
     return issues
 

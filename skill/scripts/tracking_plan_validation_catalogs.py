@@ -143,24 +143,18 @@ SAFE_NAME_EXCEPTIONS = {
     "link_url",
 }
 
-PIANO_OFFICIAL_CLASSIFICATIONS = {"piano_standard", "piano_sales_insights", "piano_av_insights"}
-PIANO_CLASSIFICATIONS = PIANO_OFFICIAL_CLASSIFICATIONS | {"piano_custom"}
 GA4_CLASSIFICATIONS = {"automatic", "enhanced_measurement", "recommended", "recommended_ecommerce", "custom"}
-CUSTOM_CLASSIFICATIONS = {"custom", "piano_custom"}
+CUSTOM_CLASSIFICATIONS = {"custom"}
 CUSTOM_PARAMETER_CLASSIFICATIONS = {
     "custom_event_parameter",
     "custom_item_parameter",
     "custom_user_property",
-    "piano_custom_property",
 }
 OFFICIAL_VERIFICATION_CLASSES = {
     "automatic",
     "enhanced_measurement",
     "recommended",
     "recommended_ecommerce",
-    "piano_standard",
-    "piano_sales_insights",
-    "piano_av_insights",
 }
 OFFICIAL_PARAMETER_CLASSES = {
     "ga4_auto_collected_parameter",
@@ -168,13 +162,6 @@ OFFICIAL_PARAMETER_CLASSES = {
     "ga4_recommended_parameter",
     "ga4_ecommerce_parameter",
     "ga4_ecommerce_item_parameter",
-    "piano_page_property",
-    "piano_click_property",
-    "piano_product_property",
-    "piano_cart_property",
-    "piano_transaction_property",
-    "piano_av_property",
-    "piano_conversion_property",
 }
 POTENTIAL_DUPLICATE_EVENTS = {
     "page_view",
@@ -193,7 +180,6 @@ WEAK_TEMPLATE_REASON_RE = re.compile(r"^(n/a|none|no|not applicable|tbd|same)$",
 NON_CONVERSION_MEASUREMENT_ROLES = {"context", "diagnostic"}
 OFFICIAL_SOURCE_DOMAINS = {
     "ga4": ("developers.google.com/analytics", "support.google.com/analytics"),
-    "piano_analytics": ("developers.piano.io", "analytics-docs.piano.io"),
 }
 CUSTOM_RATIONALE_RE = re.compile(
     r"(custom|no official|no native|no recommended|no standard|not sufficient|insufficient|"
@@ -313,10 +299,6 @@ def references_dir() -> Path:
     return Path(__file__).resolve().parents[1] / "references" / "03-rules"
 
 
-def default_piano_catalog_path() -> Path:
-    return references_dir() / "platform-piano-official-events.json"
-
-
 def default_ga4_recommended_events_path() -> Path:
     return references_dir() / "library-ga4-recommended-events.json"
 
@@ -373,25 +355,3 @@ def load_ga4_catalog() -> dict[str, Any]:
         "all_official": recommended | standard | set(ECOMMERCE_EVENTS),
         "recommended_required_parameters": recommended_required_parameters,
     }
-
-
-def load_piano_event_catalog() -> dict[str, dict[str, Any]]:
-    path = default_piano_catalog_path()
-    if not path.exists():
-        return {}
-    catalog = load_json(path)
-    events: dict[str, dict[str, Any]] = {}
-    for family in catalog.get("event_families", []):
-        if not isinstance(family, dict):
-            continue
-        family_classification = str(family.get("classification", ""))
-        for event in family.get("events", []):
-            if not isinstance(event, dict) or not event.get("event"):
-                continue
-            events[str(event["event"])] = {
-                "family": family.get("family", ""),
-                "classification": family_classification,
-                "mandatory_properties": set(event.get("mandatory_properties", [])),
-                "server_side_extra_mandatory_properties": set(event.get("server_side_extra_mandatory_properties", [])),
-            }
-    return events

@@ -1,38 +1,19 @@
 # Purpose
 
-Use this file to understand the skill's product objective before running or
-maintaining it.
+Create or review GA4 web tracking plans with the judgement of a real web
+analyst. Turn business context, journeys, analysis needs, website evidence,
+GA4 rules, and implementation constraints into a readable and scalable plan.
 
-## Core Purpose
-
-GA4 Tracking Plan acts as a web analyst for GA4-first tracking-plan creation.
-It turns business context, user journeys, analysis needs, platform rules, and
-implementation constraints into a readable, scalable, QA-ready tracking plan.
-
-The skill is not primarily an event generator. Event selection is the result of
-measurement judgement.
+The skill is not an event generator. Event selection is the result of a
+measurement strategy.
 
 ## North Star
 
-Answer this question:
-
 ```text
-What should this website or journey measure, with which GA4 events and
-parameters, so users can analyse business performance, implement cleanly,
-and test the setup reliably?
+What should this website or journey measure in GA4, with which events and
+parameters, so analysts can use the data and developers can implement it?
 ```
 
-## Working Principle
-
-Define the measurement model before listing events:
-
-- business goal and journey role;
-- macro conversions, micro conversions, diagnostics, and context events;
-- official GA4 or Piano event fit;
-- reusable parameter taxonomy and controlled values;
-- data availability, privacy sensitivity, and implementation constraints;
-- QA and future recette requirements;
-- scalability for future pages, markets, components, and journey variants.
-
-Only then recommend events, parameters, custom definitions, non-tracked
-decisions, and QA cases.
+Define business goals, success and diagnostic signals, official-event fit,
+parameter availability, privacy, data ownership, and future reuse before
+finalizing event rows.

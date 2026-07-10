@@ -11,7 +11,7 @@ For each journey, check:
 1. Business role: the journey has a clear business purpose, user intent, and
    success signal.
 2. Analysis need: each proposed event answers a reporting, optimization,
-   media, product, ecommerce, or QA question.
+   media, product, ecommerce, or diagnostic question.
 3. Event role: macro conversions, micro conversions, diagnostics, and context
    events are separated but still explain one measurement flow.
 4. Official fit: GA4 automatic, enhanced-measurement, recommended, or
@@ -46,7 +46,7 @@ Do not approve the plan when:
 
 ## Output Expectation
 
-The Event Matrix should let a human analyst, developer, media user, or QA user
+The Event Matrix should let a human analyst, developer, or media user
 answer these questions quickly:
 
 - What business question does this event answer?
@@ -54,4 +54,4 @@ answer these questions quickly:
 - Which GA4 event should be sent?
 - Which parameters and value rules are required?
 - What is intentionally not tracked?
-- What visual or QA evidence is required, shared, skipped, or not needed?
+- What visual evidence is required, shared, skipped, or not needed?

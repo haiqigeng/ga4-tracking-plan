@@ -1,9 +1,6 @@
 {
-  "schema_version": "1.1.0",
+  "schema_version": "2.0.0",
   "plan_id": "generic_ecommerce_homepage",
-  "analytics_platforms": [
-    "ga4"
-  ],
   "execution_context": {
     "execution_mode": "greenfield_best_practice",
     "mode_reason": "Generic fixture uses the integrated default GA4 tracking plan template without client-specific artifacts.",
@@ -27,10 +24,10 @@
       "mode": "default_skill_template",
       "template_source": "assets/ga4_tracking_plan_template.xlsx",
       "preservation_requirements": [
-        "Keep default six-sheet workbook structure stable."
+        "Keep default five-sheet workbook structure stable."
       ],
       "allowed_changes": [
-        "Populate rows and QA placeholders from the structured plan."
+        "Populate rows and screenshot evidence rows from the structured plan."
       ],
       "template_diff_required": false
     },
@@ -45,11 +42,9 @@
   "document": {
     "title": "Generic GA4 ecommerce homepage tracking plan",
     "version": "v0.1",
-    "status": "draft",
     "owner": "TBD",
-    "created_date": "2026-06-26",
-    "template_source": "assets/ga4_tracking_plan_template.xlsx",
-    "notes": "Generic fixture for validating the skill contract, workbook generator, and QA-ready output."
+    "notes": "Generic fixture for validating the skill contract, workbook generator, and analyst-readable output.",
+    "publish_date": "2026-06-26"
   },
   "measurement_brief": [
     {
@@ -135,7 +130,6 @@
       {
         "family_id": "homepage_context",
         "family_name": "Homepage context",
-        "analytics_platform": "ga4",
         "events_or_actions": [
           "page_view"
         ],
@@ -147,7 +141,6 @@
       {
         "family_id": "ecommerce_promotion_engagement",
         "family_name": "Ecommerce promotion engagement",
-        "analytics_platform": "ga4",
         "events_or_actions": [
           "view_promotion",
           "select_promotion"
@@ -161,7 +154,6 @@
       {
         "family_id": "site_search",
         "family_name": "Site search",
-        "analytics_platform": "ga4",
         "events_or_actions": [
           "search"
         ],
@@ -173,7 +165,6 @@
       {
         "family_id": "content_navigation_selection",
         "family_name": "Content and navigation selection",
-        "analytics_platform": "ga4",
         "events_or_actions": [
           "select_content"
         ],
@@ -185,7 +176,6 @@
       {
         "family_id": "account_access_intent",
         "family_name": "Account access intent",
-        "analytics_platform": "ga4",
         "events_or_actions": [
           "account_access_intent"
         ],
@@ -226,7 +216,6 @@
     ],
     "scalability_notes": [
       "Reuse the same homepage discovery event families for future home, landing, or campaign-entry pages when the trigger and parameter structure match.",
-      "Keep event_id and qa_id stable so future GTM Preview and network recette can map tests back to the Event Matrix.",
       "Use controlled lowercase ASCII snake_case values for component, content, and CTA parameters so future French labels remain reportable."
     ]
   },
@@ -318,9 +307,7 @@
       "classification": "automatic",
       "measurement_role": "context",
       "business_event_family": "homepage_context",
-      "primary_platform": "ga4",
       "official_match": "GA4 automatic page_view",
-      "official_ga4_match": "page_view",
       "page_url_pattern": "https://example.com/",
       "page_type": "homepage",
       "page_or_component": "Homepage document body",
@@ -365,48 +352,11 @@
         },
         "items": []
       },
-      "platform_mappings": [
-        {
-          "platform": "piano_analytics",
-          "event_name": "page.display",
-          "classification": "piano_standard",
-          "official_match": "Piano standard page display event",
-          "parameters_or_properties": {
-            "page": "homepage",
-            "page_chapter1": "ecommerce"
-          },
-          "items_or_products": [],
-          "implementation_notes": "Use only when Piano Analytics is in scope; keep GA4 page_view and Piano page.display as separate platform mappings.",
-          "documentation_source": "https://developers.piano.io/analytics/data-collection/how-to-send-events/standard-events/"
-        }
-      ],
       "privacy": {
         "pii_risk": "low",
         "consent_dependency": "analytics_storage",
         "cardinality_risk": "medium",
         "notes": "Remove sensitive query parameters before sending page_location if the website can contain them."
-      },
-      "qa": {
-        "qa_id": "QA-HOME-PAGE-VIEW",
-        "methods": [
-          "DebugView",
-          "GTM Preview",
-          "Network"
-        ],
-        "steps": [
-          "Open https://example.com/ once.",
-          "Reload only after the first test has been recorded."
-        ],
-        "expected_data_layer": [
-          "page_data.location equals the current URL.",
-          "page_data.template equals homepage."
-        ],
-        "expected_network": [
-          "GA4 request contains en=page_view.",
-          "page_location and page_title are populated."
-        ],
-        "debugview_expectation": "One homepage page_view appears for the initial load.",
-        "status": "not_started"
       },
       "implementation_notes": "Avoid duplicate page_view if enhanced measurement already sends the correct event.",
       "official_verification": {
@@ -422,6 +372,14 @@
           "reason": "GA4 may collect this natively depending on stream settings.",
           "dedupe_rule": "Do not add a manual GTM duplicate unless native collection is disabled or insufficient."
         }
+      },
+      "analysis_use": "How many users view the homepage and from which acquisition contexts?",
+      "evidence_basis": {
+        "status": "inferred",
+        "source_refs": [
+          "Journey coverage: homepage_discovery"
+        ],
+        "confidence": "medium"
       }
     },
     {
@@ -431,9 +389,7 @@
       "classification": "recommended_ecommerce",
       "measurement_role": "diagnostic",
       "business_event_family": "ecommerce_promotion_engagement",
-      "primary_platform": "ga4",
       "official_match": "GA4 recommended ecommerce view_promotion",
-      "official_ga4_match": "view_promotion",
       "page_url_pattern": "https://example.com/",
       "page_type": "homepage",
       "page_or_component": "Homepage merchandising promotion module",
@@ -493,48 +449,11 @@
           }
         ]
       },
-      "platform_mappings": [
-        {
-          "platform": "piano_analytics",
-          "event_name": "self_promotion.impression",
-          "classification": "piano_standard",
-          "official_match": "Piano onsite self-promotion impression event",
-          "parameters_or_properties": {
-            "onsitead_type": "self_promotion",
-            "onsitead_campaign": "%promotion_id%",
-            "onsitead_creation": "%creative_name%",
-            "onsitead_general_placement": "%creative_slot%"
-          },
-          "items_or_products": [],
-          "implementation_notes": "Use Piano self-promotion only for promotional placements, not ordinary navigation cards.",
-          "documentation_source": "https://developers.piano.io/analytics/data-collection/how-to-send-events/standard-events/"
-        }
-      ],
       "privacy": {
         "pii_risk": "low",
         "consent_dependency": "analytics_storage",
         "cardinality_risk": "low",
         "notes": "Promotion values should be controlled campaign or merchandising identifiers."
-      },
-      "qa": {
-        "qa_id": "QA-HOME-PROMO-VIEW",
-        "methods": [
-          "GTM Preview",
-          "Network"
-        ],
-        "steps": [
-          "Open the homepage and expose a tracked promotion in the viewport."
-        ],
-        "expected_data_layer": [
-          "ecommerce is flushed before the event.",
-          "promotion_id, promotion_name, creative_name, creative_slot, and items are populated."
-        ],
-        "expected_network": [
-          "GA4 request contains en=view_promotion.",
-          "Promotion parameters and at least one valid item identifier are present."
-        ],
-        "debugview_expectation": "view_promotion appears once per qualified promotion impression.",
-        "status": "not_started"
       },
       "implementation_notes": "Use one consolidated view_promotion definition and list allowed promotion values rather than one event per banner.",
       "official_verification": {
@@ -585,6 +504,14 @@
           "items[].promotion_name"
         ],
         "exception_reason": ""
+      },
+      "analysis_use": "Which homepage promotions are exposed to users?",
+      "evidence_basis": {
+        "status": "inferred",
+        "source_refs": [
+          "Journey coverage: homepage_discovery"
+        ],
+        "confidence": "medium"
       }
     },
     {
@@ -594,9 +521,7 @@
       "classification": "recommended_ecommerce",
       "measurement_role": "micro_conversion",
       "business_event_family": "ecommerce_promotion_engagement",
-      "primary_platform": "ga4",
       "official_match": "GA4 recommended ecommerce select_promotion",
-      "official_ga4_match": "select_promotion",
       "page_url_pattern": "https://example.com/",
       "page_type": "homepage",
       "page_or_component": "Homepage merchandising promotion link or card",
@@ -662,26 +587,6 @@
         "cardinality_risk": "low",
         "notes": "Use stable controlled values; avoid visible text when it changes often."
       },
-      "qa": {
-        "qa_id": "QA-HOME-PROMO-SELECT",
-        "methods": [
-          "GTM Preview",
-          "Network"
-        ],
-        "steps": [
-          "Click a tracked homepage promotion."
-        ],
-        "expected_data_layer": [
-          "ecommerce is flushed before the event.",
-          "select_promotion uses the same promotion_id as the related view_promotion."
-        ],
-        "expected_network": [
-          "GA4 request contains en=select_promotion.",
-          "Promotion parameters and items are present."
-        ],
-        "debugview_expectation": "select_promotion appears after the user click.",
-        "status": "not_started"
-      },
       "implementation_notes": "Keep this as an ecommerce promotion event, not a generic click event.",
       "official_verification": {
         "status": "verified",
@@ -731,6 +636,14 @@
           "items[].promotion_name"
         ],
         "exception_reason": ""
+      },
+      "analysis_use": "Which exposed promotions drive clicks?",
+      "evidence_basis": {
+        "status": "inferred",
+        "source_refs": [
+          "Journey coverage: homepage_discovery"
+        ],
+        "confidence": "medium"
       }
     },
     {
@@ -740,9 +653,7 @@
       "classification": "recommended",
       "measurement_role": "micro_conversion",
       "business_event_family": "site_search",
-      "primary_platform": "ga4",
       "official_match": "GA4 recommended search event",
-      "official_ga4_match": "search",
       "page_url_pattern": "https://example.com/",
       "page_type": "homepage",
       "page_or_component": "Homepage search form",
@@ -785,27 +696,6 @@
         "cardinality_risk": "high",
         "notes": "Search terms can contain PII or high-cardinality data. Scrub email, phone, order IDs, and sensitive values before sending. Do not register raw search_term as a custom dimension unless a governed reporting need is approved."
       },
-      "qa": {
-        "qa_id": "QA-HOME-SEARCH",
-        "methods": [
-          "DebugView",
-          "GTM Preview",
-          "Network"
-        ],
-        "steps": [
-          "Submit a safe test query such as summer_dress."
-        ],
-        "expected_data_layer": [
-          "event_data.search_term is present.",
-          "No direct PII is present in the pushed term."
-        ],
-        "expected_network": [
-          "GA4 request contains en=search.",
-          "search_term is populated."
-        ],
-        "debugview_expectation": "search appears with search_term.",
-        "status": "not_started"
-      },
       "implementation_notes": "Use the official recommended search event instead of a custom search_submit event.",
       "official_verification": {
         "status": "verified",
@@ -820,6 +710,14 @@
           "reason": "Site-search can be configured through enhanced measurement or manual dataLayer tracking.",
           "dedupe_rule": "Use this dataLayer search event only when enhanced measurement site-search is disabled or insufficient for required parameters."
         }
+      },
+      "analysis_use": "What do users search for from the homepage?",
+      "evidence_basis": {
+        "status": "inferred",
+        "source_refs": [
+          "Journey coverage: homepage_discovery"
+        ],
+        "confidence": "medium"
       }
     },
     {
@@ -829,9 +727,7 @@
       "classification": "recommended",
       "measurement_role": "micro_conversion",
       "business_event_family": "content_navigation_selection",
-      "primary_platform": "ga4",
       "official_match": "GA4 recommended select_content event",
-      "official_ga4_match": "select_content",
       "page_url_pattern": "https://example.com/",
       "page_type": "homepage",
       "page_or_component": "Homepage navigation, editorial, or service module",
@@ -886,26 +782,6 @@
         "cardinality_risk": "medium",
         "notes": "Remove sensitive query parameters from link_url and keep controlled content names stable."
       },
-      "qa": {
-        "qa_id": "QA-HOME-CONTENT-SELECT",
-        "methods": [
-          "GTM Preview",
-          "Network"
-        ],
-        "steps": [
-          "Click one representative link for each allowed content_type."
-        ],
-        "expected_data_layer": [
-          "event_data.content_type uses allowed normalized values.",
-          "content_id and content_name identify the selected module."
-        ],
-        "expected_network": [
-          "GA4 request contains en=select_content.",
-          "content_type and content_id are present."
-        ],
-        "debugview_expectation": "select_content appears with normalized controlled values.",
-        "status": "not_started"
-      },
       "implementation_notes": "Do not create one custom event per homepage link when this consolidated event is sufficient.",
       "official_verification": {
         "status": "verified",
@@ -920,6 +796,14 @@
           "reason": "Manual dataLayer collection is scoped to this explicit business interaction.",
           "dedupe_rule": "Fire once per qualifying user action and avoid parallel automatic or enhanced-measurement collection."
         }
+      },
+      "analysis_use": "Which homepage modules or navigation paths drive user interest?",
+      "evidence_basis": {
+        "status": "inferred",
+        "source_refs": [
+          "Journey coverage: homepage_discovery"
+        ],
+        "confidence": "medium"
       }
     },
     {
@@ -929,9 +813,7 @@
       "classification": "custom",
       "measurement_role": "micro_conversion",
       "business_event_family": "account_access_intent",
-      "primary_platform": "ga4",
       "official_match": "custom GA4 event justified by account entry intent before login",
-      "official_ga4_match": "no official GA4 event fits account entry intent before login",
       "page_url_pattern": "https://example.com/",
       "page_type": "homepage",
       "page_or_component": "Homepage account access entry point",
@@ -981,26 +863,6 @@
         "cardinality_risk": "low",
         "notes": "Do not send email, account ID, phone number, or customer number."
       },
-      "qa": {
-        "qa_id": "QA-HOME-ACCOUNT-ACCESS",
-        "methods": [
-          "GTM Preview",
-          "Network"
-        ],
-        "steps": [
-          "Click the account access entry point."
-        ],
-        "expected_data_layer": [
-          "event_data.cta_location is populated.",
-          "user_data.login_status is logged, not_logged, or unknown."
-        ],
-        "expected_network": [
-          "GA4 request contains en=account_access_intent.",
-          "No direct personal identifiers are present."
-        ],
-        "debugview_expectation": "account_access_intent appears only on account entry click, not on successful login.",
-        "status": "not_started"
-      },
       "implementation_notes": "This is custom because the official login event should represent successful authentication, not an account-link click.",
       "official_verification": {
         "status": "not_applicable",
@@ -1015,6 +877,14 @@
           "reason": "Manual dataLayer collection is scoped to this explicit business interaction.",
           "dedupe_rule": "Fire once per qualifying user action and avoid parallel automatic or enhanced-measurement collection."
         }
+      },
+      "analysis_use": "How often do users try to access the account area from the homepage?",
+      "evidence_basis": {
+        "status": "inferred",
+        "source_refs": [
+          "Journey coverage: homepage_discovery"
+        ],
+        "confidence": "medium"
       }
     }
   ],
@@ -1041,7 +911,9 @@
         "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
         "checked_date": "2026-06-29",
         "scope_note": "Official GA4 event parameter scope checked for page_location."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "page_title",
@@ -1065,7 +937,9 @@
         "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
         "checked_date": "2026-06-29",
         "scope_note": "Official GA4 event parameter scope checked for page_title."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "page_referrer",
@@ -1089,7 +963,9 @@
         "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
         "checked_date": "2026-06-29",
         "scope_note": "Official GA4 event parameter scope checked for page_referrer."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "page_data.template",
@@ -1120,7 +996,9 @@
         "source_url": "https://developers.google.com/tag-platform/tag-manager/datalayer",
         "checked_date": "2026-06-29",
         "scope_note": "Implementation variable page_data.template; not a GA4 reporting parameter by itself."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "promotion_id",
@@ -1144,7 +1022,9 @@
         "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
         "checked_date": "2026-06-29",
         "scope_note": "Official GA4 ecommerce event parameter scope checked for promotion_id."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "promotion_name",
@@ -1168,7 +1048,9 @@
         "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
         "checked_date": "2026-06-29",
         "scope_note": "Official GA4 ecommerce event parameter scope checked for promotion_name."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "creative_name",
@@ -1192,7 +1074,9 @@
         "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
         "checked_date": "2026-06-29",
         "scope_note": "Official GA4 ecommerce event parameter scope checked for creative_name."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "creative_slot",
@@ -1216,7 +1100,9 @@
         "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
         "checked_date": "2026-06-29",
         "scope_note": "Official GA4 ecommerce event parameter scope checked for creative_slot."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "items",
@@ -1240,7 +1126,9 @@
         "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
         "checked_date": "2026-06-29",
         "scope_note": "Official GA4 ecommerce event parameter scope checked for items."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "items[].item_id",
@@ -1264,7 +1152,9 @@
         "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/item-scoped-ecommerce",
         "checked_date": "2026-06-29",
         "scope_note": "Official GA4 item-scoped ecommerce parameter scope checked for items[].item_id."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "items[].item_name",
@@ -1288,7 +1178,9 @@
         "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/item-scoped-ecommerce",
         "checked_date": "2026-06-29",
         "scope_note": "Official GA4 item-scoped ecommerce parameter scope checked for items[].item_name."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "search_term",
@@ -1312,7 +1204,9 @@
         "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
         "checked_date": "2026-06-29",
         "scope_note": "Official GA4 event parameter scope checked for search_term."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "content_type",
@@ -1340,7 +1234,9 @@
         "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
         "checked_date": "2026-06-29",
         "scope_note": "Official GA4 event parameter scope checked for content_type."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "content_id",
@@ -1364,7 +1260,9 @@
         "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
         "checked_date": "2026-06-29",
         "scope_note": "Official GA4 event parameter scope checked for content_id."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "content_name",
@@ -1388,7 +1286,9 @@
         "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
         "checked_date": "2026-06-29",
         "scope_note": "Official GA4 event parameter scope checked for content_name."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "cta_location",
@@ -1418,7 +1318,9 @@
         "source_url": "https://support.google.com/analytics/answer/13316687",
         "checked_date": "2026-06-29",
         "scope_note": "Custom analytics parameter cta_location; governed by GA4 naming and registration rules."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "link_url",
@@ -1442,7 +1344,9 @@
         "source_url": "https://support.google.com/analytics/answer/13316687",
         "checked_date": "2026-06-29",
         "scope_note": "Custom analytics parameter link_url; governed by GA4 naming and registration rules."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "cta_text",
@@ -1466,7 +1370,9 @@
         "source_url": "https://support.google.com/analytics/answer/13316687",
         "checked_date": "2026-06-29",
         "scope_note": "Custom analytics parameter cta_text; governed by GA4 naming and registration rules."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     },
     {
       "parameter_name": "login_status",
@@ -1494,60 +1400,11 @@
         "source_url": "https://support.google.com/analytics/answer/13316687",
         "checked_date": "2026-06-29",
         "scope_note": "Custom analytics parameter login_status; governed by GA4 naming and registration rules."
-      }
+      },
+      "availability": "to_confirm",
+      "data_owner": "Web analyst and development team"
     }
   ],
-  "custom_definitions": [
-    {
-      "parameter_name": "content_type",
-      "display_name": "Content type",
-      "scope": "event",
-      "registration_type": "custom_dimension",
-      "reason": "Segment select_content performance by type of homepage component.",
-      "priority": "should"
-    },
-    {
-      "parameter_name": "content_id",
-      "display_name": "Content ID",
-      "scope": "event",
-      "registration_type": "custom_dimension",
-      "reason": "Compare consolidated select_content events by stable component or navigation identifier.",
-      "priority": "should"
-    },
-    {
-      "parameter_name": "content_name",
-      "display_name": "Content name",
-      "scope": "event",
-      "registration_type": "custom_dimension",
-      "reason": "Provide a readable breakdown for controlled content/module selections.",
-      "priority": "could"
-    },
-    {
-      "parameter_name": "cta_location",
-      "display_name": "CTA location",
-      "scope": "event",
-      "registration_type": "custom_dimension",
-      "reason": "Compare interaction performance by page area.",
-      "priority": "should"
-    },
-    {
-      "parameter_name": "cta_text",
-      "display_name": "CTA text",
-      "scope": "event",
-      "registration_type": "custom_dimension",
-      "reason": "Compare account-intent and CTA interactions by controlled normalized label.",
-      "priority": "could"
-    },
-    {
-      "parameter_name": "login_status",
-      "display_name": "Login status",
-      "scope": "event",
-      "registration_type": "custom_dimension",
-      "reason": "Segment account intent without exposing personal identifiers.",
-      "priority": "could"
-    }
-  ],
-  "key_events": [],
   "not_tracked": [
     {
       "interaction": "Hover states",
@@ -1589,144 +1446,84 @@
       "checked_for": "dataLayer.push implementation pattern"
     }
   ],
-  "qa_cases": [
+  "screenshot_evidence": [
     {
-      "qa_id": "QA-HOME-PAGE-VIEW",
-      "event_id": "EVT-HOME-PAGE-VIEW",
-      "event_name": "page_view",
-      "methods": [
-        "DebugView",
-        "GTM Preview",
-        "Network"
+      "evidence_id": "EVIDENCE-EVT-HOME-PAGE-VIEW",
+      "event_ids": [
+        "EVT-HOME-PAGE-VIEW"
       ],
-      "steps": [
-        "Open https://example.com/ once."
-      ],
-      "expected_data_layer": [
-        "page_data.location equals current URL.",
-        "page_data.template equals homepage."
-      ],
-      "expected_network": [
-        "en=page_view",
-        "page_location populated"
-      ],
-      "debugview_expectation": "One homepage page_view appears.",
-      "status": "not_started",
-      "evidence": ""
+      "file_name": "",
+      "page_or_component": "Homepage document body",
+      "url_or_route": "https://example.com/",
+      "capture_objective": "Show Homepage document body for page_view.",
+      "status": "capture_required",
+      "shared_reason": "",
+      "notes": "Capture a representative page state or clearly identify the tracked interaction."
     },
     {
-      "qa_id": "QA-HOME-PROMO-VIEW",
-      "event_id": "EVT-HOME-PROMO-VIEW",
-      "event_name": "view_promotion",
-      "methods": [
-        "GTM Preview",
-        "Network"
+      "evidence_id": "EVIDENCE-EVT-HOME-PROMO-VIEW",
+      "event_ids": [
+        "EVT-HOME-PROMO-VIEW"
       ],
-      "steps": [
-        "Expose a tracked promotion."
-      ],
-      "expected_data_layer": [
-        "ecommerce object is flushed.",
-        "promotion_id and items are present."
-      ],
-      "expected_network": [
-        "en=view_promotion",
-        "promotion_id and item identifier present"
-      ],
-      "debugview_expectation": "view_promotion appears for the qualified impression.",
-      "status": "not_started",
-      "evidence": ""
+      "file_name": "",
+      "page_or_component": "Homepage merchandising promotion module",
+      "url_or_route": "https://example.com/",
+      "capture_objective": "Show Homepage merchandising promotion module for view_promotion.",
+      "status": "capture_required",
+      "shared_reason": "",
+      "notes": "Capture a representative page state or clearly identify the tracked interaction."
     },
     {
-      "qa_id": "QA-HOME-PROMO-SELECT",
-      "event_id": "EVT-HOME-PROMO-SELECT",
-      "event_name": "select_promotion",
-      "methods": [
-        "GTM Preview",
-        "Network"
+      "evidence_id": "EVIDENCE-EVT-HOME-PROMO-SELECT",
+      "event_ids": [
+        "EVT-HOME-PROMO-SELECT"
       ],
-      "steps": [
-        "Click a tracked promotion."
-      ],
-      "expected_data_layer": [
-        "select_promotion uses the same promotion_id as view_promotion."
-      ],
-      "expected_network": [
-        "en=select_promotion",
-        "promotion_id and item identifier present"
-      ],
-      "debugview_expectation": "select_promotion appears after click.",
-      "status": "not_started",
-      "evidence": ""
+      "file_name": "",
+      "page_or_component": "Homepage merchandising promotion link or card",
+      "url_or_route": "https://example.com/",
+      "capture_objective": "Show Homepage merchandising promotion link or card for select_promotion.",
+      "status": "capture_required",
+      "shared_reason": "",
+      "notes": "Capture a representative page state or clearly identify the tracked interaction."
     },
     {
-      "qa_id": "QA-HOME-SEARCH",
-      "event_id": "EVT-HOME-SEARCH",
-      "event_name": "search",
-      "methods": [
-        "DebugView",
-        "GTM Preview",
-        "Network"
+      "evidence_id": "EVIDENCE-EVT-HOME-SEARCH",
+      "event_ids": [
+        "EVT-HOME-SEARCH"
       ],
-      "steps": [
-        "Submit a safe search query."
-      ],
-      "expected_data_layer": [
-        "event_data.search_term is present and scrubbed."
-      ],
-      "expected_network": [
-        "en=search",
-        "search_term populated"
-      ],
-      "debugview_expectation": "search appears with search_term.",
-      "status": "not_started",
-      "evidence": ""
+      "file_name": "",
+      "page_or_component": "Homepage search form",
+      "url_or_route": "https://example.com/",
+      "capture_objective": "Show Homepage search form for search.",
+      "status": "capture_required",
+      "shared_reason": "",
+      "notes": "Capture a representative page state or clearly identify the tracked interaction."
     },
     {
-      "qa_id": "QA-HOME-CONTENT-SELECT",
-      "event_id": "EVT-HOME-CONTENT-SELECT",
-      "event_name": "select_content",
-      "methods": [
-        "GTM Preview",
-        "Network"
+      "evidence_id": "EVIDENCE-EVT-HOME-CONTENT-SELECT",
+      "event_ids": [
+        "EVT-HOME-CONTENT-SELECT"
       ],
-      "steps": [
-        "Click one representative content or navigation module."
-      ],
-      "expected_data_layer": [
-        "event_data.content_type uses an allowed value.",
-        "content_id identifies the selected module."
-      ],
-      "expected_network": [
-        "en=select_content",
-        "content_type and content_id present"
-      ],
-      "debugview_expectation": "select_content appears with controlled values.",
-      "status": "not_started",
-      "evidence": ""
+      "file_name": "",
+      "page_or_component": "Homepage navigation, editorial, or service module",
+      "url_or_route": "https://example.com/",
+      "capture_objective": "Show Homepage navigation, editorial, or service module for select_content.",
+      "status": "capture_required",
+      "shared_reason": "",
+      "notes": "Capture a representative page state or clearly identify the tracked interaction."
     },
     {
-      "qa_id": "QA-HOME-ACCOUNT-ACCESS",
-      "event_id": "EVT-HOME-ACCOUNT-ACCESS",
-      "event_name": "account_access_intent",
-      "methods": [
-        "GTM Preview",
-        "Network"
+      "evidence_id": "EVIDENCE-EVT-HOME-ACCOUNT-ACCESS",
+      "event_ids": [
+        "EVT-HOME-ACCOUNT-ACCESS"
       ],
-      "steps": [
-        "Click the account access entry point."
-      ],
-      "expected_data_layer": [
-        "event_data.cta_location is present.",
-        "user_data.login_status is logged, not_logged, or unknown."
-      ],
-      "expected_network": [
-        "en=account_access_intent",
-        "No direct personal identifiers are present"
-      ],
-      "debugview_expectation": "account_access_intent appears on account entry click.",
-      "status": "not_started",
-      "evidence": ""
+      "file_name": "",
+      "page_or_component": "Homepage account access entry point",
+      "url_or_route": "https://example.com/",
+      "capture_objective": "Show Homepage account access entry point for account_access_intent.",
+      "status": "skip_allowed",
+      "shared_reason": "",
+      "notes": "Skip is allowed when approved credentials or a safe test environment are unavailable."
     }
   ]
 }

@@ -56,10 +56,9 @@ dataLayer.push({
 });
 ```
 
-## QA Contract
+## Implementation Notes
 
 - Confirm the ecommerce object is flushed before each ecommerce event when reusable ecommerce data can persist.
-- In GTM Preview, verify the event name, ecommerce object, and item array at the exact event.
-- In network checks, verify GA4 requests contain the expected event name and item parameters.
-- For purchase and refund, verify `transaction_id` uniqueness and revenue deduplication behavior.
-- For promotions, test impression and click with the same `promotion_id` / `promotion_name` when applicable.
+- Specify the event name, ecommerce object, and item array at the exact trigger.
+- For purchase and refund, document `transaction_id` ownership and uniqueness expectations.
+- For promotions, use the same `promotion_id` and `promotion_name` across impression and selection when applicable.

@@ -4,7 +4,6 @@ import argparse
 import zipfile
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 BANNED_PARTS = {"deliverables", "generated", "release", "tracking-plan-corpus-analysis", "__pycache__"}
 PACKAGE_ROOTS = [ROOT / "skill"]

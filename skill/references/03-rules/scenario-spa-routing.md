@@ -32,10 +32,9 @@ dataLayer.push({
 });
 ```
 
-## QA Contract
+## Implementation Notes
 
-- Test initial load, route navigation, browser back/forward, and reload on a deep route.
-- Confirm one expected page_view per route view and no duplicates.
-- Confirm route-specific events inherit the correct current page context.
-- Confirm previous page, ecommerce, or event objects do not persist into the next route.
-
+- Define initial load, route navigation, browser back/forward, and deep-route reload behavior.
+- Send one expected `page_view` per route view without duplicates.
+- Ensure route-specific events use the current page context.
+- Prevent previous page, ecommerce, or event objects from persisting into the next route.

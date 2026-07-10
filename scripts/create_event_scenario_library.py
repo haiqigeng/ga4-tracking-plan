@@ -1,15 +1,14 @@
+import html
 import json
+import re
+from datetime import date
 from pathlib import Path
 from urllib.request import Request, urlopen
-import html
-import re
-
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_REFS = ROOT / "skill" / "references" / "03-rules"
 OFFICIAL_JSON = SKILL_REFS / "library-ga4-recommended-events.json"
 LIBRARY_JSON = SKILL_REFS / "library-ga4-event-scenarios.json"
-LIBRARY_MD = SKILL_REFS / "library-ga4-event-scenarios.md"
 
 SOURCES = [
     {
@@ -141,7 +140,8 @@ def fetch_recommended_events():
                     }
                 )
         events.append({"event": event_name, "group": section_name, "description": description, "parameters": params})
-    return events
+    updated_match = re.search(r"Last updated\s+(\d{4}-\d{2}-\d{2})\s+UTC", text)
+    return events, updated_match.group(1) if updated_match else ""
 
 
 STANDARD_EVENTS = [
@@ -514,99 +514,31 @@ DATALAYER_PATTERNS = [
 def build_library():
     SKILL_REFS.mkdir(parents=True, exist_ok=True)
     try:
-        recommended = fetch_recommended_events()
+        recommended, official_updated = fetch_recommended_events()
     except Exception:
         recommended = json.loads(OFFICIAL_JSON.read_text(encoding="utf-8")) if OFFICIAL_JSON.exists() else []
+        existing = json.loads(LIBRARY_JSON.read_text(encoding="utf-8")) if LIBRARY_JSON.exists() else {}
+        official_updated = existing.get("catalog_metadata", {}).get("official_source_last_updated", "")
     OFFICIAL_JSON.write_text(json.dumps(recommended, indent=2, ensure_ascii=False), encoding="utf-8")
     library = {
-        "version": "2026-06-26",
+        "version": official_updated or date.today().isoformat(),
+        "catalog_metadata": {
+            "catalog_schema_version": "1.0.0",
+            "generated_date": date.today().isoformat(),
+            "generator_version": "1.0.0",
+            "official_source_last_updated": official_updated,
+        },
         "scope": "GA4 web tracking-plan scenario library for human analysts and Codex-assisted tracking plan generation.",
         "source_priority": "Official Google documentation first. Trusted practitioner sources only for custom-event patterns and implementation judgement.",
         "value_convention": "For controlled analytics values, use lowercase ASCII snake_case, remove accents/diacritics, and list finite options with pipes. Preserve official IDs, ISO codes, numeric values, URLs, and raw native/user-entered fields only when required and privacy-safe.",
         "sources": SOURCES,
         "standard_events": STANDARD_EVENTS,
-        "official_recommended_events": recommended,
         "typical_custom_events": TYPICAL_CUSTOM_EVENTS,
         "scenario_playbooks": SCENARIOS,
         "datalayer_patterns": DATALAYER_PATTERNS,
     }
     LIBRARY_JSON.write_text(json.dumps(library, indent=2, ensure_ascii=False), encoding="utf-8")
-    LIBRARY_MD.write_text(render_markdown(library), encoding="utf-8")
     print(LIBRARY_JSON)
-    print(LIBRARY_MD)
-
-
-def render_markdown(library):
-    lines = [
-        "# GA4 Event Scenario Library",
-        "",
-        "Use this reference when creating a GA4 tracking plan from a website, page, or journey.",
-        "",
-        "Decision order:",
-        "",
-        "1. Use automatic or enhanced-measurement events when they already answer the need.",
-        "2. Use GA4 recommended events when the semantics match.",
-        "3. Use ecommerce recommended events for product, cart, checkout, purchase, refund, and promotion flows.",
-        "4. Use custom events only when the interaction is business-specific and no official event fits.",
-        "5. Keep custom events stable, low-noise, and tied to a business question.",
-        "6. Consolidate repeated same-name events when possible and normalize controlled values to lowercase ASCII snake_case with accents removed.",
-        "",
-        "## Contents",
-        "",
-        "- [Standard Web Events](#standard-web-events)",
-        "- [Official Recommended Events](#official-recommended-events)",
-        "- [Scenario Playbooks](#scenario-playbooks)",
-        "- [Typical Custom Events](#typical-custom-events)",
-        "- [DataLayer Patterns](#datalayer-patterns)",
-        "- [Sources](#sources)",
-        "",
-        "## Standard Web Events",
-        "",
-        "| Event | Group | Scenario | Parameters | Implementation note |",
-        "|---|---|---|---|---|",
-    ]
-    for event in library["standard_events"]:
-        lines.append(
-            f"| `{event['event']}` | {event['group']} | {event['scenario']} | {event['parameters']} | {event['implementation']} |"
-        )
-    lines += ["", "## Official Recommended Events", ""]
-    by_group = {}
-    for event in library["official_recommended_events"]:
-        by_group.setdefault(event["group"], []).append(event)
-    for group, events in by_group.items():
-        lines += [f"### {group}", "", "| Event | Main parameters | Use |", "|---|---|---|"]
-        for event in events:
-            params = ", ".join(p["name"] for p in event["parameters"]) or "-"
-            lines.append(f"| `{event['event']}` | {params} | {event['description']} |")
-        lines.append("")
-    lines += ["## Scenario Playbooks", "", "| Scenario | Official events | Typical custom events | Primary parameters | Notes |", "|---|---|---|---|---|"]
-    for scenario in library["scenario_playbooks"]:
-        lines.append(
-            f"| {scenario['scenario']} | {scenario['official_events']} | {scenario['typical_custom_events']} | {scenario['primary_parameters']} | {scenario['notes']} |"
-        )
-    lines += ["", "## Typical Custom Events", "", "| Event | Scenario | Use when | Prefer official if | Parameters |", "|---|---|---|---|---|"]
-    for event in library["typical_custom_events"]:
-        lines.append(
-            f"| `{event['event']}` | {event['scenario']} | {event['use_when']} | {event['prefer_official_if']} | {event['parameters']} |"
-        )
-    lines += ["", "## DataLayer Patterns", ""]
-    for pattern in library["datalayer_patterns"]:
-        lines += [
-            f"### {pattern['name']}",
-            "",
-            f"Use for: {pattern['use_for']}",
-            "",
-            "```js",
-            pattern["format"],
-            "```",
-            "",
-            f"GTM mapping: {pattern['gtm_mapping']}",
-            "",
-        ]
-    lines += ["## Sources", "", "| Source | Type | URL | Used for |", "|---|---|---|---|"]
-    for source in library["sources"]:
-        lines.append(f"| {source['name']} | {source['type']} | {source['url']} | {source['used_for']} |")
-    return "\n".join(lines)
 
 
 if __name__ == "__main__":

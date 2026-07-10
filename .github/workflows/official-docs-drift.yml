@@ -1,0 +1,17 @@
+name: Check official GA4 catalog
+
+on:
+  schedule:
+    - cron: "17 7 * * 1"
+  workflow_dispatch:
+
+jobs:
+  catalog-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compare bundled catalog with official GA4 documentation
+        run: python scripts/check_official_catalog.py

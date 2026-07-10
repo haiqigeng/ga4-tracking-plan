@@ -18,10 +18,10 @@ Prefer sources in this precision order when available:
 1. User-provided scope, business brief, concerned journeys, URLs, and analysis
    needs. This is the clearest signal for what the plan must answer.
 2. Existing client tracking plans, templates, naming conventions, dev specs,
-   recette files, event inventories, or approved business documentation. Use
+   implementation-review files, event inventories, or approved business documentation. Use
    these for expected structure and client-specific logic, but challenge legacy
    or weak measurement choices.
-3. Manual browser exploration by the analyst or agent. Use it to understand
+3. Manual browser exploration. Use it to understand
    real user journeys, visible components, interactions, modals, filters,
    checkout/account gates, and screenshot needs.
 4. Playwright or rendered-DOM exploration. Use it when dynamic navigation,
@@ -61,7 +61,7 @@ Before proposing events for broad scope, capture:
 Use `website_coverage_map` in the structured plan. Keep this information
 concise. Do not add a dense visible workbook tab unless the user asks for it;
 summarize assumptions and evidence through Overview, Screenshot Register, and
-QA Cases.
+implementation review.
 
 Use `scripts/discover_site_journeys.py` as a support helper when a URL is
 provided and no complete URL inventory exists:
@@ -96,7 +96,7 @@ Use Playwright or equivalent browser exploration when:
 - manual browser exploration is unavailable or needs repeatable rendered-DOM
   support;
 - the plan will be used as a real delivery and missing journeys would create
-  implementation or recette risk.
+  implementation risk.
 
 Playwright is optional when the user/client scope, existing client files,
 manual browser exploration, navigation, and page templates already provide

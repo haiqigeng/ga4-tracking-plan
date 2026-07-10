@@ -3,24 +3,26 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from tempfile import TemporaryDirectory
 from collections import defaultdict
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
+from ecommerce_matrix import (
+    event_family as ecommerce_event_family,
+)
+from ecommerce_matrix import (
+    ordered_parameters_for_events,
+    parameter_matrix_value,
+    parameter_type,
+)
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter, quote_sheetname
 from openpyxl.worksheet.datavalidation import DataValidation
-
-from ecommerce_matrix import (
-    event_family as ecommerce_event_family,
-    ordered_parameters_for_events,
-    parameter_matrix_value,
-    parameter_type,
-)
+from tracking_plan_screenshots import PREVIEW_HEIGHT, PREVIEW_WIDTH, create_screenshot_preview, resolve_screenshot, screenshot_files
 from validate_tracking_plan import render_text, validate_plan_data
 
 NAVY = "263238"
@@ -57,24 +59,8 @@ WRAP = Alignment(wrap_text=True, vertical="top")
 CENTER = Alignment(wrap_text=True, vertical="center", horizontal="center")
 
 EVENT_SLOT_COUNT = 4
-STATUS_OPTIONS = "OK,KO,Cannot test"
 SCREENSHOT_STATUS_OPTIONS = "capture_required,captured,shared_evidence,skip_allowed,not_needed,blocked"
-SCREENSHOT_PREVIEW_WIDTH = 260
-SCREENSHOT_PREVIEW_HEIGHT = 160
 SCREENSHOT_ROW_HEIGHT = 132
-SCREENSHOT_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
-GATED_SCREENSHOT_TERMS = {
-    "account",
-    "authentication",
-    "checkout",
-    "connexion",
-    "credential",
-    "login",
-    "logged",
-    "paiement",
-    "password",
-    "payment",
-}
 
 
 def matrix_max_col() -> int:
@@ -240,14 +226,6 @@ def compact_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
-def event_requires_gated_access(event: dict[str, Any]) -> bool:
-    text = " ".join(
-        str(event.get(key, ""))
-        for key in ["page_type", "page_or_component", "trigger", "page_url_pattern"]
-    ).lower()
-    return any(term in text for term in GATED_SCREENSHOT_TERMS)
-
-
 def event_family(event: dict[str, Any]) -> str:
     return ecommerce_event_family(event)
 
@@ -259,16 +237,6 @@ def transport_event_name(event: dict[str, Any]) -> str:
     ga4_payload = event.get("ga4_payload", {})
     if isinstance(ga4_payload, dict) and ga4_payload.get("event_name"):
         return str(ga4_payload["event_name"])
-    payloads = event.get("implementation_payloads", [])
-    if isinstance(payloads, list):
-        for payload in payloads:
-            if isinstance(payload, dict) and payload.get("event_name"):
-                return str(payload["event_name"])
-    mappings = event.get("platform_mappings", [])
-    if isinstance(mappings, list):
-        for mapping in mappings:
-            if isinstance(mapping, dict) and mapping.get("event_name"):
-                return str(mapping["event_name"])
     return str(event.get("event_name", ""))
 
 
@@ -353,25 +321,6 @@ def parameter_value(event: dict[str, Any], parameter: str) -> str:
     if current is not None:
         return compact_json(current)
 
-    for mapping in event.get("platform_mappings", []):
-        if not isinstance(mapping, dict):
-            continue
-        props = mapping.get("parameters_or_properties", {})
-        if isinstance(props, dict) and parameter in props:
-            return compact_json(props[parameter])
-        products = mapping.get("items_or_products", [])
-        if parameter.startswith("items_or_products[].") and isinstance(products, list):
-            key = parameter.split(".", 1)[1]
-            values = [item.get(key) for item in products if isinstance(item, dict) and item.get(key) not in (None, "")]
-            if values:
-                return join_values(values)
-
-    for payload in event.get("implementation_payloads", []):
-        if not isinstance(payload, dict):
-            continue
-        payload_data = payload.get("payload", {})
-        if isinstance(payload_data, dict) and parameter in payload_data:
-            return compact_json(payload_data[parameter])
     return "-"
 
 
@@ -393,30 +342,10 @@ def build_overview(wb: Workbook, plan: dict[str, Any]) -> None:
     max_col = 8
     title(ws, doc["title"], "Document details and workbook navigation.", max_col)
 
-    def display_value(value: Any) -> str:
-        labels = {
-            "ga4": "GA4",
-            "piano_analytics": "Piano Analytics",
-            "other": "Other",
-            "draft": "Draft",
-            "ready_for_review": "Ready for review",
-            "approved": "Approved",
-            "deprecated": "Deprecated",
-            "must": "Must",
-            "should": "Should",
-            "could": "Could",
-        }
-        return labels.get(str(value), str(value))
-
-    def display_values(values: list[Any] | None) -> str:
-        if not values:
-            return ""
-        return join_values([display_value(value) for value in values])
-
     rows = [
         ["Document Summary", "", "", "", "", "", "", "", ""],
-        ["Document", doc["title"], "Owner / contact", doc["owner"], "Last update", doc["created_date"], "", ""],
-        ["Version", doc["version"], "Platform", display_values(plan.get("analytics_platforms", ["ga4"])), "", "", "", ""],
+        ["Document", doc["title"], "Owner / contact", doc["owner"], "Publish date", doc["publish_date"], "", ""],
+        ["Version", doc["version"], "", "", "", "", "", ""],
         [],
         ["Sheet Contents", "", "", "", "", "", "", "", ""],
         ["#", "Sheet", "What it is for", "", "", "", "", ""],
@@ -424,12 +353,11 @@ def build_overview(wb: Workbook, plan: dict[str, Any]) -> None:
         ["2", "01 GTM Protocol", "Shared GTM/dataLayer rules and official references.", "", "", "", "", ""],
         ["3", "02 Parameter Reference", "Variable dictionary and value rules.", "", "", "", "", ""],
         ["4", "03 Event Matrix", "Main tracking plan: events, parameters, and value rules.", "", "", "", "", ""],
-        ["5", "04 Screenshot Register", "Capture requirements and visual evidence for later recette.", "", "", "", "", ""],
-        ["6", "05 QA Cases", "Manual recette checks and validation status.", "", "", "", "", ""],
+        ["5", "04 Screenshot Register", "Page and interaction evidence supporting implementation.", "", "", "", "", ""],
         [],
         ["Version History", "", "", "", "", "", "", "", ""],
         ["Version", "Date", "Owner", "Summary", "Publish date", "", "", "", ""],
-        [doc["version"], doc["created_date"], doc["owner"], "Tracking plan draft generated for review.", "TBD", "", "", "", ""],
+        [doc["version"], doc["publish_date"], doc["owner"], "GA4 tracking plan prepared for review.", doc["publish_date"], "", "", "", ""],
     ]
     for row in rows:
         ws.append((row + [""] * max_col)[:max_col])
@@ -440,7 +368,6 @@ def build_overview(wb: Workbook, plan: dict[str, Any]) -> None:
         "02 Parameter Reference",
         "03 Event Matrix",
         "04 Screenshot Register",
-        "05 QA Cases",
     }
     for row in range(1, ws.max_row + 1):
         label = ws.cell(row, 1).value
@@ -466,16 +393,8 @@ def build_gtm_protocol(wb: Workbook, plan: dict[str, Any]) -> None:
         ["Flush reusable objects", "Flush page_data, ecommerce, or event_data before a new event when previous values could persist.", "dataLayer.push({ ecommerce: null });", "Use a separate push for flushing."],
         ["Controlled values", "Use lowercase ASCII snake_case, replace spaces with underscores, and remove accents for controlled analytics values.", "pret_a_porter_femme", "Keep product IDs, ISO codes, numeric values, URLs, and safe raw terms when required."],
         ["GA4 ecommerce", "Use official GA4 ecommerce event names and parameters. Keep ecommerce event blocks separate from interaction events.", "items[].item_id\nitems[].item_name\ncurrency\nvalue", "Map GTM wrapper paths in implementation notes, not as replacements for GA4 names."],
-        ["QA status", "Record execution status in QA Cases or Screenshot Register, not inside the Event Matrix.", "OK / KO / Cannot test / captured", "Keep the Event Matrix focused on implementation rules."],
         ["Official references", "Check current official documentation before approving standard, recommended, ecommerce, and GTM dataLayer decisions.", "GA4 recommended events: https://developers.google.com/analytics/devguides/collection/ga4/reference/events\nGA4 ecommerce: https://developers.google.com/analytics/devguides/collection/ga4/ecommerce\nGA4 item parameters: https://developers.google.com/analytics/devguides/collection/ga4/item-scoped-ecommerce\nGTM dataLayer: https://developers.google.com/tag-platform/tag-manager/datalayer", "Keep external references here, not on the Overview tab."],
     ]
-    if "piano_analytics" in set(plan.get("analytics_platforms", [])):
-        rows.insert(-1, [
-            "Piano Analytics mappings",
-            "Keep Piano event names and properties separate from GA4 parameters when Piano is in scope.",
-            "pa.sendEvent(\"page.display\", { page: \"homepage\" });",
-            "Use Piano official names only when Piano documentation defines them.",
-        ])
     for row in rows:
         ws.append(row)
     header(ws, 3, 4)
@@ -487,7 +406,7 @@ def build_gtm_protocol(wb: Workbook, plan: dict[str, Any]) -> None:
 
 def build_parameter_reference(wb: Workbook, plan: dict[str, Any]) -> None:
     ws = wb.create_sheet("02 Parameter Reference")
-    title(ws, "Parameter Reference", "Variable dictionary for parameters used in the Event Matrix.", 9)
+    title(ws, "Parameter Reference", "Variable dictionary for parameters used in the Event Matrix.", 11)
     headers = [
         "Variable name",
         "Display name",
@@ -496,29 +415,20 @@ def build_parameter_reference(wb: Workbook, plan: dict[str, Any]) -> None:
         "Description",
         "Value rules",
         "Example value",
+        "Availability",
+        "Data owner",
         "Register in GA4",
         "Comments",
     ]
     ws.append(headers)
     header(ws, 3, len(headers))
-    custom_definitions = {
-        definition["parameter_name"]: definition
-        for definition in plan.get("custom_definitions", [])
-    }
     for param in plan["parameters"]:
         comments = []
         if param.get("cardinality_risk") != "low":
             comments.append(f"Cardinality risk: {param.get('cardinality_risk')}")
         if param.get("pii_risk") != "low":
             comments.append(f"PII risk: {param.get('pii_risk')}")
-        custom_definition = custom_definitions.get(param["parameter_name"])
-        register = ""
-        if custom_definition:
-            register = f"Yes - {custom_definition['registration_type']}"
-            if custom_definition.get("priority"):
-                register = f"{register} ({custom_definition['priority']})"
-        elif param.get("register_custom_definition"):
-            register = "Yes"
+        register = "Yes" if param.get("register_custom_definition") else "No"
         ws.append([
             param["parameter_name"],
             param["display_name"],
@@ -527,12 +437,14 @@ def build_parameter_reference(wb: Workbook, plan: dict[str, Any]) -> None:
             param["description"],
             param["value_rules"],
             param["example_value"],
+            param["availability"],
+            param["data_owner"],
             register,
             "; ".join(comments),
         ])
-    set_widths(ws, [32, 28, 16, 16, 52, 52, 34, 24, 42])
+    set_widths(ws, [32, 28, 16, 16, 48, 48, 30, 24, 30, 20, 38])
     ws.freeze_panes = "A4"
-    ws.auto_filter.ref = f"A3:I{ws.max_row}"
+    ws.auto_filter.ref = f"A3:K{ws.max_row}"
     style_cells(ws)
 
 
@@ -596,118 +508,6 @@ def build_event_matrix(wb: Workbook, plan: dict[str, Any]) -> None:
     style_event_matrix_rows(ws)
 
 
-def screenshot_files(screenshot_dir: Path | None) -> list[Path]:
-    if not screenshot_dir or not screenshot_dir.exists():
-        return []
-    return sorted(
-        path
-        for path in screenshot_dir.iterdir()
-        if path.is_file() and path.suffix.lower() in SCREENSHOT_IMAGE_EXTENSIONS
-    )
-
-
-def screenshot_evidence_by_journey(plan: dict[str, Any], available_files: list[Path]) -> dict[str, list[Path]]:
-    by_name = {path.name.lower(): path for path in available_files}
-    evidence: dict[str, list[Path]] = defaultdict(list)
-    coverage = plan.get("website_coverage_map", {})
-    for journey in coverage.get("journeys_covered", []):
-        if not isinstance(journey, dict):
-            continue
-        journey_id = str(journey.get("journey_id", ""))
-        for item in journey.get("evidence", []):
-            item_name = Path(str(item)).name.lower()
-            if item_name in by_name:
-                evidence[journey_id].append(by_name[item_name])
-    return evidence
-
-
-def screenshot_keywords_for_event(event: dict[str, Any]) -> list[str]:
-    event_name = str(event.get("event_name", "")).lower()
-    journey_id = str(event.get("journey_id", "")).lower()
-    page_type = str(event.get("page_type", "")).lower()
-    component = str(event.get("page_or_component", "")).lower()
-    text = " ".join([event_name, journey_id, page_type, component])
-
-    if any(term in text for term in ["checkout", "payment", "purchase", "cart", "panier", "commander"]):
-        return ["cart_checkout", "checkout", "cart", "panier", "commander"]
-    if any(term in text for term in ["login", "sign_up", "account", "authentication", "espaceclient"]):
-        return ["login", "account", "espaceclient"]
-    if any(term in text for term in ["contact", "support", "faq"]):
-        return ["contact", "support", "faq"]
-    if any(term in text for term in ["catalog", "catalogue", "direct_order"]):
-        return ["catalog", "catalogue", "contact", "support"]
-    if any(term in text for term in ["product_detail", "view_item", "add_to_cart", "pdp"]):
-        return ["product_detail_valid", "product_detail", "pdp", "product"]
-    if any(term in text for term in ["listing", "search", "filter", "sort", "select_item", "item_list", "plp"]):
-        return ["listing", "soldes", "plp", "search"]
-    if any(term in text for term in ["home", "homepage", "promotion", "select_content", "navigation"]):
-        return ["home", "homepage", "listing"]
-    if any(term in text for term in ["site_context", "all_pages", "page_view", "scroll", "rendered page"]):
-        return ["home", "homepage", "listing"]
-    return []
-
-
-def resolve_screenshot_for_event(
-    event: dict[str, Any],
-    available_files: list[Path],
-    evidence_by_journey: dict[str, list[Path]],
-) -> Path | None:
-    if not available_files:
-        return None
-
-    for keyword in screenshot_keywords_for_event(event):
-        for path in available_files:
-            if keyword in path.stem.lower():
-                return path
-
-    for path in evidence_by_journey.get(str(event.get("journey_id", "")), []):
-        return path
-
-    return None
-
-
-def create_screenshot_preview(source: Path, destination: Path) -> Path | None:
-    try:
-        from PIL import Image as PILImage
-        from PIL import ImageDraw, ImageOps
-    except ImportError:
-        return None
-
-    with PILImage.open(source) as image:
-        image = ImageOps.exif_transpose(image).convert("RGB")
-        crop_height = min(image.height, max(1, int(image.width * SCREENSHOT_PREVIEW_HEIGHT / SCREENSHOT_PREVIEW_WIDTH)))
-        crop_box = (0, 0, image.width, crop_height)
-        cropped = image.crop(crop_box)
-        cropped.thumbnail((SCREENSHOT_PREVIEW_WIDTH, SCREENSHOT_PREVIEW_HEIGHT), PILImage.Resampling.LANCZOS)
-
-        canvas = PILImage.new("RGB", (SCREENSHOT_PREVIEW_WIDTH, SCREENSHOT_PREVIEW_HEIGHT), "white")
-        offset = ((SCREENSHOT_PREVIEW_WIDTH - cropped.width) // 2, (SCREENSHOT_PREVIEW_HEIGHT - cropped.height) // 2)
-        canvas.paste(cropped, offset)
-        draw = ImageDraw.Draw(canvas)
-        draw.rectangle((0, 0, SCREENSHOT_PREVIEW_WIDTH - 1, SCREENSHOT_PREVIEW_HEIGHT - 1), outline="#BBC8D6", width=1)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        canvas.save(destination, "PNG", optimize=True)
-        return destination
-
-
-def screenshot_status(event: dict[str, Any], screenshot_path: Path | None) -> str:
-    if event_requires_gated_access(event):
-        return "skip_allowed"
-    if screenshot_path:
-        return "shared_evidence"
-    return "capture_required"
-
-
-def screenshot_notes(event: dict[str, Any], screenshot_path: Path | None) -> str:
-    if screenshot_path and event_requires_gated_access(event):
-        return "Representative page evidence embedded; action capture can be skipped until approved test access is available."
-    if screenshot_path:
-        return "Representative screenshot preview embedded. Capture a more precise action screenshot during QA if needed."
-    if event_requires_gated_access(event):
-        return "Skip is allowed when approved credentials or a safe test environment are unavailable."
-    return "Capture during coverage or later QA when the journey is accessible."
-
-
 def build_screenshot_register(
     wb: Workbook,
     plan: dict[str, Any],
@@ -715,111 +515,63 @@ def build_screenshot_register(
     preview_dir: Path | None = None,
 ) -> None:
     ws = wb.create_sheet("04 Screenshot Register")
-    title(ws, "Screenshot Register", "Capture requirements and visual evidence for later recette.", 9)
-    ws.append(["Journey", "Event", "Screenshot preview", "Page / component", "URL / route", "Capture objective", "Automation cue", "Status", "Notes"])
-    header(ws, 3, 9)
+    title(ws, "Screenshot Register", "Page and interaction evidence supporting the Event Matrix.", 8)
+    ws.append(["Journey", "Event(s)", "Screenshot preview", "Page / component", "URL / route", "Capture objective", "Status", "Notes"])
+    header(ws, 3, 8)
     journey_names = {brief["journey_id"]: brief["journey_name"] for brief in plan["measurement_brief"]}
-    available_files = screenshot_files(screenshot_dir)
-    evidence_by_journey = screenshot_evidence_by_journey(plan, available_files)
+    events_by_id = {event["event_id"]: event for event in plan["events"]}
+    files_by_name = screenshot_files(screenshot_dir)
     preview_dir = preview_dir or (screenshot_dir / "_workbook_previews" if screenshot_dir else None)
 
-    def automation_cue(event: dict[str, Any]) -> str:
-        classification = event.get("classification", "")
-        role = event.get("measurement_role", "")
-        if event_requires_gated_access(event):
-            return "Skip or capture only with approved test access; do not use personal credentials."
-        if role == "transaction":
-            return "Use a controlled test order; validate payload in the future QA skill."
-        if classification == "recommended_ecommerce":
-            return "Open the route and reproduce the ecommerce state before validating GA4 payload."
-        if classification == "custom":
-            return "Open the route, perform the trigger, and capture the component state."
-        return "Open the route and capture the rendered page state."
-
-    image_rows: list[tuple[int, Path]] = []
-    for event in plan["events"]:
-        screenshot_path = resolve_screenshot_for_event(event, available_files, evidence_by_journey)
+    image_rows: list[tuple[int, Path, dict[str, Any]]] = []
+    for evidence in plan["screenshot_evidence"]:
+        related_events = [events_by_id[event_id] for event_id in evidence["event_ids"] if event_id in events_by_id]
+        event_names = [event["event_name"] for event in related_events]
+        journeys = list(dict.fromkeys(journey_names.get(event["journey_id"], event["journey_id"]) for event in related_events))
+        screenshot_path = resolve_screenshot(evidence, files_by_name)
+        notes = str(evidence.get("notes", ""))
+        if evidence.get("file_name") and not screenshot_path:
+            notes = f"{notes} Evidence file not found in the selected screenshot folder.".strip()
         row_number = ws.max_row + 1
         ws.append([
-            journey_names.get(event["journey_id"], event["journey_id"]),
-            event["event_name"],
+            " | ".join(journeys),
+            " | ".join(event_names),
             "",
-            event["page_or_component"],
-            event["page_url_pattern"],
-            f"{event['page_or_component']} - {event['trigger']}",
-            automation_cue(event),
-            screenshot_status(event, screenshot_path),
-            screenshot_notes(event, screenshot_path),
+            evidence["page_or_component"],
+            evidence["url_or_route"],
+            evidence["capture_objective"],
+            evidence["status"],
+            notes,
         ])
         if screenshot_path and preview_dir:
-            image_rows.append((row_number, screenshot_path))
+            image_rows.append((row_number, screenshot_path, evidence))
     for row in range(4, ws.max_row + 1):
         ws.row_dimensions[row].height = SCREENSHOT_ROW_HEIGHT
-    for row_number, screenshot_path in image_rows:
+    for row_number, screenshot_path, evidence in image_rows:
         preview_path = create_screenshot_preview(
             screenshot_path,
             preview_dir / f"{row_number:03d}_{screenshot_path.stem}.png",
+            crop=evidence.get("crop"),
+            annotation=evidence.get("annotation"),
         )
         if not preview_path:
             continue
         image = XLImage(str(preview_path))
-        image.width = SCREENSHOT_PREVIEW_WIDTH
-        image.height = SCREENSHOT_PREVIEW_HEIGHT
+        image.width = PREVIEW_WIDTH
+        image.height = PREVIEW_HEIGHT
         ws.add_image(image, f"C{row_number}")
     status_dv = DataValidation(type="list", formula1=f'"{SCREENSHOT_STATUS_OPTIONS}"', allow_blank=True)
     ws.add_data_validation(status_dv)
-    status_dv.add(f"H4:H{ws.max_row + 200}")
-    ws.conditional_formatting.add(f"H4:H{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"captured"'], fill=PatternFill("solid", fgColor=GREEN)))
-    ws.conditional_formatting.add(f"H4:H{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"shared_evidence"'], fill=PatternFill("solid", fgColor=TEAL_LIGHT)))
-    ws.conditional_formatting.add(f"H4:H{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"skip_allowed"'], fill=PatternFill("solid", fgColor=NOT_AVAILABLE_FILL)))
-    ws.conditional_formatting.add(f"H4:H{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"capture_required"'], fill=PatternFill("solid", fgColor=YELLOW)))
-    ws.conditional_formatting.add(f"H4:H{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"blocked"'], fill=PatternFill("solid", fgColor=RED)))
-    ws.conditional_formatting.add(f"H4:H{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"not_needed"'], fill=PatternFill("solid", fgColor=GRAY)))
-    set_widths(ws, [24, 24, 38, 24, 34, 40, 38, 18, 40])
+    status_dv.add(f"G4:G{ws.max_row + 200}")
+    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"captured"'], fill=PatternFill("solid", fgColor=GREEN)))
+    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"shared_evidence"'], fill=PatternFill("solid", fgColor=TEAL_LIGHT)))
+    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"skip_allowed"'], fill=PatternFill("solid", fgColor=NOT_AVAILABLE_FILL)))
+    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"capture_required"'], fill=PatternFill("solid", fgColor=YELLOW)))
+    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"blocked"'], fill=PatternFill("solid", fgColor=RED)))
+    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"not_needed"'], fill=PatternFill("solid", fgColor=GRAY)))
+    set_widths(ws, [24, 28, 38, 26, 34, 44, 18, 46])
     ws.freeze_panes = "A4"
-    ws.auto_filter.ref = f"A3:I{ws.max_row}"
-    style_cells(ws)
-
-
-def build_qa_cases(wb: Workbook, plan: dict[str, Any]) -> None:
-    ws = wb.create_sheet("05 QA Cases")
-    title(ws, "QA Cases", "Manual recette checklist for the events in the Event Matrix.", 9)
-    ws.append([
-        "Event name",
-        "Journey",
-        "Page / component",
-        "Test method",
-        "Test steps",
-        "Expected dataLayer",
-        "Expected GA4 / network",
-        "Status",
-        "Evidence / notes",
-    ])
-    header(ws, 3, 9)
-    events_by_id = {event["event_id"]: event for event in plan["events"]}
-    journey_names = {brief["journey_id"]: brief["journey_name"] for brief in plan["measurement_brief"]}
-    for case in plan["qa_cases"]:
-        event = events_by_id.get(case["event_id"], {})
-        ws.append([
-            case["event_name"],
-            journey_names.get(event.get("journey_id"), event.get("journey_id", "")),
-            event.get("page_or_component", ""),
-            join_values(case["methods"]),
-            "\n".join(case["steps"]),
-            "\n".join(case["expected_data_layer"]),
-            "\n".join(case["expected_network"]),
-            "Cannot test" if case["status"] == "not_started" else case["status"],
-            join_values([case.get("debugview_expectation", ""), case["evidence"]]).strip(" | "),
-        ])
-    status_dv = DataValidation(type="list", formula1=f'"{STATUS_OPTIONS}"', allow_blank=True)
-    ws.add_data_validation(status_dv)
-    status_dv.add(f"H4:H{ws.max_row + 200}")
-    ws.conditional_formatting.add(f"H4:H{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"OK"'], fill=PatternFill("solid", fgColor=GREEN)))
-    ws.conditional_formatting.add(f"H4:H{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"KO"'], fill=PatternFill("solid", fgColor=RED)))
-    ws.conditional_formatting.add(f"H4:H{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"Cannot test"'], fill=PatternFill("solid", fgColor=YELLOW)))
-    set_widths(ws, [20, 28, 28, 28, 54, 54, 56, 16, 52])
-    ws.freeze_panes = "A4"
-    ws.auto_filter.ref = f"A3:I{ws.max_row}"
+    ws.auto_filter.ref = f"A3:H{ws.max_row}"
     style_cells(ws)
 
 
@@ -835,7 +587,6 @@ def build_workbook(
     build_parameter_reference(wb, plan)
     build_event_matrix(wb, plan)
     build_screenshot_register(wb, plan, screenshot_dir=screenshot_dir, preview_dir=preview_dir)
-    build_qa_cases(wb, plan)
     apply_workbook_settings(wb)
     return wb
 

@@ -14,9 +14,10 @@ Use this reference for quote funnels, contact forms, newsletter signup, appointm
 
 | Scenario | Prefer event | Classification | Notes |
 |---|---|---|---|
-| Lead form start | `begin_quote`, `form_start`, or scenario-specific custom event | custom | Use when no official GA4 event represents the start intent clearly |
+| Lead form start | `form_start` | enhanced_measurement | Use when enhanced measurement identifies the correct form without duplicates |
+| Distinct quote journey start | `begin_quote` | custom | Use only when quote-start intent is analytically different from generic form engagement |
 | Lead form step view | `form_step_view` | custom | Useful for multi-step funnels when page_view is not enough |
-| Lead form step complete | `form_step_complete` | custom | Use only when progression analysis is needed |
+| Lead form step complete | `form_step_submit` | custom | Use only when progression analysis is needed |
 | Validation error | `form_error` | custom | Send generic error category and field group, never raw values |
 | Successful lead | `generate_lead` | recommended | Use for completed quote/contact/lead submission |
 | Signup success | `sign_up` | recommended | Use for account creation or newsletter signup when it is truly signup |
@@ -48,10 +49,9 @@ dataLayer.push({
 });
 ```
 
-## QA Contract
+## Implementation Notes
 
-- Validate the start, each tracked step, and the final success event with clean test data.
-- Confirm failed validation does not fire `generate_lead`.
-- Confirm errors contain only generic categories.
-- Confirm no direct PII appears in dataLayer, GTM variables, GA4 requests, DebugView, or screenshots.
-
+- Define the start, each meaningful tracked step, and the final success trigger clearly.
+- Fire `generate_lead` only after successful validation.
+- Keep errors limited to generic categories.
+- Keep direct PII out of the dataLayer, GA4 payload, URLs, and screenshots.
