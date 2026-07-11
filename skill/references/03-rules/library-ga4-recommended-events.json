@@ -6,6 +6,7 @@
     "parameters": [
       {
         "name": "virtual_currency_name",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "Gems",
@@ -13,6 +14,7 @@
       },
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -27,6 +29,7 @@
     "parameters": [
       {
         "name": "group_id",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "G_12345",
@@ -41,6 +44,7 @@
     "parameters": [
       {
         "name": "method",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -55,6 +59,7 @@
     "parameters": [
       {
         "name": "search_term",
+        "scope": "event",
         "type": "string",
         "required": "Yes",
         "example": "t-shirts",
@@ -69,6 +74,7 @@
     "parameters": [
       {
         "name": "content_type",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "product",
@@ -76,6 +82,7 @@
       },
       {
         "name": "content_id",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "C_12345",
@@ -90,6 +97,7 @@
     "parameters": [
       {
         "name": "method",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "Twitter",
@@ -97,6 +105,7 @@
       },
       {
         "name": "content_type",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "image",
@@ -104,6 +113,7 @@
       },
       {
         "name": "item_id",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "C_12345",
@@ -118,6 +128,7 @@
     "parameters": [
       {
         "name": "method",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -132,6 +143,7 @@
     "parameters": [
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "Yes",
         "example": "5",
@@ -139,6 +151,7 @@
       },
       {
         "name": "virtual_currency_name",
+        "scope": "event",
         "type": "string",
         "required": "Yes",
         "example": "Gems",
@@ -146,6 +159,7 @@
       },
       {
         "name": "item_name",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "Starter Boost",
@@ -172,6 +186,7 @@
     "parameters": [
       {
         "name": "currency",
+        "scope": "event",
         "type": "string",
         "required": "Yes*",
         "example": "USD",
@@ -179,6 +194,7 @@
       },
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "Yes*",
         "example": "30.03",
@@ -186,6 +202,7 @@
       },
       {
         "name": "coupon",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -193,6 +210,7 @@
       },
       {
         "name": "payment_type",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "Credit Card",
@@ -200,6 +218,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "Yes",
         "example": "",
@@ -207,6 +226,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -214,6 +234,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -221,6 +242,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -228,6 +250,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -235,6 +258,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -242,6 +266,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -249,6 +274,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -256,6 +282,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -263,6 +290,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -270,6 +298,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -277,6 +306,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -284,6 +314,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -291,6 +322,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -298,6 +330,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -305,6 +338,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -312,6 +346,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -319,6 +354,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -326,6 +362,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -340,6 +377,7 @@
     "parameters": [
       {
         "name": "currency",
+        "scope": "event",
         "type": "string",
         "required": "Yes*",
         "example": "USD",
@@ -347,6 +385,7 @@
       },
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "Yes*",
         "example": "30.03",
@@ -354,6 +393,7 @@
       },
       {
         "name": "coupon",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -361,6 +401,7 @@
       },
       {
         "name": "shipping_tier",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "Ground",
@@ -368,6 +409,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "Yes",
         "example": "",
@@ -375,6 +417,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -382,6 +425,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -389,6 +433,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -396,6 +441,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -403,6 +449,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -410,6 +457,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -417,6 +465,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -424,6 +473,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -431,6 +481,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -438,6 +489,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -445,6 +497,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -452,6 +505,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -459,6 +513,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -466,6 +521,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -473,6 +529,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -480,6 +537,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -487,6 +545,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -494,6 +553,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -508,6 +568,7 @@
     "parameters": [
       {
         "name": "currency",
+        "scope": "event",
         "type": "string",
         "required": "Yes*",
         "example": "USD",
@@ -515,6 +576,7 @@
       },
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "Yes*",
         "example": "30.03",
@@ -522,6 +584,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "Yes",
         "example": "",
@@ -529,6 +592,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -536,6 +600,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -543,6 +608,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -550,6 +616,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -557,6 +624,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -564,6 +632,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -571,6 +640,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -578,6 +648,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -585,6 +656,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -592,6 +664,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -599,6 +672,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -606,6 +680,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -613,6 +688,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -620,6 +696,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -627,6 +704,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -634,6 +712,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -641,6 +720,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -648,6 +728,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -662,6 +743,7 @@
     "parameters": [
       {
         "name": "currency",
+        "scope": "event",
         "type": "string",
         "required": "Yes*",
         "example": "USD",
@@ -669,6 +751,7 @@
       },
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "Yes*",
         "example": "30.03",
@@ -676,6 +759,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "Yes",
         "example": "",
@@ -683,6 +767,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -690,6 +775,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -697,6 +783,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -704,6 +791,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -711,6 +799,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -718,6 +807,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -725,6 +815,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -732,6 +823,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -739,6 +831,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -746,6 +839,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -753,6 +847,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -760,6 +855,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -767,6 +863,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -774,6 +871,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -781,6 +879,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -788,6 +887,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -795,6 +895,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -802,6 +903,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -816,6 +918,7 @@
     "parameters": [
       {
         "name": "currency",
+        "scope": "event",
         "type": "string",
         "required": "Yes*",
         "example": "USD",
@@ -823,6 +926,7 @@
       },
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "Yes*",
         "example": "30.03",
@@ -830,6 +934,7 @@
       },
       {
         "name": "coupon",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -837,6 +942,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "Yes",
         "example": "",
@@ -844,6 +950,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -851,6 +958,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -858,6 +966,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -865,6 +974,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -872,6 +982,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -879,6 +990,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -886,6 +998,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -893,6 +1006,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -900,6 +1014,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -907,6 +1022,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -914,6 +1030,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -921,6 +1038,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -928,6 +1046,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -935,6 +1054,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -942,6 +1062,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -949,6 +1070,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -956,6 +1078,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -963,6 +1086,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -977,6 +1101,7 @@
     "parameters": [
       {
         "name": "currency",
+        "scope": "event",
         "type": "string",
         "required": "Yes*",
         "example": "USD",
@@ -984,6 +1109,7 @@
       },
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "Yes*",
         "example": "30.03",
@@ -991,6 +1117,7 @@
       },
       {
         "name": "customer_type",
+        "scope": "event",
         "type": "string (new / returning)",
         "required": "No",
         "example": "new",
@@ -998,6 +1125,7 @@
       },
       {
         "name": "transaction_id",
+        "scope": "event",
         "type": "string",
         "required": "Yes",
         "example": "T_12345",
@@ -1005,6 +1133,7 @@
       },
       {
         "name": "coupon",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -1012,6 +1141,7 @@
       },
       {
         "name": "shipping",
+        "scope": "event",
         "type": "number",
         "required": "No",
         "example": "3.33",
@@ -1019,6 +1149,7 @@
       },
       {
         "name": "tax",
+        "scope": "event",
         "type": "number",
         "required": "No",
         "example": "1.11",
@@ -1026,6 +1157,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "Yes",
         "example": "",
@@ -1033,6 +1165,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -1040,6 +1173,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -1047,6 +1181,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -1054,6 +1189,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -1061,6 +1197,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -1068,6 +1205,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -1075,6 +1213,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -1082,6 +1221,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -1089,6 +1229,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -1096,6 +1237,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -1103,6 +1245,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -1110,6 +1253,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -1117,6 +1261,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -1124,6 +1269,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -1131,6 +1277,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -1138,6 +1285,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -1145,6 +1293,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -1152,6 +1301,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -1166,6 +1316,7 @@
     "parameters": [
       {
         "name": "currency",
+        "scope": "event",
         "type": "string",
         "required": "Yes*",
         "example": "USD",
@@ -1173,6 +1324,7 @@
       },
       {
         "name": "transaction_id",
+        "scope": "event",
         "type": "string",
         "required": "Yes",
         "example": "T_12345",
@@ -1180,6 +1332,7 @@
       },
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "Yes*",
         "example": "30.03",
@@ -1187,6 +1340,7 @@
       },
       {
         "name": "coupon",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -1194,6 +1348,7 @@
       },
       {
         "name": "shipping",
+        "scope": "event",
         "type": "number",
         "required": "No",
         "example": "3.33",
@@ -1201,6 +1356,7 @@
       },
       {
         "name": "tax",
+        "scope": "event",
         "type": "number",
         "required": "No",
         "example": "1.11",
@@ -1208,6 +1364,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "No*",
         "example": "",
@@ -1215,6 +1372,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -1222,6 +1380,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -1229,6 +1388,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -1236,6 +1396,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -1243,6 +1404,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -1250,6 +1412,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -1257,6 +1420,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -1264,6 +1428,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -1271,6 +1436,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -1278,6 +1444,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -1285,6 +1452,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -1292,6 +1460,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -1299,6 +1468,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -1306,6 +1476,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -1313,6 +1484,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -1320,6 +1492,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -1327,6 +1500,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -1334,6 +1508,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -1348,6 +1523,7 @@
     "parameters": [
       {
         "name": "currency",
+        "scope": "event",
         "type": "string",
         "required": "Yes*",
         "example": "USD",
@@ -1355,6 +1531,7 @@
       },
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "Yes*",
         "example": "30.03",
@@ -1362,6 +1539,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "Yes",
         "example": "",
@@ -1369,6 +1547,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -1376,6 +1555,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -1383,6 +1563,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -1390,6 +1571,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -1397,6 +1579,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -1404,6 +1587,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -1411,6 +1595,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -1418,6 +1603,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -1425,6 +1611,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -1432,6 +1619,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -1439,6 +1627,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -1446,6 +1635,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -1453,6 +1643,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -1460,6 +1651,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -1467,6 +1659,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -1474,6 +1667,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -1481,6 +1675,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -1488,6 +1683,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -1502,6 +1698,7 @@
     "parameters": [
       {
         "name": "item_list_id",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -1509,6 +1706,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -1516,6 +1714,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "Yes",
         "example": "",
@@ -1523,6 +1722,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -1530,6 +1730,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -1537,6 +1738,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -1544,6 +1746,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -1551,6 +1754,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -1558,6 +1762,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -1565,6 +1770,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -1572,6 +1778,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -1579,6 +1786,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -1586,6 +1794,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -1593,6 +1802,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -1600,6 +1810,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -1607,6 +1818,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -1614,6 +1826,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -1621,6 +1834,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -1628,6 +1842,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -1635,6 +1850,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -1642,6 +1858,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -1656,6 +1873,7 @@
     "parameters": [
       {
         "name": "creative_name",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "summer_banner2",
@@ -1663,6 +1881,7 @@
       },
       {
         "name": "creative_slot",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "featured_app_1",
@@ -1670,6 +1889,7 @@
       },
       {
         "name": "promotion_id",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "P_12345",
@@ -1677,6 +1897,7 @@
       },
       {
         "name": "promotion_name",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "Summer Sale",
@@ -1684,6 +1905,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "No*",
         "example": "",
@@ -1691,6 +1913,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -1698,6 +1921,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -1705,6 +1929,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -1712,6 +1937,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -1719,6 +1945,7 @@
       },
       {
         "name": "creative_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "summer_banner2",
@@ -1726,6 +1953,7 @@
       },
       {
         "name": "creative_slot",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "featured_app_1",
@@ -1733,6 +1961,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -1740,6 +1969,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -1747,6 +1977,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -1754,6 +1985,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -1761,6 +1993,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -1768,6 +2001,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -1775,6 +2009,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -1782,6 +2017,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -1789,6 +2025,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -1796,6 +2033,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -1803,6 +2041,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -1810,6 +2049,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -1817,6 +2057,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -1824,6 +2065,7 @@
       },
       {
         "name": "promotion_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "P_12345",
@@ -1831,6 +2073,7 @@
       },
       {
         "name": "promotion_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Summer Sale",
@@ -1838,6 +2081,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -1852,6 +2096,7 @@
     "parameters": [
       {
         "name": "currency",
+        "scope": "event",
         "type": "string",
         "required": "Yes*",
         "example": "USD",
@@ -1859,6 +2104,7 @@
       },
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "Yes*",
         "example": "30.03",
@@ -1866,6 +2112,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "Yes",
         "example": "",
@@ -1873,6 +2120,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -1880,6 +2128,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -1887,6 +2136,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -1894,6 +2144,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -1901,6 +2152,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -1908,6 +2160,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -1915,6 +2168,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -1922,6 +2176,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -1929,6 +2184,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -1936,6 +2192,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -1943,6 +2200,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -1950,6 +2208,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -1957,6 +2216,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -1964,6 +2224,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -1971,6 +2232,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -1978,6 +2240,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -1985,6 +2248,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -1992,6 +2256,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -2006,6 +2271,7 @@
     "parameters": [
       {
         "name": "currency",
+        "scope": "event",
         "type": "string",
         "required": "Yes*",
         "example": "USD",
@@ -2013,6 +2279,7 @@
       },
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "Yes*",
         "example": "30.03",
@@ -2020,6 +2287,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "Yes",
         "example": "",
@@ -2027,6 +2295,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -2034,6 +2303,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -2041,6 +2311,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -2048,6 +2319,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -2055,6 +2327,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -2062,6 +2335,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -2069,6 +2343,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -2076,6 +2351,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -2083,6 +2359,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -2090,6 +2367,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -2097,6 +2375,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -2104,6 +2383,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -2111,6 +2391,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -2118,6 +2399,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -2125,6 +2407,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -2132,6 +2415,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -2139,6 +2423,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -2146,6 +2431,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -2160,6 +2446,7 @@
     "parameters": [
       {
         "name": "currency",
+        "scope": "event",
         "type": "string",
         "required": "Yes*",
         "example": "USD",
@@ -2167,6 +2454,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -2174,6 +2462,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -2181,6 +2470,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "Yes",
         "example": "",
@@ -2188,6 +2478,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -2195,6 +2486,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -2202,6 +2494,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -2209,6 +2502,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -2216,6 +2510,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -2223,6 +2518,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -2230,6 +2526,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -2237,6 +2534,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -2244,6 +2542,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -2251,6 +2550,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -2258,6 +2558,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -2265,6 +2566,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -2272,6 +2574,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -2279,6 +2582,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -2286,6 +2590,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -2293,6 +2598,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -2300,6 +2606,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -2307,6 +2614,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -2321,6 +2629,7 @@
     "parameters": [
       {
         "name": "creative_name",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "summer_banner2",
@@ -2328,6 +2637,7 @@
       },
       {
         "name": "creative_slot",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "featured_app_1",
@@ -2335,6 +2645,7 @@
       },
       {
         "name": "promotion_id",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "P_12345",
@@ -2342,6 +2653,7 @@
       },
       {
         "name": "promotion_name",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "Summer Sale",
@@ -2349,6 +2661,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "Yes",
         "example": "",
@@ -2356,6 +2669,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -2363,6 +2677,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -2370,6 +2685,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -2377,6 +2693,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -2384,6 +2701,7 @@
       },
       {
         "name": "creative_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "summer_banner2",
@@ -2391,6 +2709,7 @@
       },
       {
         "name": "creative_slot",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "featured_app_1",
@@ -2398,6 +2717,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -2405,6 +2725,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -2412,6 +2733,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -2419,6 +2741,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -2426,6 +2749,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -2433,6 +2757,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -2440,6 +2765,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -2447,6 +2773,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -2454,6 +2781,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -2461,6 +2789,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -2468,6 +2797,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -2475,6 +2805,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -2482,6 +2813,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -2489,6 +2821,7 @@
       },
       {
         "name": "promotion_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "P_12345",
@@ -2496,6 +2829,7 @@
       },
       {
         "name": "promotion_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Summer Sale",
@@ -2503,6 +2837,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -2517,6 +2852,7 @@
     "parameters": [
       {
         "name": "level_name",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "The journey begins...",
@@ -2524,6 +2860,7 @@
       },
       {
         "name": "success",
+        "scope": "event",
         "type": "boolean",
         "required": "No",
         "example": "true",
@@ -2538,6 +2875,7 @@
     "parameters": [
       {
         "name": "level_name",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "The journey begins...",
@@ -2552,6 +2890,7 @@
     "parameters": [
       {
         "name": "level",
+        "scope": "event",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -2559,6 +2898,7 @@
       },
       {
         "name": "character",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "Player 1",
@@ -2573,6 +2913,7 @@
     "parameters": [
       {
         "name": "score",
+        "scope": "event",
         "type": "number",
         "required": "Yes",
         "example": "10000",
@@ -2580,6 +2921,7 @@
       },
       {
         "name": "level",
+        "scope": "event",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -2587,6 +2929,7 @@
       },
       {
         "name": "character",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "Player 1",
@@ -2601,6 +2944,7 @@
     "parameters": [
       {
         "name": "achievement_id",
+        "scope": "event",
         "type": "string",
         "required": "Yes",
         "example": "A_12345",
@@ -2615,6 +2959,7 @@
     "parameters": [
       {
         "name": "currency",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "USD",
@@ -2622,6 +2967,7 @@
       },
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "No",
         "example": "2500",
@@ -2629,6 +2975,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "No",
         "example": "",
@@ -2636,6 +2983,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -2643,6 +2991,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -2650,6 +2999,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -2657,6 +3007,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -2664,6 +3015,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -2671,6 +3023,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -2678,6 +3031,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -2685,6 +3039,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -2692,6 +3047,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -2699,6 +3055,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -2706,6 +3063,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -2713,6 +3071,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -2720,6 +3079,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -2727,6 +3087,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -2734,6 +3095,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -2741,6 +3103,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -2748,6 +3111,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -2755,6 +3119,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -2769,6 +3134,7 @@
     "parameters": [
       {
         "name": "currency",
+        "scope": "event",
         "type": "string",
         "required": "Yes*",
         "example": "USD",
@@ -2776,6 +3142,7 @@
       },
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "Yes*",
         "example": "30.03",
@@ -2783,6 +3150,7 @@
       },
       {
         "name": "unconvert_lead_reason",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "Never responded",
@@ -2790,6 +3158,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "No",
         "example": "",
@@ -2797,6 +3166,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -2804,6 +3174,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -2811,6 +3182,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -2818,6 +3190,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -2825,6 +3198,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -2832,6 +3206,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -2839,6 +3214,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -2846,6 +3222,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -2853,6 +3230,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -2860,6 +3238,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -2867,6 +3246,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -2874,6 +3254,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -2881,6 +3262,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -2888,6 +3270,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -2895,6 +3278,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -2902,6 +3286,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -2909,6 +3294,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -2916,6 +3302,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -2930,6 +3317,7 @@
     "parameters": [
       {
         "name": "currency",
+        "scope": "event",
         "type": "string",
         "required": "Yes*",
         "example": "USD",
@@ -2937,6 +3325,7 @@
       },
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "Yes*",
         "example": "30.03",
@@ -2944,6 +3333,7 @@
       },
       {
         "name": "disqualified_lead_reason",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "Not looking to buy",
@@ -2951,6 +3341,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "No",
         "example": "",
@@ -2958,6 +3349,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -2965,6 +3357,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -2972,6 +3365,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -2979,6 +3373,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -2986,6 +3381,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -2993,6 +3389,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -3000,6 +3397,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -3007,6 +3405,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -3014,6 +3413,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -3021,6 +3421,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -3028,6 +3429,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -3035,6 +3437,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -3042,6 +3445,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -3049,6 +3453,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -3056,6 +3461,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -3063,6 +3469,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -3070,6 +3477,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -3077,6 +3485,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -3091,6 +3500,7 @@
     "parameters": [
       {
         "name": "currency",
+        "scope": "event",
         "type": "string",
         "required": "Yes*",
         "example": "USD",
@@ -3098,6 +3508,7 @@
       },
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "Yes*",
         "example": "30.03",
@@ -3105,6 +3516,7 @@
       },
       {
         "name": "lead_source",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "Trade show",
@@ -3112,6 +3524,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "No",
         "example": "",
@@ -3119,6 +3532,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -3126,6 +3540,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -3133,6 +3548,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -3140,6 +3556,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -3147,6 +3564,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -3154,6 +3572,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -3161,6 +3580,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -3168,6 +3588,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -3175,6 +3596,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -3182,6 +3604,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -3189,6 +3612,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -3196,6 +3620,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -3203,6 +3628,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -3210,6 +3636,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -3217,6 +3644,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -3224,6 +3652,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -3231,6 +3660,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -3238,6 +3668,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -3252,6 +3683,7 @@
     "parameters": [
       {
         "name": "currency",
+        "scope": "event",
         "type": "string",
         "required": "Yes*",
         "example": "USD",
@@ -3259,6 +3691,7 @@
       },
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "Yes*",
         "example": "30.03",
@@ -3266,6 +3699,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "No",
         "example": "",
@@ -3273,6 +3707,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -3280,6 +3715,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -3287,6 +3723,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -3294,6 +3731,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -3301,6 +3739,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -3308,6 +3747,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -3315,6 +3755,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -3322,6 +3763,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -3329,6 +3771,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -3336,6 +3779,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -3343,6 +3787,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -3350,6 +3795,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -3357,6 +3803,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -3364,6 +3811,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -3371,6 +3819,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -3378,6 +3827,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -3385,6 +3835,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -3392,6 +3843,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",
@@ -3406,6 +3858,7 @@
     "parameters": [
       {
         "name": "currency",
+        "scope": "event",
         "type": "string",
         "required": "Yes*",
         "example": "USD",
@@ -3413,6 +3866,7 @@
       },
       {
         "name": "value",
+        "scope": "event",
         "type": "number",
         "required": "Yes*",
         "example": "30.03",
@@ -3420,6 +3874,7 @@
       },
       {
         "name": "lead_status",
+        "scope": "event",
         "type": "string",
         "required": "No",
         "example": "Started conversations",
@@ -3427,6 +3882,7 @@
       },
       {
         "name": "items",
+        "scope": "event",
         "type": "Array<Item>",
         "required": "No",
         "example": "",
@@ -3434,6 +3890,7 @@
       },
       {
         "name": "item_id",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "SKU_12345",
@@ -3441,6 +3898,7 @@
       },
       {
         "name": "item_name",
+        "scope": "item",
         "type": "string",
         "required": "Yes*",
         "example": "Stan and Friends Tee",
@@ -3448,6 +3906,7 @@
       },
       {
         "name": "affiliation",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google Store",
@@ -3455,6 +3914,7 @@
       },
       {
         "name": "coupon",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "SUMMER_FUN",
@@ -3462,6 +3922,7 @@
       },
       {
         "name": "discount",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "2.22",
@@ -3469,6 +3930,7 @@
       },
       {
         "name": "index",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "5",
@@ -3476,6 +3938,7 @@
       },
       {
         "name": "item_brand",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Google",
@@ -3483,6 +3946,7 @@
       },
       {
         "name": "item_category",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Apparel",
@@ -3490,6 +3954,7 @@
       },
       {
         "name": "item_category2",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Adult",
@@ -3497,6 +3962,7 @@
       },
       {
         "name": "item_category3",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Shirts",
@@ -3504,6 +3970,7 @@
       },
       {
         "name": "item_category4",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Crew",
@@ -3511,6 +3978,7 @@
       },
       {
         "name": "item_category5",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Short sleeve",
@@ -3518,6 +3986,7 @@
       },
       {
         "name": "item_list_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "related_products",
@@ -3525,6 +3994,7 @@
       },
       {
         "name": "item_list_name",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "Related products",
@@ -3532,6 +4002,7 @@
       },
       {
         "name": "item_variant",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "green",
@@ -3539,6 +4010,7 @@
       },
       {
         "name": "location_id",
+        "scope": "item",
         "type": "string",
         "required": "No",
         "example": "ChIJIQBpAG2ahYAR_6128GcTUEo (the Google Place ID for San Francisco)",
@@ -3546,6 +4018,7 @@
       },
       {
         "name": "price",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "10.01",
@@ -3553,6 +4026,7 @@
       },
       {
         "name": "quantity",
+        "scope": "item",
         "type": "number",
         "required": "No",
         "example": "3",

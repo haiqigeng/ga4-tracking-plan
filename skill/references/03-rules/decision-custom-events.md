@@ -29,6 +29,7 @@ Use this reference before proposing custom events. A custom event is acceptable 
 | File download or outbound click | Enhanced measurement `file_download` or outbound `click` | Enhanced measurement is unavailable, insufficiently scoped, or a distinct business action requires deliberate manual collection. |
 | Video engagement | Enhanced measurement video events for supported embeds | The player is unsupported, non-YouTube, or needs domain-specific media diagnostics. |
 | Content item selected | `select_content` | The action is a richer business intent with its own funnel role. |
+| Header, menu, submenu, or footer navigation | Follow the approved client convention; otherwise use `header_click`, `menu_click`, `submenu_click`, and `footer_click` for whole-site plans | Use `select_content` when the selected object is actual content, or when a coherent client convention explicitly consolidates navigation there. |
 
 ## Common Custom Events
 
@@ -50,9 +51,36 @@ Use these as patterns, not standards. Always justify them in `custom_event_accep
 | `calculator_start` | A simulator/calculator is a distinct business tool. | `tool_name`, `tool_step`, `entry_point` | It is just a generic content page view. |
 | `calculator_complete` | Tool completion predicts lead, quote, or eligibility. | `tool_name`, `result_type`, `journey_name` | Result values are sensitive, personal, financial, or health data. |
 | `quote_step_submit` | A quote funnel has meaningful intermediate validation. | `quote_type`, `form_step`, `validation_status` | A standard form event answers the need. |
-| `checkout_error` | Checkout errors explain revenue loss and can be safely categorized. | `checkout_step`, `error_type`, `error_code` | Error values include payment details, addresses, or user-entered text. |
+| `checkout_error` | Checkout errors explain revenue loss and can be safely categorized. | `journey_step`, `error_type`, `error_code` | Error values include payment details, addresses, or user-entered text. |
 | `support_article_feedback` | Helpful/not helpful feedback is used for support deflection. | `content_id`, `content_type`, `feedback_value` | Feedback is free text or not reviewed operationally. |
 | `account_access_intent` | Entry to login/member area matters before authentication. | `account_area`, `cta_location`, `login_status` | Successful login occurs; use `login`. |
+| `header_click` | Header and utility navigation require direct reporting separate from other surfaces. | `link_name`, `link_url`, `navigation_group`, `link_position` | A coherent client convention uses one consolidated navigation event. |
+| `menu_click` | Top-level menu choices need their own reporting and implementation surface. | `link_name`, `link_url`, `navigation_group`, `link_position` | The selected object is a product tile; use `select_item`. |
+| `submenu_click` | Second-level or deeper menu choices need to be distinguished from top-level use. | `link_name`, `link_url`, `navigation_group`, `navigation_level` | Menu depth has no analysis value or the client convention consolidates it. |
+| `footer_click` | Footer navigation and service links need direct reporting separate from header and menus. | `link_name`, `link_url`, `navigation_group`, `link_position` | Enhanced outbound click is sufficient and footer-specific reporting is unnecessary. |
+| `payment_error` | A submitted payment is refused or fails before confirmed purchase. | `journey_step`, `error_type`, `error_code`, `payment_type`, optional `retry_number` | The event is a successful order; use `purchase`. |
+| `newsletter_subscribe` | Newsletter success is a distinct permissioned-audience outcome rather than a generic lead. | `form_name`, `lead_source`, optional governed subscription context | The client intentionally consolidates all successful leads under `generate_lead`. |
+| `contact_submit` | A completed contact request has separate service or commercial reporting. | `form_name`, `contact_method`, `support_topic`, `lead_source` | The submission is intentionally governed as the same lead KPI as other forms. |
+| `catalog_request` | A confirmed catalogue request has distinct acquisition or fulfilment reporting. | `form_name`, `lead_source`, optional `catalog_type` | The request is intentionally consolidated under `generate_lead`. |
+| `cancel_order` | The backend confirms cancellation of an existing order before or independently of refund completion. | `transaction_id`, `cancellation_stage`, `cancellation_reason` | Money or items are refunded; also use official `refund` at refund completion. |
+| `view_order_history` | Authenticated order-history use is a meaningful self-service KPI and page typing alone is insufficient. | `account_section`, optional `order_count_bucket` | A reliable `page_view` with account page typing already answers the question. |
+| `view_order` | Authenticated order-detail use needs separate analysis. | `account_section`, `order_status`, `order_age_bucket` | Typed `page_view` reporting is sufficient. |
+| `start_return` | A customer starts a governed return workflow. | `return_scope`, `order_age_bucket`, optional `eligibility_status` | Only completed financial impact matters; use `refund` when completed. |
+| `update_profile` | A profile change is a useful self-service outcome. | `profile_field_group` | The change has no actionable analysis need. |
+| `update_preferences` | A governed preference change is analytically useful. | `preference_type`, `preference_state` | Consent or privacy governance does not permit collection. |
+| `password_reset` | Password recovery completion is needed to measure access resolution. | `method` or a controlled recovery method | Login success alone sufficiently measures recovery. |
+
+## Navigation Event Choice
+
+`select_content` is an official event, but official status does not make it the
+best client convention for every navigation surface.
+
+1. Follow a coherent existing client convention.
+2. Without one, use surface-level navigation events for whole-site plans.
+3. Reuse the same parameter names and value rules across those events.
+4. Consolidate all links within each surface; never create one event per link.
+5. Reserve `select_content` for editorial cards, guides, articles, FAQs, tools,
+   and other content objects whose meaning fits the official event.
 
 ## Select Item, View Item, Filter, Sort
 
@@ -66,7 +94,7 @@ Use these as patterns, not standards. Always justify them in `custom_event_accep
 
 - Event names: lowercase `snake_case`, semantic, stable, no accents.
 - Controlled values: lowercase ASCII `snake_case`; remove French accents; keep official IDs, ISO codes, numeric values, and safe raw terms only when required.
-- Do not use `button_click`, `cta_click`, `menu_click`, `link_click`, `interaction`, `custom_event`, `eventCategory`, `eventAction`, or `eventLabel`.
+- Avoid generic `button_click`, `cta_click`, `link_click`, `interaction`, `custom_event`, `eventCategory`, `eventAction`, or `eventLabel`. `menu_click` is acceptable only as the governed navigation surface event defined above.
 
 ## Required Custom Rationale
 

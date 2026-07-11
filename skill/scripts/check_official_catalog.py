@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import argparse
-import html
 import json
-import re
 from pathlib import Path
 from urllib.request import Request, urlopen
+
+from official_ga4_catalog import catalog_signature, parse_catalog_html
 
 OFFICIAL_URL = "https://developers.google.com/analytics/devguides/collection/ga4/reference/events"
 
@@ -20,23 +20,11 @@ def references_dir() -> Path:
     return Path(__file__).resolve().parents[1] / "references" / "03-rules"
 
 
-def parse_event_names(page: str) -> set[str]:
-    return {
-        html.unescape(name).strip()
-        for name in re.findall(r'<h3[^>]*id="[^"]+"[^>]*>\s*<code[^>]*>([^<]+)</code>\s*</h3>', page, re.S)
-    }
-
-
-def parse_last_updated(page: str) -> str:
-    match = re.search(r"Last updated\s+(\d{4}-\d{2}-\d{2})\s+UTC", page)
-    return match.group(1) if match else ""
-
-
-def load_local_catalog() -> tuple[dict, set[str]]:
+def load_local_catalog() -> tuple[dict, list[dict]]:
     rules = references_dir()
     library = json.loads((rules / "library-ga4-event-scenarios.json").read_text(encoding="utf-8-sig"))
     recommended = json.loads((rules / "library-ga4-recommended-events.json").read_text(encoding="utf-8-sig"))
-    return library, {str(item["event"]) for item in recommended if isinstance(item, dict) and item.get("event")}
+    return library, recommended
 
 
 def validate_metadata(library: dict) -> list[str]:
@@ -58,20 +46,28 @@ def fetch_official_page() -> str:
 
 def main() -> int:
     args = parse_args()
-    library, local_events = load_local_catalog()
+    library, local_catalog = load_local_catalog()
     errors = validate_metadata(library)
     if not args.offline:
         page = fetch_official_page()
-        official_events = parse_event_names(page)
-        if not official_events:
-            errors.append("Could not parse official recommended-event names")
-        missing = sorted(official_events - local_events)
-        extra = sorted(local_events - official_events)
+        official_catalog, official_updated = parse_catalog_html(page)
+        official_signature = catalog_signature(official_catalog)
+        local_signature = catalog_signature(local_catalog)
+        if not official_signature:
+            errors.append("Could not parse official recommended-event catalog")
+        missing = sorted(set(official_signature) - set(local_signature))
+        extra = sorted(set(local_signature) - set(official_signature))
         if missing:
             errors.append(f"Events missing from bundled catalog: {', '.join(missing)}")
         if extra:
             errors.append(f"Bundled events absent from official catalog: {', '.join(extra)}")
-        official_updated = parse_last_updated(page)
+        changed = sorted(
+            name
+            for name in set(official_signature) & set(local_signature)
+            if official_signature[name] != local_signature[name]
+        )
+        if changed:
+            errors.append(f"Bundled event parameter definitions differ from official documentation: {', '.join(changed)}")
         bundled_updated = str(library.get("catalog_metadata", {}).get("official_source_last_updated", ""))
         if official_updated and bundled_updated != official_updated:
             errors.append(f"Official source date changed from {bundled_updated} to {official_updated}")

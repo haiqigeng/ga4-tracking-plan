@@ -12,6 +12,24 @@ import discover_site_journeys as discovery  # noqa: E402
 
 
 class DiscoverSiteJourneysTests(unittest.TestCase):
+    def test_canonical_url_removes_fragment_and_campaign_parameters(self) -> None:
+        url = discovery.canonical_url("HTTPS://EXAMPLE.COM/path?utm_source=x&color=blue&gclid=123#details")
+        self.assertEqual(url, "https://example.com/path?color=blue")
+
+    def test_sitemap_indexes_are_followed_recursively(self) -> None:
+        sitemap_index = """<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+        <sitemap><loc>https://example.com/products.xml</loc></sitemap>
+        </sitemapindex>"""
+        products = """<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+        <url><loc>https://example.com/p/one</loc></url>
+        <url><loc>https://example.com/p/two?utm_source=test</loc></url>
+        </urlset>"""
+        with patch.object(discovery, "fetch_text", side_effect=[sitemap_index, products]):
+            errors = []
+            urls = discovery.parse_sitemap("https://example.com/sitemap.xml", 10, errors)
+        self.assertEqual(urls, ["https://example.com/p/one", "https://example.com/p/two"])
+        self.assertEqual(errors, [])
+
     def test_sitemap_fetch_errors_are_recorded(self) -> None:
         errors: list[discovery.SourceError] = []
         with patch.object(discovery, "fetch_text", side_effect=OSError("network unavailable")):

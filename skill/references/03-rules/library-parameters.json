@@ -3,9 +3,10 @@
   "policy": [
     "Use official GA4 parameters and item parameters when the event is official or ecommerce.",
     "Use custom parameters only when they answer a concrete analysis, segmentation, implementation, or optimization need.",
-    "Use lowercase ASCII snake_case for controlled values and remove accents.",
+    "Use English lowercase ASCII snake_case for controlled values across multilingual websites and remove accents.",
+    "Exhaust finite website values when practical and display them with space-pipe-space separators in human output.",
     "Do not use Universal Analytics fields such as eventCategory, eventAction, eventLabel, nonInteraction, dimension1, or metric1.",
-    "Do not send PII, contact-derived identifiers, free text, account IDs, addresses, or sensitive user input."
+    "Do not send PII, contact-derived identifiers, free text, account IDs, addresses, or sensitive user input to GA4. Governed non-GA4 implementation variables must identify destination, consent, transformation, and ownership."
   ],
   "families": [
     {
@@ -60,11 +61,89 @@
         {
           "parameter_name": "login_status",
           "display_name": "Login status",
+          "scope": "user",
+          "type": "string",
+          "classification": "custom_user_property",
+          "value_rules": "Controlled values: logged_in | logged_out. Update when authentication state changes; do not send account IDs.",
+          "registration_default": "user_scoped_custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "customer_status",
+          "display_name": "Customer status",
+          "scope": "user",
+          "type": "string",
+          "classification": "custom_user_property",
+          "value_rules": "Controlled values: new | returning | unknown from an approved backend rule.",
+          "registration_default": "user_scoped_custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "account_type",
+          "display_name": "Account type",
+          "scope": "user",
+          "type": "string",
+          "classification": "custom_user_property",
+          "value_rules": "Optional low-cardinality English account category; omit when the business has no stable account types.",
+          "registration_default": "user_scoped_custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "user_id",
+          "display_name": "GA4 User ID",
+          "scope": "implementation",
+          "type": "string",
+          "classification": "implementation_variable",
+          "value_rules": "Opaque stable non-PII ID. Map only to the Google tag user_id setting, omit until sign-in, set null on logout, and never register as a custom dimension.",
+          "registration_default": "never_register_use_ga4_user_id_setting"
+        }
+      ]
+    },
+    {
+      "family": "navigation",
+      "use_when": "Header, menu, submenu, footer, and utility navigation events when the client uses surface-level event names.",
+      "parameters": [
+        {
+          "parameter_name": "link_name",
+          "display_name": "Link name",
           "scope": "event",
           "type": "string",
           "classification": "custom_event_parameter",
-          "value_rules": "Controlled values such as logged_in | logged_out | unknown. Do not send account IDs.",
+          "value_rules": "Stable English lowercase ASCII snake_case label derived from navigation purpose, not transient localized display text.",
           "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "link_url",
+          "display_name": "Link URL",
+          "scope": "event",
+          "type": "string",
+          "classification": "ga4_native_parameter",
+          "value_rules": "Resolved destination URL after removing sensitive query parameters; do not translate URLs.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "navigation_group",
+          "display_name": "Navigation group",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled English group such as utility | women | lingerie | shoes | men | services | legal | social.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "navigation_level",
+          "display_name": "Navigation level",
+          "scope": "event",
+          "type": "integer",
+          "classification": "custom_event_parameter",
+          "value_rules": "Positive menu depth such as 1 | 2 | 3; use only for nested menu navigation.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "link_position",
+          "display_name": "Link position",
+          "scope": "event",
+          "type": "integer",
+          "classification": "custom_event_parameter",
+          "value_rules": "One-based position within the relevant navigation group when stable and analytically useful.",
+          "registration_default": "custom_dimension_only_if_stable"
         }
       ]
     },
@@ -285,6 +364,129 @@
       ]
     },
     {
+      "family": "authenticated_customer_space",
+      "use_when": "Authenticated account self-service, order history, returns, cancellation, profile, and preference outcomes.",
+      "parameters": [
+        {
+          "parameter_name": "account_section",
+          "display_name": "Account section",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "English controlled values such as dashboard | orders | returns | profile | preferences | wishlist | loyalty.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "order_status",
+          "display_name": "Order status",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled lifecycle state from the commerce backend, for example processing | shipped | delivered | cancelled | partially_refunded | refunded. Never send raw labels or support notes.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "order_age_bucket",
+          "display_name": "Order age bucket",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Stable non-personal bucket such as under_30_days | days_30_90 | over_90_days; do not send exact customer timestamps.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "order_count_bucket",
+          "display_name": "Visible order count bucket",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Optional low-cardinality count band such as zero | one | two_to_five | over_five.",
+          "registration_default": "custom_dimension_only_when_analysis_requires_it"
+        },
+        {
+          "parameter_name": "return_scope",
+          "display_name": "Return scope",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "English controlled values: full_order | selected_items.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "eligibility_status",
+          "display_name": "Eligibility status",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled outcome such as eligible | not_eligible | manual_review; do not send raw reason text.",
+          "registration_default": "custom_dimension_when_used_for_diagnostics"
+        },
+        {
+          "parameter_name": "cancellation_stage",
+          "display_name": "Cancellation stage",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled order stage such as before_fulfilment | after_fulfilment | partial_order.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "cancellation_reason",
+          "display_name": "Cancellation reason",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Approved non-personal reason category such as customer_request | inventory_issue | payment_issue | duplicate_order | other_controlled. Never send free text.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "profile_field_group",
+          "display_name": "Profile field group",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled group such as identity | address | contact_details | contact_preferences. Never send the changed value.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "preference_type",
+          "display_name": "Preference type",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Governed preference category such as email_marketing | sms_marketing | postal_marketing | service_notifications.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "preference_state",
+          "display_name": "Preference state",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "English controlled values: opt_in | opt_out. Collect only when approved by consent and privacy governance.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "subscription_type",
+          "display_name": "Subscription type",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled newsletter or subscription category; never send email address or audience identifiers.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "catalog_type",
+          "display_name": "Catalogue type",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled catalogue edition or category; never send delivery details.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        }
+      ]
+    },
+    {
       "family": "ga4_ecommerce_event_parameters",
       "use_when": "GA4 official ecommerce events. Keep event-level and item-level parameters separate.",
       "parameters": [
@@ -304,6 +506,15 @@
           "type": "number",
           "classification": "ga4_ecommerce_parameter",
           "value_rules": "Monetary value for the event, excluding shipping and tax when applicable according to GA4 ecommerce rules.",
+          "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "customer_type",
+          "display_name": "Purchase customer type",
+          "scope": "event",
+          "type": "string",
+          "classification": "ga4_ecommerce_parameter",
+          "value_rules": "Official purchase parameter: new | returning. Omit when the commerce backend cannot determine it reliably.",
           "registration_default": "not_needed_for_official_parameter"
         },
         {
@@ -410,6 +621,15 @@
           "classification": "ga4_ecommerce_item_parameter",
           "value_rules": "Official variant field; use for size, color, option, or variant when sufficient before custom item fields.",
           "registration_default": "not_needed_for_official_parameter"
+        },
+        {
+          "parameter_name": "items[].availability_status",
+          "display_name": "Availability status",
+          "scope": "item",
+          "type": "string",
+          "classification": "custom_item_parameter",
+          "value_rules": "English controlled values: in_stock | low_stock | out_of_stock | preorder | backorder | discontinued. Use on view_item for selected variants; use on view_cart only for persistent carts with live inventory.",
+          "registration_default": "item_scoped_custom_dimension_when_used_for_reporting"
         },
         {
           "parameter_name": "items[].price",

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/HQ-Guillaume/ga4-tracking-plan/schema/schema-tracking-plan.json",
+  "$id": "https://github.com/haiqigeng/ga4-tracking-plan/schema/schema-tracking-plan.json",
   "title": "GA4 tracking plan contract",
   "description": "Canonical GA4-only structure for analyst-readable, implementation-ready tracking plans.",
   "type": "object",
@@ -13,6 +13,7 @@
     "measurement_brief",
     "measurement_strategy",
     "website_coverage_map",
+    "user_context",
     "events",
     "parameters",
     "screenshot_evidence",
@@ -47,6 +48,9 @@
     },
     "website_coverage_map": {
       "$ref": "#/$defs/websiteCoverageMap"
+    },
+    "user_context": {
+      "$ref": "#/$defs/userContext"
     },
     "events": {
       "type": "array",
@@ -363,6 +367,7 @@
         "selected_event_families",
         "excluded_event_families",
         "custom_event_acceptance",
+        "lead_event_model",
         "scalability_notes"
       ],
       "properties": {
@@ -399,6 +404,9 @@
             "$ref": "#/$defs/customEventAcceptance"
           }
         },
+        "lead_event_model": {
+          "$ref": "#/$defs/leadEventModel"
+        },
         "scalability_notes": {
           "$ref": "#/$defs/stringArray"
         }
@@ -414,6 +422,7 @@
         "journeys_covered",
         "journeys_discovered",
         "coverage_gaps",
+        "authenticated_journey",
         "playwright_recommendation"
       ],
       "properties": {
@@ -457,6 +466,9 @@
             "$ref": "#/$defs/coverageGap"
           }
         },
+        "authenticated_journey": {
+          "$ref": "#/$defs/authenticatedJourney"
+        },
         "playwright_recommendation": {
           "type": "object",
           "additionalProperties": false,
@@ -499,8 +511,10 @@
             "navigation",
             "url_list",
             "page_template",
+            "static_html",
             "playwright_crawl",
             "browser_exploration",
+            "synthetic_account_exploration",
             "existing_tracking_plan",
             "analytics_export",
             "search_console_export",
@@ -1352,6 +1366,7 @@
         "status": {
           "enum": [
             "observed",
+            "synthetic_observation",
             "confirmed",
             "inferred",
             "recommended",
@@ -1367,6 +1382,243 @@
             "medium",
             "low"
           ]
+        }
+      }
+    },
+    "leadEventModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "rationale",
+        "outcome_mappings"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "not_applicable",
+            "consolidated",
+            "separate",
+            "hybrid"
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome_mappings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/leadOutcomeMapping"
+          }
+        }
+      }
+    },
+    "leadOutcomeMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "event_name",
+        "business_owner",
+        "evidence_status"
+      ],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "business_owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_status": {
+          "enum": [
+            "observed",
+            "synthetic_observation",
+            "confirmed",
+            "inferred",
+            "recommended",
+            "unavailable"
+          ]
+        }
+      }
+    },
+    "authenticatedJourney": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applicable",
+        "discovery_status",
+        "attempted_actions",
+        "evidence",
+        "gap_reason"
+      ],
+      "properties": {
+        "applicable": {
+          "type": "boolean"
+        },
+        "discovery_status": {
+          "enum": [
+            "not_applicable",
+            "not_attempted",
+            "public_entry_observed",
+            "synthetic_signup_observed",
+            "authenticated_observed",
+            "client_confirmed",
+            "attempted_blocked"
+          ]
+        },
+        "attempted_actions": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "evidence": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "gap_reason": {
+          "type": "string"
+        }
+      }
+    },
+    "userContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "data_layer_object",
+        "push_timing",
+        "ga4_user_id",
+        "user_properties",
+        "advertising_user_data"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_applicable",
+            "planned",
+            "observed",
+            "confirmed"
+          ]
+        },
+        "data_layer_object": {
+          "type": "string",
+          "minLength": 1
+        },
+        "push_timing": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "ga4_user_id": {
+          "$ref": "#/$defs/ga4UserIdMapping"
+        },
+        "user_properties": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/userPropertyMapping"
+          }
+        },
+        "advertising_user_data": {
+          "$ref": "#/$defs/advertisingUserData"
+        }
+      }
+    },
+    "ga4UserIdMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "source_path",
+        "signed_out_behavior",
+        "mapping_rule"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "source_path": {
+          "type": "string"
+        },
+        "signed_out_behavior": {
+          "enum": [
+            "omit_until_known",
+            "set_null_on_logout",
+            "not_applicable"
+          ]
+        },
+        "mapping_rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "userPropertyMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter_name",
+        "source_path",
+        "allowed_values",
+        "register_in_ga4"
+      ],
+      "properties": {
+        "parameter_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allowed_values": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "register_in_ga4": {
+          "type": "boolean"
+        }
+      }
+    },
+    "advertisingUserData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "data_layer_object",
+        "destination",
+        "fields",
+        "consent_requirements",
+        "handling_rule"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_applicable",
+            "planned",
+            "observed",
+            "confirmed"
+          ]
+        },
+        "data_layer_object": {
+          "type": "string"
+        },
+        "destination": {
+          "enum": [
+            "not_applicable",
+            "google_ads_only",
+            "other_non_ga4"
+          ]
+        },
+        "fields": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "consent_requirements": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "handling_rule": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },

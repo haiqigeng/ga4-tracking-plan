@@ -87,6 +87,18 @@ not submit forms, log in, place orders, or mutate live state. Treat
 credential-gated or payment-like journeys as `needs_discovery`, `blocked`, or
 `skip_allowed` unless approved test access exists.
 
+## Authenticated Journey Default
+
+Unless the user explicitly opts out, treat synthetic account creation and
+customer-space exploration as consented when public self-registration is
+available. Use synthetic information and investigate signup, login, account,
+order, return, wishlist, preference, loyalty, and reorder paths. Record this as
+synthetic account exploration. Do not omit these journeys merely because no
+credentials were supplied. When the environment cannot complete the flow,
+document the concrete coverage gap and required follow-up. Do not create
+implementation events for inaccessible capabilities unless they are observed
+or client-confirmed.
+
 ## Playwright Decision
 
 Use Playwright or equivalent browser exploration when:

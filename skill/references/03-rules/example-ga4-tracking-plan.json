@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.0.0",
+  "schema_version": "2.1.0",
   "plan_id": "generic_ecommerce_homepage",
   "execution_context": {
     "execution_mode": "greenfield_best_practice",
@@ -24,7 +24,7 @@
       "mode": "default_skill_template",
       "template_source": "assets/ga4_tracking_plan_template.xlsx",
       "preservation_requirements": [
-        "Keep default five-sheet workbook structure stable."
+        "Keep default six-sheet workbook structure stable."
       ],
       "allowed_changes": [
         "Populate rows and screenshot evidence rows from the structured plan."
@@ -208,12 +208,16 @@
         "business_reason": "Measure account demand before authentication success without misusing the official login or sign_up events.",
         "required_parameters": [
           "cta_location",
-          "cta_text",
-          "login_status"
+          "cta_text"
         ],
         "registration_notes": "Register cta_location and cta_text only if account-entry performance is needed in GA4 reports or audiences."
       }
     ],
+    "lead_event_model": {
+      "mode": "not_applicable",
+      "rationale": "The selected homepage fixture has no completed lead-generation outcome.",
+      "outcome_mappings": []
+    },
     "scalability_notes": [
       "Reuse the same homepage discovery event families for future home, landing, or campaign-entry pages when the trigger and parameter structure match.",
       "Use controlled lowercase ASCII snake_case values for component, content, and CTA parameters so future French labels remain reportable."
@@ -269,6 +273,17 @@
         "recommended_next_step": "Add separate journeys and coverage evidence for PLP, PDP, cart, checkout, confirmation, and refund flows."
       }
     ],
+    "authenticated_journey": {
+      "applicable": true,
+      "discovery_status": "public_entry_observed",
+      "attempted_actions": [
+        "review public account entry point"
+      ],
+      "evidence": [
+        "Representative homepage account-access link"
+      ],
+      "gap_reason": "Authentication and customer-space pages are outside the selected homepage fixture scope."
+    },
     "playwright_recommendation": {
       "status": "not_needed",
       "reason": "The fixture validates a selected homepage template, not a dynamic whole-site crawl."
@@ -298,6 +313,56 @@
         "decision_reason": "Cart, checkout, and product-listing journeys are intentionally outside this fixture."
       }
     ]
+  },
+  "user_context": {
+    "status": "planned",
+    "data_layer_object": "user_context",
+    "push_timing": [
+      "initial page load when authentication state is known",
+      "immediately after successful login",
+      "immediately after logout"
+    ],
+    "ga4_user_id": {
+      "enabled": true,
+      "source_path": "user_context.user_id",
+      "signed_out_behavior": "set_null_on_logout",
+      "mapping_rule": "Map only to the Google tag user_id setting. Do not send it as an event parameter, user property, or custom dimension."
+    },
+    "user_properties": [
+      {
+        "parameter_name": "login_status",
+        "source_path": "user_context.login_status",
+        "allowed_values": [
+          "logged_in",
+          "logged_out"
+        ],
+        "register_in_ga4": true
+      },
+      {
+        "parameter_name": "customer_status",
+        "source_path": "user_context.customer_status",
+        "allowed_values": [
+          "new",
+          "returning",
+          "unknown"
+        ],
+        "register_in_ga4": true
+      },
+      {
+        "parameter_name": "account_type",
+        "source_path": "user_context.account_type",
+        "allowed_values": [],
+        "register_in_ga4": true
+      }
+    ],
+    "advertising_user_data": {
+      "status": "not_applicable",
+      "data_layer_object": "",
+      "destination": "not_applicable",
+      "fields": [],
+      "consent_requirements": [],
+      "handling_rule": "Direct identifiers are not sent to GA4. Define them only in a separate advertising implementation when explicitly required and approved."
+    }
   },
   "events": [
     {
@@ -404,10 +469,10 @@
       "key_event": false,
       "priority": "should",
       "parameters": [
-        "promotion_id",
-        "promotion_name",
         "creative_name",
         "creative_slot",
+        "promotion_id",
+        "promotion_name",
         "items",
         "items[].item_id",
         "items[].item_name"
@@ -474,11 +539,10 @@
         "profile_id": "promotion_profile",
         "profile_source": "skill/scripts/ecommerce_matrix.py official GA4 ecommerce profile",
         "canonical_parameter_order": [
-          "currency",
-          "promotion_id",
-          "promotion_name",
           "creative_name",
           "creative_slot",
+          "promotion_id",
+          "promotion_name",
           "items",
           "items[].item_id",
           "items[].item_name",
@@ -536,10 +600,10 @@
       "key_event": false,
       "priority": "should",
       "parameters": [
-        "promotion_id",
-        "promotion_name",
         "creative_name",
         "creative_slot",
+        "promotion_id",
+        "promotion_name",
         "items",
         "items[].item_id",
         "items[].item_name"
@@ -606,11 +670,10 @@
         "profile_id": "promotion_profile",
         "profile_source": "skill/scripts/ecommerce_matrix.py official GA4 ecommerce profile",
         "canonical_parameter_order": [
-          "currency",
-          "promotion_id",
-          "promotion_name",
           "creative_name",
           "creative_slot",
+          "promotion_id",
+          "promotion_name",
           "items",
           "items[].item_id",
           "items[].item_name",
@@ -828,8 +891,7 @@
       "priority": "could",
       "parameters": [
         "cta_location",
-        "cta_text",
-        "login_status"
+        "cta_text"
       ],
       "data_layer": {
         "event_key": "account_access_intent",
@@ -841,9 +903,6 @@
           "event_data": {
             "cta_location": "%cta_location%",
             "cta_text": "%normalized_cta_text%"
-          },
-          "user_data": {
-            "login_status": "%login_status%"
           }
         },
         "mapping_notes": "Use the official login event only when a login actually succeeds."
@@ -852,8 +911,7 @@
         "event_name": "account_access_intent",
         "parameters": {
           "cta_location": "header | menu",
-          "cta_text": "%normalized_cta_text%",
-          "login_status": "logged | not_logged | unknown"
+          "cta_text": "%normalized_cta_text%"
         },
         "items": []
       },
@@ -1375,20 +1433,45 @@
       "data_owner": "Web analyst and development team"
     },
     {
+      "parameter_name": "user_id",
+      "display_name": "GA4 User ID",
+      "scope": "implementation",
+      "type": "string",
+      "classification": "implementation_variable",
+      "required": "conditional",
+      "description": "Opaque stable authenticated identifier mapped only to the GA4 User-ID configuration setting.",
+      "reporting_purpose": "Supports cross-session and cross-device signed-in journey analysis through GA4 User-ID.",
+      "value_rules": "Use a stable non-PII internal identifier. Omit before sign-in and set null after logout. Never use email or register this value as a custom dimension.",
+      "example_value": "usr_7f3a91",
+      "allowed_values": [],
+      "source": "authentication backend",
+      "register_custom_definition": false,
+      "cardinality_risk": "high",
+      "pii_risk": "medium",
+      "consent_dependency": "analytics_storage and organization-approved User-ID policy",
+      "official_verification": {
+        "status": "verified",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/user-id",
+        "checked_date": "2026-07-11",
+        "scope_note": "Official GA4 User-ID configuration behavior and logout clearing rule verified."
+      },
+      "availability": "requires_development",
+      "data_owner": "Authentication and analytics teams"
+    },
+    {
       "parameter_name": "login_status",
       "display_name": "Login status",
-      "scope": "event",
+      "scope": "user",
       "type": "string",
-      "classification": "custom_event_parameter",
+      "classification": "custom_user_property",
       "required": "optional",
       "description": "Known anonymous login state.",
-      "reporting_purpose": "Segments account-access intent by approved login state.",
-      "value_rules": "Use logged | not_logged | unknown.",
-      "example_value": "not_logged",
+      "reporting_purpose": "Segments GA4 users and journeys by the current authenticated state.",
+      "value_rules": "Use logged_in | logged_out and update immediately after login or logout.",
+      "example_value": "logged_out",
       "allowed_values": [
-        "logged",
-        "not_logged",
-        "unknown"
+        "logged_in",
+        "logged_out"
       ],
       "source": "site authentication state",
       "register_custom_definition": true,
@@ -1397,12 +1480,68 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "not_applicable",
-        "source_url": "https://support.google.com/analytics/answer/13316687",
-        "checked_date": "2026-06-29",
-        "scope_note": "Custom analytics parameter login_status; governed by GA4 naming and registration rules."
+        "source_url": "https://developers.google.com/analytics/devguides/collection/protocol/ga4/user-properties",
+        "checked_date": "2026-07-11",
+        "scope_note": "Custom GA4 user property governed by official user-property behavior and registration rules."
       },
       "availability": "to_confirm",
       "data_owner": "Web analyst and development team"
+    },
+    {
+      "parameter_name": "customer_status",
+      "display_name": "Customer status",
+      "scope": "user",
+      "type": "string",
+      "classification": "custom_user_property",
+      "required": "optional",
+      "description": "Low-cardinality customer lifecycle group available after authentication.",
+      "reporting_purpose": "Segments authenticated journey and retention analysis by new or returning customer status.",
+      "value_rules": "Use new | returning | unknown from an approved backend rule.",
+      "example_value": "returning",
+      "allowed_values": [
+        "new",
+        "returning",
+        "unknown"
+      ],
+      "source": "customer account backend",
+      "register_custom_definition": true,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "not_applicable",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/protocol/ga4/user-properties",
+        "checked_date": "2026-07-11",
+        "scope_note": "Custom GA4 user property with project-defined controlled values."
+      },
+      "availability": "to_confirm",
+      "data_owner": "CRM and analytics teams"
+    },
+    {
+      "parameter_name": "account_type",
+      "display_name": "Account type",
+      "scope": "user",
+      "type": "string",
+      "classification": "custom_user_property",
+      "required": "optional",
+      "description": "Optional low-cardinality account category when the business has stable account types.",
+      "reporting_purpose": "Supports authenticated journey segmentation by a governed account category.",
+      "value_rules": "Use a small English controlled taxonomy defined by the business; omit when no meaningful account categories exist.",
+      "example_value": "standard",
+      "allowed_values": [],
+      "source": "customer account backend",
+      "register_custom_definition": true,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "analytics_storage",
+      "official_verification": {
+        "status": "not_applicable",
+        "source_url": "https://developers.google.com/analytics/devguides/collection/protocol/ga4/user-properties",
+        "checked_date": "2026-07-11",
+        "scope_note": "Optional custom GA4 user property with project-defined controlled values."
+      },
+      "availability": "to_confirm",
+      "data_owner": "CRM and analytics teams"
     }
   ],
   "not_tracked": [

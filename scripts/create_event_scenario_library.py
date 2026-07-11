@@ -1,6 +1,5 @@
-import html
 import json
-import re
+import sys
 from datetime import date
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -9,6 +8,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SKILL_REFS = ROOT / "skill" / "references" / "03-rules"
 OFFICIAL_JSON = SKILL_REFS / "library-ga4-recommended-events.json"
 LIBRARY_JSON = SKILL_REFS / "library-ga4-event-scenarios.json"
+sys.path.insert(0, str(ROOT / "skill" / "scripts"))
+
+from official_ga4_catalog import parse_catalog_html  # noqa: E402
 
 SOURCES = [
     {
@@ -92,56 +94,10 @@ SOURCES = [
 ]
 
 
-def clean(value):
-    value = re.sub(r"<br\s*/?>", " ", value)
-    value = re.sub(r"</p>|</li>|</td>|</tr>", " ", value)
-    value = re.sub(r"<.*?>", "", value)
-    value = html.unescape(value)
-    return " ".join(value.split())
-
-
 def fetch_recommended_events():
     url = "https://developers.google.com/analytics/devguides/collection/ga4/reference/events"
     text = urlopen(Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=30).read().decode("utf-8", "ignore")
-    sections = []
-    for match in re.finditer(r'<h2[^>]*id="([^"]+)"[^>]*>(.*?)</h2>', text, re.S):
-        sections.append((match.start(), clean(match.group(2))))
-    sections.append((len(text), "END"))
-
-    events = []
-    for match in re.finditer(r'<h3[^>]*id="([^"]+)"[^>]*>\s*<code[^>]*>([^<]+)</code></h3>', text, re.S):
-        event_name = clean(match.group(2))
-        pos = match.start()
-        section_name = ""
-        for i in range(len(sections) - 1):
-            if sections[i][0] <= pos < sections[i + 1][0]:
-                section_name = sections[i][1]
-                break
-        next_positions = []
-        for pattern in [r'<h3[^>]*id="', r'<h2[^>]*id="']:
-            next_match = re.search(pattern, text[match.end() :], re.S)
-            if next_match:
-                next_positions.append(match.end() + next_match.start())
-        end = min(next_positions) if next_positions else len(text)
-        block = text[match.end() : end]
-        description_match = re.search(r"<p>(.*?)</p>", block, re.S)
-        description = clean(description_match.group(1)) if description_match else ""
-        params = []
-        for row in re.findall(r"<tr>(.*?)</tr>", block, re.S):
-            cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.S)
-            if len(cells) >= 5 and clean(cells[0]).lower() != "name":
-                params.append(
-                    {
-                        "name": clean(cells[0]),
-                        "type": clean(cells[1]),
-                        "required": clean(cells[2]),
-                        "example": clean(cells[3]),
-                        "description": clean(cells[4]),
-                    }
-                )
-        events.append({"event": event_name, "group": section_name, "description": description, "parameters": params})
-    updated_match = re.search(r"Last updated\s+(\d{4}-\d{2}-\d{2})\s+UTC", text)
-    return events, updated_match.group(1) if updated_match else ""
+    return parse_catalog_html(text)
 
 
 STANDARD_EVENTS = [
@@ -296,6 +252,62 @@ TYPICAL_CUSTOM_EVENTS = [
         "parameters": "sort_type, previous_sort_type, result_count, listing_type",
     },
     {
+        "event": "header_click",
+        "scenario": "whole-site header and utility navigation",
+        "use_when": "Client reporting separates header navigation from menus, content, and footer links.",
+        "prefer_official_if": "Use select_content only for actual content objects or an approved consolidated client convention.",
+        "parameters": "link_name, link_url, navigation_group, link_position",
+    },
+    {
+        "event": "menu_click",
+        "scenario": "whole-site top-level navigation",
+        "use_when": "Top-level menu choices need direct navigation reporting.",
+        "prefer_official_if": "Use select_item for product tiles and select_content for actual content objects.",
+        "parameters": "link_name, link_url, navigation_group, link_position",
+    },
+    {
+        "event": "submenu_click",
+        "scenario": "whole-site nested navigation",
+        "use_when": "Second-level or deeper menu choices need to be distinguished from top-level navigation.",
+        "prefer_official_if": "Use a consolidated client navigation convention when menu depth has no analysis value.",
+        "parameters": "link_name, link_url, navigation_group, navigation_level",
+    },
+    {
+        "event": "footer_click",
+        "scenario": "whole-site footer navigation",
+        "use_when": "Footer collection, service, legal, or social navigation needs separate reporting.",
+        "prefer_official_if": "Use enhanced outbound click when destination-only reporting is sufficient.",
+        "parameters": "link_name, link_url, navigation_group, link_position",
+    },
+    {
+        "event": "payment_error",
+        "scenario": "ecommerce or paid booking checkout",
+        "use_when": "A payment attempt is refused or fails before confirmed purchase.",
+        "prefer_official_if": "Use purchase only after confirmed order success; no official GA4 payment-failure event exists.",
+        "parameters": "journey_step, error_type, error_code, payment_type, retry_number",
+    },
+    {
+        "event": "newsletter_subscribe",
+        "scenario": "newsletter and permissioned audience acquisition",
+        "use_when": "A newsletter subscription is confirmed and the client reports it separately from commercial leads.",
+        "prefer_official_if": "Use generate_lead only when newsletter and other lead outcomes intentionally share one KPI and owner.",
+        "parameters": "form_name, lead_source, subscription_type",
+    },
+    {
+        "event": "contact_submit",
+        "scenario": "contact and customer-service forms",
+        "use_when": "A contact request is confirmed and needs reporting separate from other lead outcomes.",
+        "prefer_official_if": "Use generate_lead when the contact submission is intentionally governed as the same lead KPI.",
+        "parameters": "form_name, contact_method, support_topic, lead_source",
+    },
+    {
+        "event": "catalog_request",
+        "scenario": "retail, publishing, travel, and mailed catalogue acquisition",
+        "use_when": "A catalogue request is confirmed and fulfilment or acquisition reporting is distinct.",
+        "prefer_official_if": "Use generate_lead when catalogue and other lead outcomes intentionally share one KPI.",
+        "parameters": "form_name, lead_source, catalog_type",
+    },
+    {
         "event": "contact_intent",
         "scenario": "lead generation, support, local business",
         "use_when": "User clicks a contact CTA but does not submit a lead form.",
@@ -308,6 +320,55 @@ TYPICAL_CUSTOM_EVENTS = [
         "use_when": "User clicks account/login entry point before authentication.",
         "prefer_official_if": "Use login after successful authentication.",
         "parameters": "entry_point, cta_location, destination_url",
+    },
+    {
+        "event": "view_order_history",
+        "scenario": "authenticated ecommerce customer space",
+        "use_when": "Order-history usage is a meaningful self-service KPI and typed page_view reporting is insufficient.",
+        "prefer_official_if": "Use page_view with governed page typing when it answers the same question.",
+        "parameters": "account_section, order_count_bucket",
+    },
+    {
+        "event": "view_order",
+        "scenario": "authenticated ecommerce order detail",
+        "use_when": "A customer views an order detail and the action needs separate self-service analysis.",
+        "prefer_official_if": "Use page_view with governed page typing when separate event reporting is unnecessary.",
+        "parameters": "account_section, order_status, order_age_bucket",
+    },
+    {
+        "event": "start_return",
+        "scenario": "authenticated ecommerce returns",
+        "use_when": "A customer starts a return workflow before any refund is completed.",
+        "prefer_official_if": "Use refund only when the financial or item refund is completed.",
+        "parameters": "return_scope, order_age_bucket, eligibility_status",
+    },
+    {
+        "event": "cancel_order",
+        "scenario": "ecommerce post-purchase customer service",
+        "use_when": "The commerce backend confirms cancellation of an existing order.",
+        "prefer_official_if": "Use refund separately when money or items are actually refunded.",
+        "parameters": "transaction_id, cancellation_stage, cancellation_reason",
+    },
+    {
+        "event": "update_profile",
+        "scenario": "authenticated customer profile",
+        "use_when": "A profile update is confirmed and self-service completion is analytically useful.",
+        "prefer_official_if": "Omit the event when the change has no actionable analysis need.",
+        "parameters": "profile_field_group",
+    },
+    {
+        "event": "update_preferences",
+        "scenario": "authenticated communication or service preferences",
+        "use_when": "A governed preference change is confirmed and approved for analytics collection.",
+        "prefer_official_if": "Omit the event when consent or privacy governance does not permit collection.",
+        "parameters": "preference_type, preference_state",
+    },
+    {
+        "event": "password_reset",
+        "scenario": "account recovery",
+        "use_when": "Password recovery completes and access-resolution analysis is needed.",
+        "prefer_official_if": "Use login when successful authentication alone sufficiently measures recovery.",
+        "parameters": "method",
     },
     {
         "event": "chat_start",
@@ -388,17 +449,17 @@ SCENARIOS = [
         "scenario": "Lead generation",
         "website_examples": "insurance, banking, B2B services, SaaS demo, contact forms",
         "official_events": "page_view, search, form_start, form_submit, generate_lead, qualify_lead, disqualify_lead, working_lead, close_convert_lead, close_unconvert_lead",
-        "typical_custom_events": "begin_quote, form_step_view, form_step_submit, form_error, contact_intent, calculator_start, calculator_complete",
+        "typical_custom_events": "begin_quote, form_step_view, form_step_submit, form_error, newsletter_subscribe, contact_submit, catalog_request, contact_intent, calculator_start, calculator_complete",
         "primary_parameters": "lead_source, form_name, form_step, product_type, quote_entry_point, cta_location",
-        "notes": "Use generate_lead only after a valid submission or qualified lead action, not on CTA click.",
+        "notes": "Use generate_lead only after a valid submission or qualified lead action. Prefer dedicated success events when newsletter, contact, catalogue, or other outcomes have distinct owners and reporting.",
     },
     {
         "scenario": "Retail ecommerce",
         "website_examples": "DTC store, marketplace, merchandising site",
         "official_events": "view_item_list, select_item, view_item, add_to_wishlist, add_to_cart, remove_from_cart, view_cart, begin_checkout, add_shipping_info, add_payment_info, purchase, refund",
-        "typical_custom_events": "filter_apply, sort_apply, size_guide_open, stock_alert_signup",
-        "primary_parameters": "currency, value, transaction_id, items, items[].item_id, items[].item_name, items[].item_category, items[].price, items[].quantity",
-        "notes": "Use official ecommerce event names and items array. Clear ecommerce object before ecommerce pushes when using GTM/dataLayer.",
+        "typical_custom_events": "filter_apply, sort_apply, size_guide_open, stock_alert_signup, payment_error, view_order_history, view_order, start_return, cancel_order, update_profile, update_preferences, password_reset",
+        "primary_parameters": "currency, value, transaction_id, items, items[].item_id, items[].item_name, items[].item_category, items[].item_variant, items[].availability_status, items[].price, items[].quantity",
+        "notes": "Use official ecommerce event names and items array. Clear ecommerce before pushes. Use custom item availability on view_item when variant shortage matters, and on view_cart only for persistent carts with live inventory. Keep confirmed cancellation separate from official refund completion.",
     },
     {
         "scenario": "Internal promotions / offer cards",
@@ -436,8 +497,8 @@ SCENARIOS = [
         "scenario": "Support / customer service",
         "website_examples": "help center, claims, account support, chat",
         "official_events": "page_view, search, select_content, file_download, login",
-        "typical_custom_events": "contact_intent, chat_start, claim_intent, account_access_intent, support_article_helpful",
-        "primary_parameters": "support_topic, contact_method, entry_point, content_id, content_name",
+        "typical_custom_events": "contact_intent, chat_start, claim_intent, account_access_intent, view_order_history, view_order, start_return, cancel_order, update_profile, update_preferences, password_reset, support_article_helpful",
+        "primary_parameters": "support_topic, contact_method, entry_point, content_id, content_name, account_section, order_status, return_scope",
         "notes": "Do not send claim descriptions, policy numbers, email, phone, or chat text to GA4.",
     },
     {

@@ -46,7 +46,7 @@ class ScreenshotEvidenceTests(unittest.TestCase):
             plan["screenshot_evidence"][0].update({"status": "captured", "file_name": "page.png"})
             plan["screenshot_evidence"][1].update({"status": "captured", "file_name": "promotion.png"})
             workbook = build_workbook(plan, screenshot_dir=folder, preview_dir=folder / "previews")
-            images = workbook["04 Screenshot Register"]._images
+            images = workbook["05 Screenshot Register"]._images
             self.assertEqual(len(images), 2)
             self.assertEqual({(image.width, image.height) for image in images}, {(PREVIEW_WIDTH, PREVIEW_HEIGHT)})
 

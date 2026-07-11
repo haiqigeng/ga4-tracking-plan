@@ -8,6 +8,7 @@ import sys
 import tempfile
 import zipfile
 from pathlib import Path
+from xml.etree import ElementTree
 
 from jsonschema import Draft202012Validator
 from openpyxl import load_workbook
@@ -32,6 +33,7 @@ REQUIRED_FILES = {
     RULES / "execution-contract.md",
     RULES / "completion-gates.md",
     RULES / "policy-ga4-boundaries.md",
+    RULES / "policy-authenticated-user-context.md",
     RULES / "library-ga4-event-scenarios.json",
     RULES / "library-ga4-recommended-events.json",
     RULES / "library-parameters.json",
@@ -43,11 +45,19 @@ REQUIRED_FILES = {
     SKILL / "scripts" / "validate_tracking_plan.py",
     SKILL / "scripts" / "generate_tracking_plan_workbook.py",
     SKILL / "scripts" / "tracking_plan_screenshots.py",
+    SKILL / "scripts" / "tracking_plan_validation_common.py",
+    SKILL / "scripts" / "tracking_plan_validation_delivery.py",
+    SKILL / "scripts" / "tracking_plan_validation_event_rules.py",
+    SKILL / "scripts" / "official_ga4_catalog.py",
+    SKILL / "scripts" / "inspect_tracking_plan_template.py",
+    SKILL / "scripts" / "adapt_tracking_plan_workbook.py",
     SKILL / "scripts" / "check_official_catalog.py",
     SKILL / "scripts" / "migrate_tracking_plan.py",
+    ROOT / "scripts" / "inspect_tracking_plan_template.py",
+    ROOT / "scripts" / "adapt_tracking_plan_workbook.py",
 }
 
-EXPECTED_TABS = ["00 Overview", "01 GTM Protocol", "02 Parameter Reference", "03 Event Matrix", "04 Screenshot Register"]
+EXPECTED_TABS = ["00 Overview", "01 GTM Protocol", "02 Parameter Reference", "03 Event Matrix", "04 DataLayer Examples", "05 Screenshot Register"]
 TEXT_SUFFIXES = {".md", ".py", ".json", ".yaml", ".yml", ".toml", ".txt", ".ps1"}
 BANNED_PATH_PARTS = {"deliverables", "generated", "release", "tracking-plan-corpus-analysis", "__pycache__"}
 SECRET_PATTERNS = {
@@ -125,8 +135,8 @@ def check_schema_and_fixture() -> None:
     errors = sorted(Draft202012Validator(schema).iter_errors(fixture), key=lambda item: list(item.path))
     if errors:
         fail("Generic GA4 fixture does not match schema:\n" + "\n".join(error.message for error in errors))
-    if fixture.get("schema_version") != "2.0.0":
-        fail("Generic fixture must use schema_version 2.0.0")
+    if fixture.get("schema_version") != "2.1.0":
+        fail("Generic fixture must use schema_version 2.1.0")
     event_ids = {event["event_id"] for event in fixture["events"]}
     covered = {event_id for evidence in fixture["screenshot_evidence"] for event_id in evidence["event_ids"]}
     if event_ids != covered:
@@ -213,12 +223,26 @@ def check_workbook(path: Path) -> None:
             fail(f"Parameter Reference is missing {expected}")
 
     matrix = wb["03 Event Matrix"]
+    if matrix.freeze_panes != "C6" or not str(matrix.auto_filter.ref).startswith("A5:F"):
+        fail("Event Matrix must keep its parameter columns frozen and all event slots filterable")
     matrix_text = " ".join(str(cell.value) for row in matrix.iter_rows() for cell in row if cell.value is not None)
     for forbidden in ("event_id", "qa_id", "screenshot_id", "primary_platform"):
         if forbidden in matrix_text:
             fail(f"Event Matrix exposes internal field {forbidden}")
 
-    screenshot_headers = [cell.value for cell in wb["04 Screenshot Register"][3]]
+    datalayer_headers = [cell.value for cell in wb["04 DataLayer Examples"][3]]
+    expected_datalayer_headers = ["Journey", "Event", "Evidence", "Trigger", "dataLayer.push example", "GTM and GA4 mapping", "Implementation notes"]
+    if datalayer_headers[:7] != expected_datalayer_headers:
+        fail(f"Unexpected DataLayer Examples headers: {datalayer_headers}")
+    if wb["04 DataLayer Examples"].freeze_panes != "A4" or not str(wb["04 DataLayer Examples"].auto_filter.ref).startswith("A3:G"):
+        fail("DataLayer Examples must keep headers frozen and all seven columns filterable")
+
+    datalayer_text = " ".join(str(cell.value) for row in wb["04 DataLayer Examples"].iter_rows() for cell in row if cell.value is not None)
+    for event in load_json(FIXTURE)["events"]:
+        if event["event_name"] not in datalayer_text:
+            fail(f"DataLayer Examples is missing event {event['event_name']}")
+
+    screenshot_headers = [cell.value for cell in wb["05 Screenshot Register"][3]]
     expected_headers = ["Journey", "Event(s)", "Screenshot preview", "Page / component", "URL / route", "Capture objective", "Status", "Notes"]
     if screenshot_headers[:8] != expected_headers:
         fail(f"Unexpected Screenshot Register headers: {screenshot_headers}")
@@ -257,8 +281,8 @@ def check_migration() -> None:
         source.write_text(json.dumps(legacy), encoding="utf-8")
         run([sys.executable, "-B", "scripts/migrate_tracking_plan.py", str(source), "--output", str(output)], "Contract migration")
         migrated = load_json(output)
-        if migrated.get("schema_version") != "2.0.0" or "analytics_platforms" in migrated or "qa_cases" in migrated:
-            fail("Contract migration did not produce a clean v2 plan")
+        if migrated.get("schema_version") != "2.1.0" or "analytics_platforms" in migrated or "qa_cases" in migrated:
+            fail("Contract migration did not produce a clean v2.1 plan")
 
 
 def check_release_package() -> None:
@@ -283,6 +307,9 @@ def check_privacy_and_cleanliness() -> None:
             continue
         if any(part in BANNED_PATH_PARTS - {"__pycache__"} for part in relative.parts):
             fail(f"Repository contains generated or release-only path: {relative}")
+        if path.suffix.lower() == ".xlsx":
+            check_xlsx_privacy(path, relative)
+            continue
         if path.suffix.lower() not in TEXT_SUFFIXES:
             continue
         raw = path.read_bytes()
@@ -295,6 +322,36 @@ def check_privacy_and_cleanliness() -> None:
                 if value in {"GTM-XXXX", "GTM-XXXXXX", "G-XXXXXXXXXX"}:
                     continue
                 fail(f"Potential {label} in {relative}: {value[:24]}")
+
+
+def check_xlsx_privacy(path: Path, relative: Path) -> None:
+    workbook = load_workbook(path, read_only=False, data_only=False)
+    hidden = [sheet.title for sheet in workbook.worksheets if sheet.sheet_state != "visible"]
+    if hidden:
+        fail(f"Workbook contains hidden sheets in {relative}: {', '.join(hidden)}")
+    with zipfile.ZipFile(path) as archive:
+        names = archive.namelist()
+        if any("externalLinks" in name for name in names):
+            fail(f"Workbook contains external links: {relative}")
+        for name in names:
+            if not name.endswith((".xml", ".rels")):
+                continue
+            text = archive.read(name).decode("utf-8", errors="ignore")
+            if name.endswith(".rels") and 'TargetMode="External"' in text:
+                relationships = ElementTree.fromstring(text)
+                blocked = [
+                    item.get("Target", "")
+                    for item in relationships
+                    if item.get("TargetMode") == "External" and not item.get("Type", "").endswith("/hyperlink")
+                ]
+                if blocked:
+                    fail(f"Workbook contains an external data relationship in {relative}: {blocked[0]}")
+            for label, pattern in SECRET_PATTERNS.items():
+                for match in pattern.finditer(text):
+                    value = match.group(0)
+                    if value in {"GTM-XXXX", "GTM-XXXXXX", "G-XXXXXXXXXX"}:
+                        continue
+                    fail(f"Potential {label} in {relative} ({name}): {value[:24]}")
 
 
 CHECKS = [

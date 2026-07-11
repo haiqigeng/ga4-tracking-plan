@@ -44,6 +44,10 @@ and apply `references/03-rules/completion-gates.md` before delivery.
   it answers a business or diagnostic need that official events do not cover.
 - Consolidate events when trigger logic, parameter structure, and business
   meaning are materially the same. Use controlled values for variants.
+- For navigation, follow a coherent client convention when one exists.
+  Otherwise, prefer separate reusable surface events such as `header_click`,
+  `menu_click`, `submenu_click`, and `footer_click` for whole-site plans. Keep
+  `select_content` for actual content objects, not as a universal click event.
 - Group related journey events together in the Event Matrix.
 - Keep ecommerce events in the official GA4 ecommerce model and separate them
   from ordinary interaction events.
@@ -53,8 +57,42 @@ and apply `references/03-rules/completion-gates.md` before delivery.
 - Use lowercase ASCII `snake_case` without accents for controlled business
   values. Preserve official IDs, ISO codes, numeric values, URLs, and safe raw
   values when required.
+- For multilingual websites, keep controlled analytics values in English across
+  markets. Exhaust finite values observed on the website and present them as
+  `value_1 | value_2 | value_3` in human output. Use rules rather than lists for
+  dynamic or high-cardinality values.
+- Unless the user explicitly opts out, use synthetic information to explore
+  publicly available signup and authenticated customer journeys when possible.
+  If access remains impossible, record the concrete coverage gap. Do not turn
+  inaccessible customer-space capabilities into implementation events unless
+  they are observed or client-confirmed.
+- Consider variant availability on `view_item` when users switch among variants
+  and shortage affects analysis. Do not add it by default to list, selection,
+  or add-to-cart events. Use it on `view_cart` only for a documented persistent-
+  cart, live-inventory use case.
+- Model payment refusal or failure as an explicit diagnostic branch after
+  `add_payment_info`; never use `purchase` for unsuccessful payment attempts.
+- Treat `generate_lead` as a consolidation option, not a universal form-success
+  event. Keep it when lead outcomes share business meaning, ownership, and
+  reporting; otherwise use distinct governed success events such as
+  `newsletter_subscribe`, `contact_submit`, or `catalog_request`. Do not send
+  both models for the same success unless duplicate measurement is explicitly
+  required and governed.
+- For whole-site scope, continue beyond `login` and `sign_up` into meaningful
+  authenticated customer-space outcomes. Consider order history and detail,
+  returns, confirmed order cancellation, profile and preference updates,
+  password recovery, wishlist, and reorder according to observed capabilities
+  and analysis needs. Use official ecommerce events where their semantics fit.
+- Use custom `cancel_order` only after the commerce backend confirms an order
+  cancellation. Use official `refund` separately when money or items are
+  actually refunded; cancellation and refund are not interchangeable.
 - Highlight PII, sensitive, consent-dependent, and high-cardinality fields.
   Do not silently place direct personal data in ordinary GA4 parameters.
+- For connected visitors, specify one shared `user_context` state object in
+  GTM Protocol and its fields in Parameter Reference. Map an opaque `user_id`
+  only to the Google tag User-ID setting; use approved low-cardinality fields
+  such as `login_status` as GA4 user properties. Keep separately governed
+  advertising `user_data` outside GA4.
 - Treat Universal Analytics and its fields as legacy evidence only. Never
   propose UA schema in a GA4 plan.
 - Make the XLSX readable for web analysts and developers. Keep internal
@@ -69,6 +107,10 @@ and apply `references/03-rules/completion-gates.md` before delivery.
 - Item parameters: https://developers.google.com/analytics/devguides/collection/ga4/item-scoped-ecommerce
 - Event naming: https://support.google.com/analytics/answer/13316687
 - GTM dataLayer: https://developers.google.com/tag-platform/tag-manager/datalayer
+- GA4 User-ID: https://developers.google.com/analytics/devguides/collection/ga4/user-id
+- GA4 user properties: https://developers.google.com/analytics/devguides/collection/protocol/ga4/user-properties
+- Consent mode: https://developers.google.com/tag-platform/security/guides/consent
+- PII policy: https://support.google.com/analytics/answer/6366371
 - Universal Analytics sunset: https://support.google.com/analytics/answer/11583528
 
 Bundled catalogs are lookup aids. If live documentation cannot be checked,
@@ -91,7 +133,9 @@ mark official verification unavailable instead of claiming it was performed.
 7. Design reusable parameters with value rules, reporting purpose,
    availability, owner, custom-definition need, privacy, and cardinality.
 8. Specify the dataLayer push and GA4 payload needed by developers. Keep the
-   pushed `event` value and GA4 event name aligned.
+   pushed `event` value and GA4 event name aligned. Provide one complete,
+   human-readable implementation example per event and use Google's official
+   `event + ecommerce + items` GTM structure for ecommerce.
 9. Create explicit screenshot-evidence rows. Link every row to one or more
    event IDs, state the capture objective, and use an explicit skip or
    not-needed reason when appropriate. Never guess evidence from filenames.
@@ -111,7 +155,7 @@ mark official verification unavailable instead of claiming it was performed.
 | Ecommerce | `references/03-rules/scenario-ecommerce.md`, `references/03-rules/policy-ga4-ecommerce-parameters.md` |
 | Lead, search, account, support, SPA | Matching `references/03-rules/scenario-*.md` file |
 | Subscription, publisher, booking, donation, SaaS, multi-market | Matching `references/03-rules/scenario-*.md` file |
-| Parameters, privacy, platform boundaries | `references/03-rules/library-parameters.json`, `references/03-rules/policy-data-quality-privacy.md`, `references/03-rules/policy-ga4-boundaries.md` |
+| Parameters, privacy, connected users, platform boundaries | `references/03-rules/library-parameters.json`, `references/03-rules/policy-data-quality-privacy.md`, `references/03-rules/policy-authenticated-user-context.md`, `references/03-rules/policy-ga4-boundaries.md` |
 | Historical examples | `references/03-rules/review-official-first.md`, `references/03-rules/review-example-comparison.md`, `references/03-rules/review-corpus-learning-policy.md` |
 | Structured contract | `references/03-rules/schema-tracking-plan.json`, `references/03-rules/example-ga4-tracking-plan.json` |
 
@@ -125,12 +169,14 @@ Use the bundled scripts for deterministic work:
 - `discover_site_journeys_playwright.py`: rendered-DOM coverage support;
 - `annotate_screenshot.py`: interaction callouts;
 - `check_official_catalog.py`: GA4 catalog freshness;
+- `inspect_tracking_plan_template.py`: client workbook structure inventory;
+- `adapt_tracking_plan_workbook.py`: validated plan rendering into mapped client sheets;
 - `migrate_tracking_plan.py`: v1 to GA4-only v2 contract migration.
 
 ## Workbook Contract
 
 Use `assets/ga4_tracking_plan_template.xlsx` when no client template is supplied.
-Keep five human-facing tabs:
+Keep six human-facing tabs:
 
 - `00 Overview`: document details, navigation, and version history only;
 - `01 GTM Protocol`: shared GTM/dataLayer rules and official links;
@@ -138,7 +184,9 @@ Keep five human-facing tabs:
   rules, examples, availability, ownership, and GA4 registration need;
 - `03 Event Matrix`: the main plan, grouped by journey and compatible event
   family, with one event per slot and one parameter path per row;
-- `04 Screenshot Register`: explicit page or interaction evidence linked to
+- `04 DataLayer Examples`: one complete developer example per event, including
+  GTM trigger, GA4 mapping, reset requirements, and no-manual-push decisions;
+- `05 Screenshot Register`: explicit page or interaction evidence linked to
   events, with standardized embedded previews where files are available.
 
 Do not add audience summaries, template provenance, internal rationale, QA

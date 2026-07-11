@@ -24,7 +24,10 @@ analyst or developer can use.
 
 - Event lists with no business or analysis purpose.
 - Custom events used where GA4 already provides an appropriate event.
+- Unrelated newsletter, contact, catalogue, or lead outcomes hidden inside one
+  generic conversion event without a business decision.
 - Ecommerce events mixed with generic click tracking.
+- Whole-site plans that stop at login and omit useful customer-space services.
 - Parameters with unclear values, source, ownership, or reporting purpose.
 - Tracking plans that invent data the website does not currently expose.
 - Journey events scattered across a workbook.
@@ -36,14 +39,24 @@ analyst or developer can use.
 1. Confirm the website scope, pages, journeys, template, and naming convention.
 2. Understand the business goal, expected actions, analysis needs, and success
    signals.
-3. Map website coverage and distinguish observed evidence from assumptions.
+3. Map website coverage, proactively explore public signup and customer-space
+   journeys with synthetic information, and distinguish evidence from assumptions.
 4. Select GA4 automatic, enhanced-measurement, recommended, and ecommerce
-   events before considering custom events.
-5. Define parameters, value rules, examples, availability, data owners,
+   events before considering custom events. Decide whether form outcomes share
+   `generate_lead` or need separate success events.
+5. Exhaust finite English controlled values where practical, then define
+   parameter rules, examples, availability, data owners,
    privacy risks, and GA4 registration needs.
-6. Specify developer-readable dataLayer and GA4 payload requirements.
-7. Map screenshot evidence explicitly to events.
-8. Generate and validate the XLSX tracking plan.
+6. Specify one complete developer-readable dataLayer and GA4 mapping example
+   per event, using Google's official GTM ecommerce structure.
+7. Define connected-user state once in GTM Protocol when relevant, with GA4
+   User-ID and user-property mappings kept separate from event payloads.
+8. Map screenshot evidence explicitly to events.
+9. Generate and validate the XLSX tracking plan.
+
+For ecommerce customer spaces, the skill considers meaningful order, return,
+cancellation, profile, preference, and reorder outcomes. It keeps confirmed
+order cancellation separate from GA4's official `refund` event.
 
 ## Inputs
 
@@ -61,14 +74,15 @@ them as inferred, and states what must be confirmed.
 
 ## Outputs
 
-The main output is an XLSX workbook with five tabs:
+The main output is an XLSX workbook with six tabs:
 
 - `00 Overview`: document details, navigation, and version history;
 - `01 GTM Protocol`: shared GTM/dataLayer rules and official links;
 - `02 Parameter Reference`: definitions, values, availability, owners, and GA4
   registration needs;
 - `03 Event Matrix`: the main tracking plan grouped by journey;
-- `04 Screenshot Register`: explicit page and interaction evidence.
+- `04 DataLayer Examples`: complete per-event GTM implementation examples;
+- `05 Screenshot Register`: explicit page and interaction evidence.
 
 The skill can also produce validated JSON and a long-format CSV. Machine fields
 remain outside the human Event Matrix.
@@ -137,6 +151,13 @@ Generate the XLSX:
 python scripts/generate_tracking_plan_workbook.py plan.json --output plan.xlsx
 ```
 
+Inspect and use a client workbook template:
+
+```powershell
+python scripts/inspect_tracking_plan_template.py client-template.xlsx --output template-inventory.json
+python scripts/adapt_tracking_plan_workbook.py plan.json client-template.xlsx --mapping sheet-mapping.json --output plan.xlsx
+```
+
 Use explicit screenshots stored beside the plan:
 
 ```powershell
@@ -182,6 +203,8 @@ Before release:
 ruff check .
 python -m compileall -q scripts skill/scripts tests
 python -m unittest discover -s tests
+python -m coverage run --source=skill/scripts -m unittest discover -s tests
+python -m coverage report --include="skill/scripts/validate_tracking_plan.py,skill/scripts/tracking_plan_validation_*.py,skill/scripts/ecommerce_matrix.py,skill/scripts/official_ga4_catalog.py,skill/scripts/generate_tracking_plan_workbook.py,skill/scripts/adapt_tracking_plan_workbook.py,skill/scripts/inspect_tracking_plan_template.py" --fail-under=80
 python scripts/check_official_catalog.py --offline
 python scripts/validate_package.py
 git diff --check
@@ -201,5 +224,7 @@ values only.
 ## Versioning
 
 The GA4-only v2 contract is a breaking change from earlier multi-platform
-drafts. Future minor releases add compatible analyst or scenario improvements;
-patch releases fix documentation, validation, or rendering defects.
+drafts. Schema `2.1.0` adds explicit lead decisions, authenticated-journey
+evidence, and connected-user context. Future minor releases add compatible
+analyst or scenario improvements; patch releases fix documentation,
+validation, or rendering defects.

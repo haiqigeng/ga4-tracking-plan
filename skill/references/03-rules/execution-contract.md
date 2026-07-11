@@ -10,6 +10,7 @@ scope and template
 -> GA4 official-event decisions
 -> parameter availability and ownership
 -> dataLayer and GA4 payload specification
+-> complete per-event developer examples
 -> explicit screenshot evidence mapping
 -> human workbook generation
 -> deterministic validation
@@ -27,9 +28,11 @@ scope and template
 6. State whether each parameter is available, needs development, needs a
    backend source, remains to confirm, or is unavailable, and name its owner.
 7. Keep ecommerce parameters at their official scope and in canonical order.
-8. Map screenshot evidence explicitly to event IDs; never infer evidence from
+8. Exhaust practical finite values, keep multilingual controlled values in
+   English, and provide a complete dataLayer example per event.
+9. Map screenshot evidence explicitly to event IDs; never infer evidence from
    a loosely matching filename.
-9. Generate the XLSX as the main human deliverable and keep internal reasoning
+10. Generate the XLSX as the main human deliverable and keep internal reasoning
    out of visible tabs.
-10. Stop after the tracking plan. Do not perform GTM implementation or runtime
+11. Stop after the tracking plan. Do not perform GTM implementation or runtime
     testing under this skill.

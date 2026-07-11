@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
+
+from official_ga4_catalog import event_parameter_order, load_catalog
 
 ECOMMERCE_GROUP_BY_EVENT = {
     "view_promotion": "Ecommerce promotions",
@@ -59,61 +62,36 @@ PROMOTION_ITEM_PARAMETERS = [
 
 OFFICIAL_ITEM_PARAMETERS = set(COMMON_ITEM_PARAMETERS) | set(PROMOTION_ITEM_PARAMETERS)
 
+CATALOG_PATH = Path(__file__).resolve().parents[1] / "references" / "03-rules" / "library-ga4-recommended-events.json"
+OFFICIAL_CATALOG = load_catalog(CATALOG_PATH)
+
+
+def _event_parameters(event_name: str) -> list[str]:
+    return event_parameter_order(OFFICIAL_CATALOG, event_name)
+
+
+def _merge_event_parameters(*event_names: str) -> list[str]:
+    merged: list[str] = []
+    has_items = False
+    for event_name in event_names:
+        for parameter in _event_parameters(event_name):
+            if parameter == "items":
+                has_items = True
+            elif parameter not in merged:
+                merged.append(parameter)
+    if has_items:
+        merged.append("items")
+    return merged
+
+
 ECOMMERCE_PARAMETERS_BY_GROUP = {
-    "Ecommerce promotions": [
-        "currency",
-        "promotion_id",
-        "promotion_name",
-        "creative_name",
-        "creative_slot",
-        "items",
-        *COMMON_ITEM_PARAMETERS,
-        *PROMOTION_ITEM_PARAMETERS,
-    ],
-    "Ecommerce product lists": [
-        "currency",
-        "item_list_id",
-        "item_list_name",
-        "items",
-        *COMMON_ITEM_PARAMETERS,
-    ],
-    "Ecommerce product detail": [
-        "currency",
-        "value",
-        "items",
-        *COMMON_ITEM_PARAMETERS,
-    ],
-    "Ecommerce cart": [
-        "currency",
-        "value",
-        "items",
-        *COMMON_ITEM_PARAMETERS,
-    ],
-    "Ecommerce checkout": [
-        "currency",
-        "value",
-        "coupon",
-        "shipping_tier",
-        "payment_type",
-        "items",
-        *COMMON_ITEM_PARAMETERS,
-    ],
-    "Ecommerce transactions": [
-        "transaction_id",
-        "currency",
-        "value",
-        "coupon",
-        "shipping",
-        "tax",
-        "items",
-        *COMMON_ITEM_PARAMETERS,
-    ],
-    "Ecommerce other": [
-        "currency",
-        "value",
-        "items",
-        *COMMON_ITEM_PARAMETERS,
-    ],
+    "Ecommerce promotions": [*_merge_event_parameters("view_promotion", "select_promotion"), *COMMON_ITEM_PARAMETERS, *PROMOTION_ITEM_PARAMETERS],
+    "Ecommerce product lists": [*_merge_event_parameters("view_item_list", "select_item"), *COMMON_ITEM_PARAMETERS],
+    "Ecommerce product detail": [*_event_parameters("view_item"), *COMMON_ITEM_PARAMETERS],
+    "Ecommerce cart": [*_merge_event_parameters("add_to_cart", "remove_from_cart", "view_cart"), *COMMON_ITEM_PARAMETERS],
+    "Ecommerce checkout": [*_merge_event_parameters("begin_checkout", "add_shipping_info", "add_payment_info"), *COMMON_ITEM_PARAMETERS],
+    "Ecommerce transactions": [*_event_parameters("purchase"), *COMMON_ITEM_PARAMETERS],
+    "Ecommerce other": ["currency", "value", "items", *COMMON_ITEM_PARAMETERS],
 }
 
 ECOMMERCE_PROFILE_BY_EVENT = {
@@ -138,24 +116,13 @@ ECOMMERCE_PARAMETERS_BY_PROFILE = {
     "item_detail_profile": ECOMMERCE_PARAMETERS_BY_GROUP["Ecommerce product detail"],
     "cart_profile": ECOMMERCE_PARAMETERS_BY_GROUP["Ecommerce cart"],
     "checkout_profile": ECOMMERCE_PARAMETERS_BY_GROUP["Ecommerce checkout"],
-    "transaction_profile": ECOMMERCE_PARAMETERS_BY_GROUP["Ecommerce transactions"],
-    "refund_profile": ECOMMERCE_PARAMETERS_BY_GROUP["Ecommerce transactions"],
+    "transaction_profile": [*_event_parameters("purchase"), *COMMON_ITEM_PARAMETERS],
+    "refund_profile": [*_event_parameters("refund"), *COMMON_ITEM_PARAMETERS],
 }
 
 EVENT_PARAMETERS_BY_EVENT = {
-    "view_promotion": {"currency", "promotion_id", "promotion_name", "creative_name", "creative_slot", "items"},
-    "select_promotion": {"currency", "promotion_id", "promotion_name", "creative_name", "creative_slot", "items"},
-    "view_item_list": {"currency", "item_list_id", "item_list_name", "items"},
-    "select_item": {"currency", "item_list_id", "item_list_name", "items"},
-    "view_item": {"currency", "value", "items"},
-    "add_to_cart": {"currency", "value", "items"},
-    "remove_from_cart": {"currency", "value", "items"},
-    "view_cart": {"currency", "value", "items"},
-    "begin_checkout": {"currency", "value", "coupon", "items"},
-    "add_shipping_info": {"currency", "value", "coupon", "shipping_tier", "items"},
-    "add_payment_info": {"currency", "value", "coupon", "payment_type", "items"},
-    "purchase": {"transaction_id", "currency", "value", "coupon", "shipping", "tax", "items"},
-    "refund": {"transaction_id", "currency", "value", "coupon", "shipping", "tax", "items"},
+    event_name: set(_event_parameters(event_name))
+    for event_name in ECOMMERCE_GROUP_BY_EVENT
 }
 
 OFFICIAL_EVENT_PARAMETERS = {

@@ -6,7 +6,7 @@ Use this reference for internal search, category listing pages, filters, sorting
 
 - Use `search` for submitted internal search when a user query is available and privacy-safe.
 - Use ecommerce `view_item_list` and `select_item` when the listing contains products or sellable items and official ecommerce item data is available.
-- Use `select_content` for non-product content modules, editorial lists, navigation categories, or service links.
+- Use `select_content` for non-product editorial cards, guides, or service-content objects. Use the approved client convention or dedicated surface events for header, menu, submenu, and footer navigation.
 - Track filters and sorts only when they answer analysis questions; avoid one noisy event for every UI micro-change.
 - Fire search and locator events on deliberate submit, result-page render, validated selection, or debounced stable result refresh. Do not fire a new analytics event for every keystroke while the user is typing.
 - Normalize controlled values to lowercase ASCII `snake_case`, but preserve product IDs, ISO codes, numeric values, and safe raw search terms when required.

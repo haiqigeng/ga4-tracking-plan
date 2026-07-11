@@ -33,7 +33,7 @@ When information is missing, continue with assumptions instead of stalling. Flag
 
 | Signal | Likely analysis need | Measurement implication |
 |---|---|---|
-| Homepage with hero, navigation, offers, search | Discovery, merchandising exposure, entry paths | Track page view, promotion exposure/clicks when truly promotional, search, consolidated content/navigation selection. |
+| Homepage with hero, navigation, offers, search | Discovery, merchandising exposure, entry paths | Track page view, genuine promotions, search, navigation by approved surface, and `select_content` for actual content objects. |
 | Product listing or search results | Product discovery, filter/search behavior, list performance | Use official ecommerce list events for product lists; custom filter/sort events only when they answer merchandising or UX questions. |
 | Product detail page | Product interest, variant choice, add-to-cart intent | Use official product detail and add-to-cart ecommerce events; use custom events for size guide, stock alert, configurator, or financing when analytically useful. |
 | Cart and checkout | Funnel progression, friction, revenue quality | Use official ecommerce cart, checkout, shipping, payment, purchase events with required parameters; add diagnostic error events only for actionable checkout issues. |
@@ -97,7 +97,8 @@ Avoid or heavily restrict:
 
 Use one event with controlled values when trigger, meaning, and parameter structure are the same:
 
-- one `select_content` for navigation, cards, and modules with `content_type`, `content_id`, and `cta_location`
+- one reusable event per approved navigation surface, sharing `link_name`, `link_url`, `navigation_group`, and position/depth rules
+- one `select_content` for editorial cards, guides, articles, FAQs, tools, and other real content objects
 - one `filter_apply` for filter categories with `filter_category` and `filter_value`
 - one `form_error` for validation/system errors with `error_type`, `error_code`, and `form_step`
 - one `contact_intent` for phone/email/store/contact CTA clicks with `contact_method`

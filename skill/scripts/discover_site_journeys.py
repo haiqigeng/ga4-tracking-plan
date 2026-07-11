@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
@@ -84,6 +84,19 @@ def same_host(url: str, root: str) -> bool:
     return urlparse(url).netloc.lower() == urlparse(root).netloc.lower()
 
 
+def canonical_url(url: str) -> str:
+    parsed = urlparse(url)
+    query = urlencode(
+        [
+            (key, value)
+            for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+            if not key.lower().startswith("utm_") and key.lower() not in {"gclid", "fbclid", "msclkid"}
+        ]
+    )
+    path = parsed.path or "/"
+    return urlunparse((parsed.scheme.lower(), parsed.netloc.lower(), path, parsed.params, query, ""))
+
+
 def discover_robots(root_url: str, errors: list[SourceError]) -> tuple[str, list[str]]:
     robots_url = urljoin(root_url, "/robots.txt")
     try:
@@ -98,7 +111,12 @@ def discover_robots(root_url: str, errors: list[SourceError]) -> tuple[str, list
     return robots_url, sitemaps
 
 
-def parse_sitemap(url: str, limit: int, errors: list[SourceError]) -> list[str]:
+def parse_sitemap(url: str, limit: int, errors: list[SourceError], seen: set[str] | None = None) -> list[str]:
+    seen = seen or set()
+    url = canonical_url(url)
+    if url in seen or len(seen) >= limit:
+        return []
+    seen.add(url)
     try:
         text = fetch_text(url)
     except Exception as error:
@@ -109,13 +127,15 @@ def parse_sitemap(url: str, limit: int, errors: list[SourceError]) -> list[str]:
     except ElementTree.ParseError as error:
         errors.append(SourceError("sitemap", url, f"XML parse error: {error}"))
         return []
-    urls = []
-    for loc in root.findall(".//{*}loc"):
-        if loc.text:
-            urls.append(loc.text.strip())
-        if len(urls) >= limit:
-            break
-    return urls
+    locations = [canonical_url(loc.text.strip()) for loc in root.findall(".//{*}loc") if loc.text]
+    if root.tag.rsplit("}", 1)[-1].lower() == "sitemapindex":
+        urls: list[str] = []
+        for child in locations:
+            urls.extend(parse_sitemap(child, limit - len(urls), errors, seen))
+            if len(urls) >= limit:
+                break
+        return urls[:limit]
+    return locations[:limit]
 
 
 def infer_template(url: str) -> str:
@@ -216,7 +236,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    root_url = args.url if "://" in args.url else f"https://{args.url}"
+    root_url = canonical_url(args.url if "://" in args.url else f"https://{args.url}")
     errors: list[SourceError] = []
     robots_url, robots_sitemaps = discover_robots(root_url, errors)
     sitemap_candidates = robots_sitemaps or [urljoin(root_url, "/sitemap.xml")]
@@ -248,7 +268,7 @@ def main() -> int:
                 {"source_type": "sitemap", "source_ref": sitemap, "used_for": "URL discovery"}
                 for sitemap in sitemap_candidates
             ],
-            {"source_type": "browser_exploration", "source_ref": root_url, "used_for": "static HTML link and form discovery"},
+            {"source_type": "static_html", "source_ref": root_url, "used_for": "static HTML link and form discovery"},
         ],
         "source_errors": [asdict(error) for error in errors],
         "pages_sampled": pages,

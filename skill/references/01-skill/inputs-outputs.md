@@ -23,6 +23,7 @@ The primary output is a human-readable XLSX tracking plan with:
 - shared GTM Protocol rules;
 - a Parameter Reference including availability and ownership;
 - a journey-grouped Event Matrix;
+- complete per-event dataLayer examples and GTM-to-GA4 mappings;
 - an explicit Screenshot Register with embedded previews when available.
 
 Structured JSON is the source used to validate and render the human workbook.

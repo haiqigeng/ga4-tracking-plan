@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -227,7 +228,10 @@ def compact_json(value: Any) -> str:
 
 
 def event_family(event: dict[str, Any]) -> str:
-    return ecommerce_event_family(event)
+    if event.get("classification") == "recommended_ecommerce":
+        return ecommerce_event_family(event)
+    family = str(event.get("business_event_family", "")).strip()
+    return family.replace("_", " ").title() if family else "Interactions"
 
 
 def transport_event_name(event: dict[str, Any]) -> str:
@@ -336,6 +340,60 @@ def apply_workbook_settings(wb: Workbook) -> None:
     wb.active = 0
 
 
+def parameter_value_rules(parameter: dict[str, Any]) -> str:
+    allowed = [str(value) for value in parameter.get("allowed_values", []) if str(value).strip()]
+    if allowed:
+        return " | ".join(allowed)
+    return str(parameter.get("value_rules", ""))
+
+
+def javascript_object(value: dict[str, Any]) -> str:
+    text = json.dumps(value, ensure_ascii=False, indent=2)
+    return re.sub(r'(?m)^(\s*)"([A-Za-z_$][A-Za-z0-9_$]*)":', r"\1\2:", text)
+
+
+def datalayer_example(event: dict[str, Any]) -> str:
+    data_layer = event.get("data_layer", {})
+    push = data_layer.get("push", {}) if isinstance(data_layer, dict) else {}
+    if not isinstance(push, dict) or not push:
+        classification = str(event.get("classification", ""))
+        if classification == "automatic":
+            return "No manual dataLayer push. GA4 collects this event automatically when configured correctly."
+        if classification == "enhanced_measurement":
+            return "No manual dataLayer push when GA4 Enhanced Measurement is enabled and sufficient."
+        return "No manual dataLayer example supplied; implementation source must be confirmed."
+
+    lines = []
+    for key in data_layer.get("flush_keys", []):
+        lines.append(f"dataLayer.push({{ {key}: null }});")
+    lines.append(f"dataLayer.push({javascript_object(push)});")
+    return "\n".join(lines)
+
+
+def gtm_mapping(event: dict[str, Any]) -> str:
+    name = str(event.get("event_name", ""))
+    classification = str(event.get("classification", ""))
+    if classification == "automatic":
+        return "GA4 automatic collection; do not create a duplicate manual event tag."
+    if classification == "enhanced_measurement" and not event.get("data_layer"):
+        return "Enable in the GA4 web stream; do not create a duplicate manual event tag."
+
+    payload = event.get("ga4_payload", {})
+    parameters = payload.get("parameters", {}) if isinstance(payload, dict) else {}
+    data_layer = event.get("data_layer", {})
+    push = data_layer.get("push", {}) if isinstance(data_layer, dict) else {}
+    prefix = "ecommerce" if isinstance(push, dict) and isinstance(push.get("ecommerce"), dict) else "event_data"
+    mappings = [f"Custom Event trigger: {name}", f"GA4 event name: {name}"]
+    for parameter in parameters if isinstance(parameters, dict) else []:
+        mappings.append(f"{prefix}.{parameter} -> {parameter}")
+    if isinstance(payload, dict) and payload.get("items"):
+        mappings.append("ecommerce.items -> items")
+    notes = str(data_layer.get("mapping_notes", "")) if isinstance(data_layer, dict) else ""
+    if notes:
+        mappings.append(notes)
+    return "\n".join(mappings)
+
+
 def build_overview(wb: Workbook, plan: dict[str, Any]) -> None:
     doc = plan["document"]
     ws = wb.create_sheet("00 Overview")
@@ -353,7 +411,8 @@ def build_overview(wb: Workbook, plan: dict[str, Any]) -> None:
         ["2", "01 GTM Protocol", "Shared GTM/dataLayer rules and official references.", "", "", "", "", ""],
         ["3", "02 Parameter Reference", "Variable dictionary and value rules.", "", "", "", "", ""],
         ["4", "03 Event Matrix", "Main tracking plan: events, parameters, and value rules.", "", "", "", "", ""],
-        ["5", "04 Screenshot Register", "Page and interaction evidence supporting implementation.", "", "", "", "", ""],
+        ["5", "04 DataLayer Examples", "Complete per-event GTM and dataLayer implementation examples.", "", "", "", "", ""],
+        ["6", "05 Screenshot Register", "Page and interaction evidence supporting implementation.", "", "", "", "", ""],
         [],
         ["Version History", "", "", "", "", "", "", "", ""],
         ["Version", "Date", "Owner", "Summary", "Publish date", "", "", "", ""],
@@ -367,7 +426,8 @@ def build_overview(wb: Workbook, plan: dict[str, Any]) -> None:
         "01 GTM Protocol",
         "02 Parameter Reference",
         "03 Event Matrix",
-        "04 Screenshot Register",
+        "04 DataLayer Examples",
+        "05 Screenshot Register",
     }
     for row in range(1, ws.max_row + 1):
         label = ws.cell(row, 1).value
@@ -386,6 +446,24 @@ def build_overview(wb: Workbook, plan: dict[str, Any]) -> None:
 def build_gtm_protocol(wb: Workbook, plan: dict[str, Any]) -> None:
     ws = wb.create_sheet("01 GTM Protocol")
     title(ws, "GTM Protocol", "Essential GTM and dataLayer rules for implementing the Event Matrix.", 4)
+    user_context = plan.get("user_context", {})
+    user_context_example = (
+        "dataLayer.push({\n"
+        "  user_context: {\n"
+        "    user_id: \"%opaque_user_id%\",\n"
+        "    login_status: \"logged_in\",\n"
+        "    customer_status: \"returning\",\n"
+        "    account_type: \"standard\"\n"
+        "  }\n"
+        "});"
+    )
+    user_properties = "\n".join(
+        f"{item.get('source_path')} -> GA4 user property {item.get('parameter_name')}"
+        for item in user_context.get("user_properties", [])
+        if isinstance(item, dict)
+    ) or "No custom GA4 user properties planned."
+    ads = user_context.get("advertising_user_data", {})
+    ads_rule = str(ads.get("handling_rule", "Direct identifiers are not sent to GA4.")) if isinstance(ads, dict) else "Direct identifiers are not sent to GA4."
     rows = [
         ["Topic", "Rule", "Example", "Notes"],
         ["GTM base script", "Load the GTM container once on every page. Replace GTM-XXXX with the project container ID.", "<!-- Google Tag Manager -->\n<script>/* GTM base script with GTM-XXXX */</script>\n<!-- End Google Tag Manager -->", "For SPA websites, keep the container in the root HTML shell."],
@@ -393,7 +471,12 @@ def build_gtm_protocol(wb: Workbook, plan: dict[str, Any]) -> None:
         ["Flush reusable objects", "Flush page_data, ecommerce, or event_data before a new event when previous values could persist.", "dataLayer.push({ ecommerce: null });", "Use a separate push for flushing."],
         ["Controlled values", "Use lowercase ASCII snake_case, replace spaces with underscores, and remove accents for controlled analytics values.", "pret_a_porter_femme", "Keep product IDs, ISO codes, numeric values, URLs, and safe raw terms when required."],
         ["GA4 ecommerce", "Use official GA4 ecommerce event names and parameters. Keep ecommerce event blocks separate from interaction events.", "items[].item_id\nitems[].item_name\ncurrency\nvalue", "Map GTM wrapper paths in implementation notes, not as replacements for GA4 names."],
-        ["Official references", "Check current official documentation before approving standard, recommended, ecommerce, and GTM dataLayer decisions.", "GA4 recommended events: https://developers.google.com/analytics/devguides/collection/ga4/reference/events\nGA4 ecommerce: https://developers.google.com/analytics/devguides/collection/ga4/ecommerce\nGA4 item parameters: https://developers.google.com/analytics/devguides/collection/ga4/item-scoped-ecommerce\nGTM dataLayer: https://developers.google.com/tag-platform/tag-manager/datalayer", "Keep external references here, not on the Overview tab."],
+        ["Consent", "Set and update consent through the CMP or GTM consent APIs before affected tags process user or event data.", "analytics_storage\nad_storage\nad_user_data\nad_personalization", "The tracking plan records dependencies but does not make the legal consent decision."],
+        ["Connected user context", "Push user_context independently when authentication state is known, after successful login, and after logout. Do not repeat these fields inside every event push.", user_context_example, f"Plan status: {user_context.get('status', 'not_applicable')}. Keep the object available before dependent GA4 events."],
+        ["GA4 User-ID", "Map user_context.user_id only to the Google tag user_id setting. Omit before first sign-in and set null after logout.", "user_context.user_id -> Google tag user_id", "Never send user_id as an event parameter or user property, and never register it as a custom dimension."],
+        ["GA4 user properties", "Map only approved low-cardinality connected-user fields as GA4 user properties.", user_properties, "Register planned custom user properties in GA4. Do not include direct identifiers."],
+        ["Advertising user data", "Keep direct identifiers in a separately governed non-GA4 object only when another approved advertising implementation explicitly requires them.", str(ads.get("data_layer_object", "")) or "Not applicable", ads_rule],
+        ["Official references", "Check current official documentation before approving standard, recommended, ecommerce, connected-user, and GTM dataLayer decisions.", "GA4 recommended events: https://developers.google.com/analytics/devguides/collection/ga4/reference/events\nGA4 ecommerce: https://developers.google.com/analytics/devguides/collection/ga4/ecommerce\nGA4 item parameters: https://developers.google.com/analytics/devguides/collection/ga4/item-scoped-ecommerce\nGA4 User-ID: https://developers.google.com/analytics/devguides/collection/ga4/user-id\nGA4 user properties: https://developers.google.com/analytics/devguides/collection/protocol/ga4/user-properties\nGTM dataLayer: https://developers.google.com/tag-platform/tag-manager/datalayer\nConsent mode: https://developers.google.com/tag-platform/security/guides/consent", "Keep external references here, not on the Overview tab."],
     ]
     for row in rows:
         ws.append(row)
@@ -418,16 +501,20 @@ def build_parameter_reference(wb: Workbook, plan: dict[str, Any]) -> None:
         "Availability",
         "Data owner",
         "Register in GA4",
-        "Comments",
+        "Privacy / consent",
     ]
     ws.append(headers)
     header(ws, 3, len(headers))
     for param in plan["parameters"]:
-        comments = []
+        privacy = []
         if param.get("cardinality_risk") != "low":
-            comments.append(f"Cardinality risk: {param.get('cardinality_risk')}")
+            privacy.append(f"Cardinality risk: {param.get('cardinality_risk')}")
         if param.get("pii_risk") != "low":
-            comments.append(f"PII risk: {param.get('pii_risk')}")
+            privacy.append(f"PII risk: {param.get('pii_risk')}")
+        if param.get("consent_dependency"):
+            privacy.append(f"Consent: {param.get('consent_dependency')}")
+        if param.get("scope") == "implementation" and param.get("pii_risk") in {"medium", "high"}:
+            privacy.append("Implementation-only: do not map to ordinary GA4 parameters")
         register = "Yes" if param.get("register_custom_definition") else "No"
         ws.append([
             param["parameter_name"],
@@ -435,12 +522,12 @@ def build_parameter_reference(wb: Workbook, plan: dict[str, Any]) -> None:
             param["scope"],
             param["type"],
             param["description"],
-            param["value_rules"],
+            parameter_value_rules(param),
             param["example_value"],
             param["availability"],
             param["data_owner"],
             register,
-            "; ".join(comments),
+            "; ".join(privacy),
         ])
     set_widths(ws, [32, 28, 16, 16, 48, 48, 30, 24, 30, 20, 38])
     ws.freeze_panes = "A4"
@@ -480,6 +567,8 @@ def build_event_matrix(wb: Workbook, plan: dict[str, Any]) -> None:
 
             standard_rows = [
                 ("event_classification", "string", lambda event: event["classification"]),
+                ("evidence_status", "string", lambda event: f"{event.get('evidence_basis', {}).get('status', '')} | {event.get('evidence_basis', {}).get('confidence', '')}"),
+                ("analysis_use", "string", lambda event: event.get("analysis_use", "")),
                 ("trigger", "string", lambda event: event["trigger"]),
                 ("event", "string", transport_event_name),
             ]
@@ -508,13 +597,44 @@ def build_event_matrix(wb: Workbook, plan: dict[str, Any]) -> None:
     style_event_matrix_rows(ws)
 
 
+def build_datalayer_examples(wb: Workbook, plan: dict[str, Any]) -> None:
+    ws = wb.create_sheet("04 DataLayer Examples")
+    title(ws, "DataLayer Examples", "Complete developer examples aligned with the Event Matrix and final GA4 payload.", 7)
+    headers = ["Journey", "Event", "Evidence", "Trigger", "dataLayer.push example", "GTM and GA4 mapping", "Implementation notes"]
+    ws.append(headers)
+    header(ws, 3, len(headers))
+    journey_names = {brief["journey_id"]: brief["journey_name"] for brief in plan["measurement_brief"]}
+
+    for event in plan["events"]:
+        notes = str(event.get("implementation_notes", ""))
+        if event.get("classification") == "recommended_ecommerce":
+            notes = f"Official GA4 ecommerce event. {notes}".strip()
+        elif event.get("classification") == "custom":
+            notes = f"Custom GA4 event using the project dataLayer convention. {notes}".strip()
+        ws.append([
+            journey_names.get(event["journey_id"], event["journey_id"]),
+            event["event_name"],
+            f"{event.get('evidence_basis', {}).get('status', '')} | {event.get('evidence_basis', {}).get('confidence', '')}",
+            event["trigger"],
+            datalayer_example(event),
+            gtm_mapping(event),
+            notes,
+        ])
+        ws.row_dimensions[ws.max_row].height = 180
+
+    set_widths(ws, [28, 24, 22, 44, 76, 54, 48])
+    ws.freeze_panes = "A4"
+    ws.auto_filter.ref = f"A3:G{ws.max_row}"
+    style_cells(ws)
+
+
 def build_screenshot_register(
     wb: Workbook,
     plan: dict[str, Any],
     screenshot_dir: Path | None = None,
     preview_dir: Path | None = None,
 ) -> None:
-    ws = wb.create_sheet("04 Screenshot Register")
+    ws = wb.create_sheet("05 Screenshot Register")
     title(ws, "Screenshot Register", "Page and interaction evidence supporting the Event Matrix.", 8)
     ws.append(["Journey", "Event(s)", "Screenshot preview", "Page / component", "URL / route", "Capture objective", "Status", "Notes"])
     header(ws, 3, 8)
@@ -586,6 +706,7 @@ def build_workbook(
     build_gtm_protocol(wb, plan)
     build_parameter_reference(wb, plan)
     build_event_matrix(wb, plan)
+    build_datalayer_examples(wb, plan)
     build_screenshot_register(wb, plan, screenshot_dir=screenshot_dir, preview_dir=preview_dir)
     apply_workbook_settings(wb)
     return wb

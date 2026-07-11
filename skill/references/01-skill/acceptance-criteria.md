@@ -14,9 +14,28 @@ A complete GA4 tracking plan must:
 - state collection source and duplicate risk for automatic, enhanced, and
   manually collected events;
 - reuse parameter names and controlled values consistently;
+- exhaust finite website values when practical, format them with ` | ` in human
+  output, and use English controlled taxonomies across multilingual markets;
 - give every parameter a reporting purpose, value rules, example, availability,
   data owner, registration decision, privacy risk, and cardinality risk;
 - highlight sensitive or user-provided data and the validation it requires;
+- investigate public signup and authenticated journeys with synthetic
+  information unless the user explicitly opts out;
+- record blocked authenticated journeys as coverage gaps and propose customer-
+  space events only when observed, synthetically observed, or client-confirmed;
+- define connected-user state once through a shared `user_context` protocol;
+  map opaque `user_id` only to the Google tag User-ID setting and govern
+  approved low-cardinality GA4 user properties separately from events;
+- provide one complete dataLayer example and GTM-to-GA4 mapping per event,
+  including official ecommerce reset and `ecommerce.items` structure;
+- model payment failure when a payment journey exists and scope custom item
+  availability to justified product-detail or persistent-cart use cases;
+- consolidate distinct newsletter, contact, catalogue, quote, and other form
+  outcomes under `generate_lead` only through a documented business decision;
+- cover meaningful authenticated customer-space outcomes beyond login and
+  signup when those capabilities exist;
+- distinguish backend-confirmed order cancellation from official refund
+  completion;
 - record noisy, duplicate, unavailable, sensitive, or non-actionable choices
   that should not be tracked;
 - provide an explicit screenshot-evidence row for every event, including

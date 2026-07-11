@@ -14,6 +14,18 @@ Use this reference when the scoped journey includes merchandising, product disco
 - Use explicit availability states: `send`, `send_default_quantity`, `event_level_used`, `not_available`, or `not_applicable`.
 - If required ecommerce data is unavailable, mark the ecommerce event as not implementable for that scope and consider a separate non-ecommerce intent event.
 - Consolidate repeated same-name events when the parameter structure is identical; list allowed values for list names, creative slots, item categories, or component locations.
+- Use a custom item parameter such as `items[].availability_status` on
+  `view_item` when users switch variants and shortage affects product-detail
+  analysis. Do not add it by default to `view_item_list`, `select_item`, or
+  `add_to_cart`, where availability may be expensive, unavailable, or redundant.
+- Use item availability on `view_cart` only for a documented persistent-cart,
+  live-inventory model where previously saved items can become unavailable.
+- After `add_payment_info`, represent unsuccessful payment with a custom
+  diagnostic `payment_error` or governed `checkout_error`; reserve `purchase`
+  for confirmed order success.
+- Use `cancel_order` for a backend-confirmed cancellation of an existing order.
+  Keep official `refund` for the later financial or item refund. An order can be
+  cancelled without an immediate refund, and a refund can be partial.
 Read `policy-ga4-ecommerce-parameters.md` before finalizing ecommerce matrices or CSV exports.
 
 ## Event Selection
@@ -31,6 +43,7 @@ Read `policy-ga4-ecommerce-parameters.md` before finalizing ecommerce matrices o
 | Payment method | `add_payment_info` | recommended_ecommerce | `items`; `payment_type` when available |
 | Purchase confirmation | `purchase` | recommended_ecommerce | `transaction_id`; `items`; one of item ID or item name; `currency` required if `value` is sent |
 | Refund | `refund` | recommended_ecommerce | `transaction_id`; item data when item-level refund is available |
+| Order cancellation confirmed | `cancel_order` | custom | `transaction_id`, controlled cancellation stage/reason; never raw support notes |
 | Promotion impression | `view_promotion` | recommended_ecommerce | promotion metadata and `items` when promotion references items or offers |
 | Promotion click | `select_promotion` | recommended_ecommerce | same identifiers as `view_promotion` for impression-to-click analysis |
 

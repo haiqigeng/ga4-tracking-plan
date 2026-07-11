@@ -278,7 +278,6 @@ LOW_SIGNAL_CUSTOM_EVENT_NAMES = {
     "generic_click",
     "interaction",
     "link_click",
-    "menu_click",
 }
 HIGH_CARDINALITY_GOVERNANCE_RE = re.compile(
     r"(do not register|not register|not registered|avoid registering|high[- ]cardinality|governance|"

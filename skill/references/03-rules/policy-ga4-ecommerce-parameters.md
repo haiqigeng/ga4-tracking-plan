@@ -71,6 +71,24 @@ Use a stable order inside each family:
 4. Promotion item fallback rows when relevant: `items[].creative_name`, `items[].creative_slot`, `items[].promotion_id`, `items[].promotion_name`.
 5. Business-specific item parameters only when analytically justified. Do not prefill custom item parameter names in generic templates; require explicit business need, `custom_item_parameter` classification, and item-scoped custom-dimension registration when needed for GA4 reporting.
 
+## Availability Status
+
+`items[].availability_status` is a custom item parameter, not an official GA4
+item parameter. Use it by default only on `view_item` when users navigate among
+variants and shortage status supports product or merchandising analysis.
+
+Use English controlled values such as:
+
+```text
+in_stock | low_stock | out_of_stock | preorder | backorder | discontinued
+```
+
+Do not add it by default to `view_item_list` or `select_item`, where obtaining
+availability for many products can be expensive, or to `add_to_cart`, where an
+unavailable item normally cannot be added. Use it on `view_cart` only for a
+documented persistent-cart implementation whose items are refreshed against
+live inventory and can become unavailable before purchase.
+
 ## Supplemental CSV Deliverables
 
 When visual density is a concern or the user requests a diffable secondary artifact, produce the long-format CSV from `scripts/export_tracking_plan_csv.py`. It repeats event context for each parameter and includes `parameter_scope`, `requirement`, `expected_value`, `availability`, and `scope_rule`. Do not use the CSV as a replacement for the default XLSX workbook template unless the user explicitly asks for CSV-only output.

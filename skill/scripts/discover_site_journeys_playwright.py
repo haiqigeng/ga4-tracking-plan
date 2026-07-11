@@ -8,6 +8,7 @@ from typing import Any
 
 from discover_site_journeys import (
     SourceError,
+    canonical_url,
     clean_text,
     infer_template,
     same_host,
@@ -72,7 +73,7 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
         ).filter(Boolean)""",
     )
     clean_links = [
-        {"url": item["url"], "text": clean_text(item.get("text", "")), "source": url}
+        {"url": canonical_url(item["url"]), "text": clean_text(item.get("text", "")), "source": url}
         for item in links
         if isinstance(item, dict) and item.get("url") and same_host(str(item["url"]), root_url)
     ]
@@ -87,7 +88,7 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
 
 def main() -> int:
     args = parse_args()
-    root_url = args.url if "://" in args.url else f"https://{args.url}"
+    root_url = canonical_url(args.url if "://" in args.url else f"https://{args.url}")
     sync_playwright = require_playwright()
     pages: list[dict[str, Any]] = []
     errors: list[SourceError] = []
@@ -99,7 +100,7 @@ def main() -> int:
         context = browser.new_context()
         page = context.new_page()
         while queue and len(pages) < args.limit:
-            current_url = queue.pop(0)
+            current_url = canonical_url(queue.pop(0))
             if current_url in seen or not same_host(current_url, root_url):
                 continue
             seen.add(current_url)
@@ -109,7 +110,7 @@ def main() -> int:
                 errors.append(SourceError("playwright_crawl", current_url, str(rendered["fetch_error"])))
                 continue
             for link in rendered.get("links", []):
-                href = str(link.get("url", ""))
+                href = canonical_url(str(link.get("url", "")))
                 if href and href not in seen and same_host(href, root_url):
                     queue.append(href)
         context.close()

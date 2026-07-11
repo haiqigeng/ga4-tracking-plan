@@ -10,6 +10,8 @@ Run before committing or releasing the reusable skill package:
 ruff check .
 python -m compileall -q scripts skill/scripts tests
 python -m unittest discover -s tests
+python -m coverage run --source=skill/scripts -m unittest discover -s tests
+python -m coverage report --include="skill/scripts/validate_tracking_plan.py,skill/scripts/tracking_plan_validation_*.py,skill/scripts/ecommerce_matrix.py,skill/scripts/official_ga4_catalog.py,skill/scripts/generate_tracking_plan_workbook.py,skill/scripts/adapt_tracking_plan_workbook.py,skill/scripts/inspect_tracking_plan_template.py" --fail-under=80
 python scripts/validate_package.py
 python scripts/check_official_catalog.py --offline
 git diff --check
@@ -62,7 +64,7 @@ skipped or blocked unless approved test access is available.
 
 ## Contract Migration
 
-Migrate an older v1 plan to the GA4-only v2 contract:
+Migrate an older v1 plan to the GA4-only schema `2.1.0` contract:
 
 ```powershell
 python scripts/migrate_tracking_plan.py old-plan.json --output plan-v2.json

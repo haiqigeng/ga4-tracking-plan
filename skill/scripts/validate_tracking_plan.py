@@ -4,39 +4,20 @@ import argparse
 import json
 import sys
 from collections import Counter, defaultdict
-from datetime import date
 from pathlib import Path
 from typing import Any, Iterable
 
 from ecommerce_matrix import (
-    ECOMMERCE_PARAMETERS_BY_PROFILE,
-    ECOMMERCE_PROFILE_BY_EVENT,
-    EVENT_PARAMETERS_BY_EVENT,
     OFFICIAL_ITEM_PARAMETERS,
 )
 from tracking_plan_validation_catalogs import (
     CUSTOM_CLASSIFICATIONS,
     CUSTOM_PARAMETER_CLASSIFICATIONS,
-    ECOMMERCE_EVENTS,
-    GA4_CLASSIFICATIONS,
     GA4_RESERVED_PARAMETER_NAMES,
-    HIGH_CARDINALITY_GOVERNANCE_RE,
-    LEGACY_WRAPPER_EVENT_KEYS,
-    LEGACY_WRAPPER_PARAMETERS,
-    MANUAL_COLLECTION_SOURCES,
-    NON_CONVERSION_MEASUREMENT_ROLES,
     OFFICIAL_ECOMMERCE_PARAMETER_CLASSES,
     OFFICIAL_PARAMETER_CLASSES,
     OFFICIAL_SOURCE_DOMAINS,
-    OFFICIAL_VERIFICATION_CLASSES,
-    POTENTIAL_DUPLICATE_EVENTS,
     REPORTING_PURPOSE_RE,
-    TRANSACTION_EVENTS,
-    VALUE_EVENTS_REQUIRE_CURRENCY,
-    WEAK_BUSINESS_QUESTION_RE,
-    WEAK_BUSINESS_QUESTIONS,
-    WEAK_COMPONENT_CONTEXTS,
-    WEAK_DATA_DEPENDENCY_VALUES,
     WEAK_NOT_TRACKED_REASONS,
     WEAK_REPORTING_PURPOSES,
     WEAK_VALUE_RULES,
@@ -44,9 +25,10 @@ from tracking_plan_validation_catalogs import (
     load_ga4_catalog,
     load_json,
 )
+from tracking_plan_validation_common import check_official_verification, governed_sensitive_implementation_parameter
+from tracking_plan_validation_delivery import check_delivery_rules
+from tracking_plan_validation_event_rules import check_event
 from tracking_plan_validation_events import (
-    check_custom_event_rationale,
-    check_ga4_event_shape,
     check_ga4_name,
     check_legacy_ua_field,
     check_pii_name,
@@ -102,35 +84,10 @@ def values_at_keys(value: Any, target_keys: set[str], prefix: str = "$") -> Iter
             yield from values_at_keys(child, target_keys, f"{prefix}[{index}]")
 
 
-def walk_keys(value: Any, prefix: str = "$") -> Iterable[tuple[str, str]]:
-    if isinstance(value, dict):
-        for key, child in value.items():
-            path = f"{prefix}.{key}"
-            yield path, key
-            yield from walk_keys(child, path)
-    elif isinstance(value, list):
-        for index, child in enumerate(value):
-            yield from walk_keys(child, f"{prefix}[{index}]")
-
-
 def check_duplicates(values: list[str], label: str, path: str, issues: list[Issue]) -> None:
     for value, count in Counter(values).items():
         if value and count > 1:
             add_issue(issues, "error", "DUPLICATE_ID", path, f"{label} '{value}' appears {count} times.")
-
-def check_business_question(value: Any, path: str, issues: list[Issue]) -> None:
-    question = str(value or "").strip()
-    if not question:
-        return
-    normalized = question.lower().rstrip(".")
-    if normalized in WEAK_BUSINESS_QUESTIONS or WEAK_BUSINESS_QUESTION_RE.search(question):
-        add_issue(
-            issues,
-            "error",
-            "EVENT_BUSINESS_QUESTION_WEAK",
-            path,
-            "Business question must express the analysis need or decision supported by the event, not just the implementation action to track.",
-        )
 
 
 def check_execution_context(plan: dict[str, Any], issues: list[Issue]) -> None:
@@ -241,29 +198,8 @@ def check_measurement_alignment(plan: dict[str, Any], issues: list[Issue]) -> No
                 )
 
 
-def check_measurement_strategy(plan: dict[str, Any], issues: list[Issue]) -> None:
-    strategy = plan.get("measurement_strategy", {})
-    if not isinstance(strategy, dict):
-        return
-
-    journey_ids = {
-        str(brief.get("journey_id", ""))
-        for brief in plan.get("measurement_brief", [])
-        if isinstance(brief, dict) and brief.get("journey_id")
-    }
-    selected_families = strategy.get("selected_event_families", [])
-    family_ids = {
-        str(family.get("family_id", ""))
-        for family in selected_families
-        if isinstance(family, dict) and family.get("family_id")
-    }
-    custom_acceptance_names = {
-        str(item.get("event_name", ""))
-        for item in strategy.get("custom_event_acceptance", [])
-        if isinstance(item, dict) and item.get("event_name")
-    }
-
-    for index, page_role in enumerate(strategy.get("page_roles", []) if isinstance(strategy.get("page_roles", []), list) else []):
+def check_strategy_page_roles(strategy: dict[str, Any], journey_ids: set[str], issues: list[Issue]) -> None:
+    for index, page_role in enumerate(strategy.get("page_roles", [])):
         if not isinstance(page_role, dict):
             continue
         journey_id = str(page_role.get("journey_id", ""))
@@ -276,9 +212,15 @@ def check_measurement_strategy(plan: dict[str, Any], issues: list[Issue]) -> Non
                 f"Measurement strategy references unknown journey_id '{journey_id}'.",
             )
 
-    for index, family in enumerate(selected_families if isinstance(selected_families, list) else []):
+
+
+def check_strategy_families(selected_families: list[Any], issues: list[Issue]) -> set[str]:
+    family_ids: set[str] = set()
+    for index, family in enumerate(selected_families):
         if not isinstance(family, dict):
             continue
+        if family.get("family_id"):
+            family_ids.add(str(family["family_id"]))
         reason = str(family.get("reason", "")).strip()
         if len(reason.split()) < 6:
             add_issue(
@@ -289,7 +231,11 @@ def check_measurement_strategy(plan: dict[str, Any], issues: list[Issue]) -> Non
                 "Selected event families need a concrete business or platform rationale.",
             )
 
-    for index, event in enumerate(plan.get("events", []) if isinstance(plan.get("events", []), list) else []):
+    return family_ids
+
+
+def check_strategy_events(events: list[Any], family_ids: set[str], acceptance_names: set[str], issues: list[Issue]) -> None:
+    for index, event in enumerate(events):
         if not isinstance(event, dict):
             continue
         family_id = str(event.get("business_event_family", ""))
@@ -301,7 +247,7 @@ def check_measurement_strategy(plan: dict[str, Any], issues: list[Issue]) -> Non
                 f"$.events[{index}].business_event_family",
                 f"Event references business_event_family '{family_id}' but it is not listed in measurement_strategy.selected_event_families.",
             )
-        if event.get("classification") in CUSTOM_CLASSIFICATIONS and str(event.get("event_name", "")) not in custom_acceptance_names:
+        if event.get("classification") in CUSTOM_CLASSIFICATIONS and str(event.get("event_name", "")) not in acceptance_names:
             add_issue(
                 issues,
                 "error",
@@ -310,9 +256,15 @@ def check_measurement_strategy(plan: dict[str, Any], issues: list[Issue]) -> Non
                 f"Custom event '{event.get('event_name')}' needs a custom_event_acceptance entry with official alternatives and business rationale.",
             )
 
-    for index, item in enumerate(strategy.get("custom_event_acceptance", []) if isinstance(strategy.get("custom_event_acceptance", []), list) else []):
+
+
+def check_custom_event_acceptance(entries: list[Any], issues: list[Issue]) -> set[str]:
+    names: set[str] = set()
+    for index, item in enumerate(entries):
         if not isinstance(item, dict):
             continue
+        if item.get("event_name"):
+            names.add(str(item["event_name"]))
         reason = str(item.get("business_reason", "")).strip()
         alternatives = item.get("official_alternatives_considered", [])
         if len(reason.split()) < 8 or not alternatives:
@@ -323,196 +275,110 @@ def check_measurement_strategy(plan: dict[str, Any], issues: list[Issue]) -> Non
                 f"$.measurement_strategy.custom_event_acceptance[{index}]",
                 "Custom-event acceptance entries must state a concrete business reason and official alternatives considered.",
             )
+    return names
+
+
+def check_measurement_strategy(plan: dict[str, Any], issues: list[Issue]) -> None:
+    strategy = plan.get("measurement_strategy", {})
+    if not isinstance(strategy, dict):
+        return
+    journey_ids = {
+        str(brief.get("journey_id", ""))
+        for brief in plan.get("measurement_brief", [])
+        if isinstance(brief, dict) and brief.get("journey_id")
+    }
+    selected_families = strategy.get("selected_event_families", [])
+    acceptance = strategy.get("custom_event_acceptance", [])
+    check_strategy_page_roles(strategy, journey_ids, issues)
+    family_ids = check_strategy_families(selected_families if isinstance(selected_families, list) else [], issues)
+    acceptance_names = check_custom_event_acceptance(acceptance if isinstance(acceptance, list) else [], issues)
+    events = plan.get("events", [])
+    check_strategy_events(events if isinstance(events, list) else [], family_ids, acceptance_names, issues)
+
+
+def check_covered_journeys(coverage: dict[str, Any], journey_ids: set[str], issues: list[Issue]) -> tuple[set[str], set[str]]:
+    covered_ids: set[str] = set()
+    included_ids: set[str] = set()
+    for index, item in enumerate(coverage.get("journeys_covered", [])):
+        if not isinstance(item, dict):
+            continue
+        journey_id = str(item.get("journey_id", ""))
+        if journey_id:
+            covered_ids.add(journey_id)
+            if item.get("tracking_plan_decision") == "included":
+                included_ids.add(journey_id)
+            if journey_id not in journey_ids:
+                add_issue(issues, "error", "COVERAGE_JOURNEY_UNKNOWN", f"$.website_coverage_map.journeys_covered[{index}].journey_id", f"Coverage map references unknown journey_id '{journey_id}'.")
+        if item.get("tracking_plan_decision") != "included":
+            continue
+        if item.get("coverage_status") in {"blocked", "out_of_scope"}:
+            add_issue(issues, "error", "COVERAGE_INCLUDED_BUT_NOT_COVERED", f"$.website_coverage_map.journeys_covered[{index}].coverage_status", "Included journeys cannot be marked blocked or out_of_scope.")
+        for field in ("representative_urls", "page_templates", "key_interactions", "evidence"):
+            values = item.get(field, [])
+            if not isinstance(values, list) or not any(str(value).strip() for value in values):
+                add_issue(issues, "error", "COVERAGE_INCLUDED_EVIDENCE_MISSING", f"$.website_coverage_map.journeys_covered[{index}].{field}", f"Included journeys need non-empty {field} so analysts and developers can understand coverage.")
+    return covered_ids, included_ids
+
+
+def check_discovered_journeys(coverage: dict[str, Any], journey_ids: set[str], included_ids: set[str], issues: list[Issue]) -> None:
+    gap_text = " ".join(
+        " ".join(str(value) for value in gap.values())
+        for gap in coverage.get("coverage_gaps", [])
+        if isinstance(gap, dict)
+    ).lower()
+    for index, discovered in enumerate(coverage.get("journeys_discovered", [])):
+        if not isinstance(discovered, dict):
+            continue
+        journey_id = str(discovered.get("journey_id", ""))
+        decision = str(discovered.get("decision", ""))
+        path = f"$.website_coverage_map.journeys_discovered[{index}]"
+        if decision == "include_in_plan" and journey_id not in journey_ids:
+            add_issue(issues, "error", "DISCOVERED_JOURNEY_NOT_IN_MEASUREMENT_BRIEF", f"{path}.journey_id", f"Discovered journey '{journey_id}' is marked include_in_plan but is missing from measurement_brief.")
+        if decision == "include_in_plan" and journey_id not in included_ids:
+            add_issue(issues, "error", "DISCOVERED_JOURNEY_NOT_COVERED", f"{path}.journey_id", f"Discovered journey '{journey_id}' is marked include_in_plan but has no included coverage entry.")
+        if decision == "needs_discovery":
+            markers = f"{journey_id} {discovered.get('journey_name', '')}".lower().split()
+            if not any(marker and marker in gap_text for marker in markers):
+                add_issue(issues, "error", "DISCOVERED_JOURNEY_GAP_MISSING", f"{path}.decision", f"Discovered journey '{journey_id}' needs discovery but no matching coverage gap explains the risk.")
+
+
+def check_measurement_brief_coverage(plan: dict[str, Any], covered_ids: set[str], issues: list[Issue]) -> None:
+    for index, brief in enumerate(plan.get("measurement_brief", [])):
+        if not isinstance(brief, dict):
+            continue
+        journey_id = str(brief.get("journey_id", ""))
+        if journey_id and journey_id not in covered_ids:
+            add_issue(issues, "error", "MEASUREMENT_JOURNEY_NOT_IN_COVERAGE_MAP", f"$.measurement_brief[{index}].journey_id", f"Journey '{journey_id}' must have a matching website_coverage_map.journeys_covered entry.")
+
+
+def check_whole_site_coverage(coverage: dict[str, Any], issues: list[Issue]) -> None:
+    if coverage.get("site_scope") != "whole_site":
+        return
+    source_types = {
+        str(source.get("source_type", ""))
+        for source in coverage.get("sources_checked", [])
+        if isinstance(source, dict)
+    }
+    structural_sources = {"sitemap", "robots_txt", "navigation", "url_list", "page_template", "static_html", "playwright_crawl", "browser_exploration", "existing_tracking_plan"}
+    if not source_types & structural_sources:
+        add_issue(issues, "error", "WHOLE_SITE_COVERAGE_SOURCE_MISSING", "$.website_coverage_map.sources_checked", "Whole-site plans need at least one structural source such as sitemap, navigation, URL list, page templates, static HTML, browser exploration, Playwright, or existing tracking files.")
+    if not coverage.get("journeys_discovered"):
+        add_issue(issues, "error", "WHOLE_SITE_DISCOVERED_JOURNEYS_MISSING", "$.website_coverage_map.journeys_discovered", "Whole-site plans must list discovered journeys and include/exclude/needs-discovery decisions.")
 
 
 def check_website_coverage_map(plan: dict[str, Any], issues: list[Issue]) -> None:
     coverage = plan.get("website_coverage_map", {})
     if not isinstance(coverage, dict):
         return
-
     journey_ids = {
         str(brief.get("journey_id", ""))
         for brief in plan.get("measurement_brief", [])
         if isinstance(brief, dict) and brief.get("journey_id")
     }
-    source_types = {
-        str(source.get("source_type", ""))
-        for source in coverage.get("sources_checked", [])
-        if isinstance(source, dict)
-    }
-    structural_sources = {
-        "sitemap",
-        "robots_txt",
-        "navigation",
-        "url_list",
-        "page_template",
-        "playwright_crawl",
-        "browser_exploration",
-        "existing_tracking_plan",
-    }
-
-    covered_journey_ids: set[str] = set()
-    included_coverage_ids: set[str] = set()
-    for index, item in enumerate(coverage.get("journeys_covered", []) if isinstance(coverage.get("journeys_covered", []), list) else []):
-        if not isinstance(item, dict):
-            continue
-        journey_id = str(item.get("journey_id", ""))
-        if journey_id:
-            covered_journey_ids.add(journey_id)
-            if item.get("tracking_plan_decision") == "included":
-                included_coverage_ids.add(journey_id)
-            if journey_id not in journey_ids:
-                add_issue(
-                    issues,
-                    "error",
-                    "COVERAGE_JOURNEY_UNKNOWN",
-                    f"$.website_coverage_map.journeys_covered[{index}].journey_id",
-                    f"Coverage map references unknown journey_id '{journey_id}'.",
-                )
-        if item.get("tracking_plan_decision") == "included":
-            if item.get("coverage_status") in {"blocked", "out_of_scope"}:
-                add_issue(
-                    issues,
-                    "error",
-                    "COVERAGE_INCLUDED_BUT_NOT_COVERED",
-                    f"$.website_coverage_map.journeys_covered[{index}].coverage_status",
-                    "Included journeys cannot be marked blocked or out_of_scope.",
-                )
-            for field in ["representative_urls", "page_templates", "key_interactions", "evidence"]:
-                values = item.get(field, [])
-                if not isinstance(values, list) or not any(str(value).strip() for value in values):
-                    add_issue(
-                        issues,
-                        "error",
-                        "COVERAGE_INCLUDED_EVIDENCE_MISSING",
-                        f"$.website_coverage_map.journeys_covered[{index}].{field}",
-                        f"Included journeys need non-empty {field} so analysts and developers can understand coverage.",
-                    )
-
-    coverage_gap_text = " ".join(
-        " ".join(str(value) for value in gap.values())
-        for gap in coverage.get("coverage_gaps", [])
-        if isinstance(gap, dict)
-    ).lower()
-    for index, discovered in enumerate(coverage.get("journeys_discovered", []) if isinstance(coverage.get("journeys_discovered", []), list) else []):
-        if not isinstance(discovered, dict):
-            continue
-        journey_id = str(discovered.get("journey_id", ""))
-        decision = str(discovered.get("decision", ""))
-        if decision == "include_in_plan" and journey_id not in journey_ids:
-            add_issue(
-                issues,
-                "error",
-                "DISCOVERED_JOURNEY_NOT_IN_MEASUREMENT_BRIEF",
-                f"$.website_coverage_map.journeys_discovered[{index}].journey_id",
-                f"Discovered journey '{journey_id}' is marked include_in_plan but is missing from measurement_brief.",
-            )
-        if decision == "include_in_plan" and journey_id not in included_coverage_ids:
-            add_issue(
-                issues,
-                "error",
-                "DISCOVERED_JOURNEY_NOT_COVERED",
-                f"$.website_coverage_map.journeys_discovered[{index}].journey_id",
-                f"Discovered journey '{journey_id}' is marked include_in_plan but has no included coverage entry.",
-            )
-        if decision == "needs_discovery":
-            marker_text = f"{journey_id} {discovered.get('journey_name', '')}".lower()
-            if not any(part and part in coverage_gap_text for part in marker_text.split()):
-                add_issue(
-                    issues,
-                    "error",
-                    "DISCOVERED_JOURNEY_GAP_MISSING",
-                    f"$.website_coverage_map.journeys_discovered[{index}].decision",
-                    f"Discovered journey '{journey_id}' needs discovery but no matching coverage gap explains the risk.",
-                )
-
-    for brief_index, brief in enumerate(plan.get("measurement_brief", []) if isinstance(plan.get("measurement_brief", []), list) else []):
-        if not isinstance(brief, dict):
-            continue
-        journey_id = str(brief.get("journey_id", ""))
-        if journey_id and journey_id not in covered_journey_ids:
-            add_issue(
-                issues,
-                "error",
-                "MEASUREMENT_JOURNEY_NOT_IN_COVERAGE_MAP",
-                f"$.measurement_brief[{brief_index}].journey_id",
-                f"Journey '{journey_id}' must have a matching website_coverage_map.journeys_covered entry.",
-            )
-
-    if coverage.get("site_scope") == "whole_site" and not (source_types & structural_sources):
-        add_issue(
-            issues,
-            "error",
-            "WHOLE_SITE_COVERAGE_SOURCE_MISSING",
-            "$.website_coverage_map.sources_checked",
-            "Whole-site plans need at least one structural source such as sitemap, navigation, URL list, page templates, browser exploration, Playwright, or existing tracking files.",
-        )
-    if coverage.get("site_scope") == "whole_site" and not coverage.get("journeys_discovered"):
-        add_issue(
-            issues,
-            "error",
-            "WHOLE_SITE_DISCOVERED_JOURNEYS_MISSING",
-            "$.website_coverage_map.journeys_discovered",
-            "Whole-site plans must list discovered journeys and include/exclude/needs-discovery decisions.",
-        )
-
-
-def check_official_verification(
-    verification: Any,
-    platform: str,
-    path: str,
-    issues: list[Issue],
-    *,
-    required: bool,
-) -> None:
-    if not isinstance(verification, dict):
-        if required:
-            add_issue(issues, "error", "OFFICIAL_VERIFICATION_MISSING", path, "Official-first choices need source URL, checked date, and scope note.")
-        return
-    status = str(verification.get("status", ""))
-    source_url = str(verification.get("source_url", "")).lower()
-    scope_note = str(verification.get("scope_note", "")).strip()
-    checked_date = str(verification.get("checked_date", ""))
-    if required and status != "verified":
-        add_issue(
-            issues,
-            "error",
-            "OFFICIAL_VERIFICATION_NOT_VERIFIED",
-            f"{path}.status",
-            "Official/native/recommended/platform-standard fields must be marked verified against official documentation.",
-        )
-    if required and platform in OFFICIAL_SOURCE_DOMAINS and not any(domain in source_url for domain in OFFICIAL_SOURCE_DOMAINS[platform]):
-        add_issue(
-            issues,
-            "error",
-            "OFFICIAL_VERIFICATION_SOURCE_INVALID",
-            f"{path}.source_url",
-            f"Official verification for {platform} must cite an official source domain.",
-        )
-    if required and len(scope_note.split()) < 3:
-        add_issue(
-            issues,
-            "error",
-            "OFFICIAL_VERIFICATION_SCOPE_WEAK",
-            f"{path}.scope_note",
-            "Official verification must state event, item, property, or implementation scope clearly.",
-        )
-    if required and checked_date:
-        try:
-            age_days = (date.today() - date.fromisoformat(checked_date)).days
-        except ValueError:
-            return
-        if age_days < 0:
-            add_issue(issues, "error", "OFFICIAL_VERIFICATION_DATE_FUTURE", f"{path}.checked_date", "Official verification date cannot be in the future.")
-        elif age_days > 180:
-            add_issue(
-                issues,
-                "warning",
-                "OFFICIAL_VERIFICATION_STALE",
-                f"{path}.checked_date",
-                "Official verification is more than 180 days old and should be refreshed before approval.",
-            )
-
+    covered_ids, included_ids = check_covered_journeys(coverage, journey_ids, issues)
+    check_discovered_journeys(coverage, journey_ids, included_ids, issues)
+    check_measurement_brief_coverage(plan, covered_ids, issues)
+    check_whole_site_coverage(coverage, issues)
 
 def check_not_tracked_decisions(plan: dict[str, Any], issues: list[Issue]) -> None:
     not_tracked = plan.get("not_tracked", [])
@@ -538,6 +404,25 @@ def check_not_tracked_decisions(plan: dict[str, Any], issues: list[Issue]) -> No
             )
 
 
+def check_screenshot_row(row: dict[str, Any], index: int, event_ids: set[str], covered: Counter[str], file_usage: defaultdict[str, list[dict[str, Any]]], issues: list[Issue]) -> None:
+    base = f"$.screenshot_evidence[{index}]"
+    related = [str(value) for value in row.get("event_ids", [])]
+    for event_id in related:
+        if event_id not in event_ids:
+            add_issue(issues, "error", "SCREENSHOT_EVENT_UNKNOWN", f"{base}.event_ids", f"Screenshot evidence references unknown event_id '{event_id}'.")
+        covered[event_id] += 1
+    status = str(row.get("status", ""))
+    file_name = str(row.get("file_name", "")).strip()
+    if status in {"captured", "shared_evidence"} and not file_name:
+        add_issue(issues, "error", "SCREENSHOT_FILE_MISSING", f"{base}.file_name", f"Screenshot status '{status}' requires an explicit evidence file name.")
+    if status == "shared_evidence" and len(related) < 2:
+        add_issue(issues, "error", "SCREENSHOT_SHARED_WITH_ONE_EVENT", f"{base}.event_ids", "shared_evidence must reference at least two events.")
+    if status == "shared_evidence" and len(str(row.get("shared_reason", "")).split()) < 4:
+        add_issue(issues, "error", "SCREENSHOT_SHARED_REASON_WEAK", f"{base}.shared_reason", "Shared screenshot evidence needs a clear reason describing the common page state or interaction.")
+    if file_name:
+        file_usage[file_name.lower()].append(row)
+
+
 def check_screenshot_evidence(plan: dict[str, Any], issues: list[Issue]) -> None:
     events = [event for event in plan.get("events", []) if isinstance(event, dict)]
     event_ids = {str(event.get("event_id", "")) for event in events}
@@ -552,22 +437,7 @@ def check_screenshot_evidence(plan: dict[str, Any], issues: list[Issue]) -> None
     covered: Counter[str] = Counter()
     file_usage: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
     for index, row in enumerate(evidence_rows):
-        base = f"$.screenshot_evidence[{index}]"
-        related = [str(value) for value in row.get("event_ids", [])]
-        for event_id in related:
-            if event_id not in event_ids:
-                add_issue(issues, "error", "SCREENSHOT_EVENT_UNKNOWN", f"{base}.event_ids", f"Screenshot evidence references unknown event_id '{event_id}'.")
-            covered[event_id] += 1
-        status = str(row.get("status", ""))
-        file_name = str(row.get("file_name", "")).strip()
-        if status in {"captured", "shared_evidence"} and not file_name:
-            add_issue(issues, "error", "SCREENSHOT_FILE_MISSING", f"{base}.file_name", f"Screenshot status '{status}' requires an explicit evidence file name.")
-        if status == "shared_evidence" and len(related) < 2:
-            add_issue(issues, "error", "SCREENSHOT_SHARED_WITH_ONE_EVENT", f"{base}.event_ids", "shared_evidence must reference at least two events.")
-        if status == "shared_evidence" and len(str(row.get("shared_reason", "")).split()) < 4:
-            add_issue(issues, "error", "SCREENSHOT_SHARED_REASON_WEAK", f"{base}.shared_reason", "Shared screenshot evidence needs a clear reason describing the common page state or interaction.")
-        if file_name:
-            file_usage[file_name.lower()].append(row)
+        check_screenshot_row(row, index, event_ids, covered, file_usage, issues)
 
     for event_id in sorted(event_ids):
         if covered[event_id] == 0:
@@ -585,400 +455,103 @@ def check_screenshot_evidence(plan: dict[str, Any], issues: list[Issue]) -> None
             )
 
 
-def check_event(
-    event: dict[str, Any],
-    index: int,
-    parameter_lookup: dict[str, dict[str, Any]],
-    ga4_catalog: dict[str, Any],
-    issues: list[Issue],
-) -> None:
-    base = f"$.events[{index}]"
-    event_name = event.get("event_name", "")
-    classification = event.get("classification", "")
-    parameters = event.get("parameters", [])
-    parameter_names = set(parameter_lookup)
-    data_layer = event.get("data_layer", {})
-    ga4_payload = event.get("ga4_payload", {})
-    privacy = event.get("privacy", {})
+def check_official_source_inventory(plan: dict[str, Any], events: list[Any], issues: list[Issue]) -> None:
+    source_urls = [
+        str(source.get("url", "")).lower()
+        for source in plan.get("documentation_sources_checked", [])
+        if isinstance(source, dict) and source.get("source_type") == "official"
+    ]
+    has_ga4_events = any(isinstance(event, dict) and is_ga4_event(event) for event in events)
+    if has_ga4_events and not any(any(domain in url for domain in OFFICIAL_SOURCE_DOMAINS["ga4"]) for url in source_urls):
+        add_issue(issues, "error", "GA4_OFFICIAL_SOURCE_MISSING", "$.documentation_sources_checked", "GA4 plans must cite at least one official Google Analytics documentation source.")
 
-    check_legacy_ua_field(str(event_name), f"{base}.event_name", issues)
 
-    if not str(event.get("official_match", "")).strip():
-        add_issue(issues, "error", "OFFICIAL_MATCH_MISSING", f"{base}.official_match", "Every event needs official_match describing the official event match or custom rationale.")
-    check_official_verification(
-        event.get("official_verification"),
-        "ga4",
-        f"{base}.official_verification",
-        issues,
-        required=classification in OFFICIAL_VERIFICATION_CLASSES,
-    )
-    collection_strategy = event.get("collection_strategy", {})
-    if isinstance(collection_strategy, dict):
-        collection_source = str(collection_strategy.get("collection_source", ""))
-        duplicate_risk = collection_strategy.get("duplicate_risk", {})
-        if classification == "automatic" and collection_source != "ga4_automatic":
-            add_issue(
-                issues,
-                "warning",
-                "AUTOMATIC_COLLECTION_SOURCE_MISMATCH",
-                f"{base}.collection_strategy.collection_source",
-                "GA4 automatic events should normally use collection_source='ga4_automatic'.",
-            )
-        if classification == "enhanced_measurement" and collection_source != "ga4_enhanced_measurement":
-            add_issue(
-                issues,
-                "warning",
-                "ENHANCED_COLLECTION_SOURCE_MISMATCH",
-                f"{base}.collection_strategy.collection_source",
-                "GA4 enhanced-measurement events should normally use collection_source='ga4_enhanced_measurement'.",
-            )
-        if str(event_name) in POTENTIAL_DUPLICATE_EVENTS and collection_source in MANUAL_COLLECTION_SOURCES:
-            if not isinstance(duplicate_risk, dict) or duplicate_risk.get("level") == "low":
-                add_issue(
-                    issues,
-                    "warning",
-                    "ENHANCED_MEASUREMENT_DUPLICATE_RISK_UNDERSTATED",
-                    f"{base}.collection_strategy.duplicate_risk.level",
-                    f"Manual collection of '{event_name}' needs a medium/high duplicate-risk decision unless native collection is explicitly disabled or insufficient.",
-                )
-            reason_text = " ".join(str(duplicate_risk.get(key, "")) for key in ["reason", "dedupe_rule"]) if isinstance(duplicate_risk, dict) else ""
-            if len(reason_text.split()) < 8:
-                add_issue(
-                    issues,
-                    "error",
-                    "DUPLICATE_RISK_DECISION_WEAK",
-                    f"{base}.collection_strategy.duplicate_risk",
-                    "Manual collection of automatic/enhanced-measurement candidates needs a concrete duplicate-risk reason and dedupe rule.",
-                )
-    page_or_component = str(event.get("page_or_component", "")).strip()
-    if page_or_component.lower().rstrip(".") in WEAK_COMPONENT_CONTEXTS or len(page_or_component.split()) < 2:
-        add_issue(
-            issues,
-            "error",
-            "EVENT_COMPONENT_CONTEXT_WEAK",
-            f"{base}.page_or_component",
-            "Event page_or_component must identify the concrete page area, module, form, list, or interaction target.",
-        )
-    data_dependencies = event.get("data_dependencies", [])
-    if not isinstance(data_dependencies, list) or not data_dependencies:
-        add_issue(
-            issues,
-            "error",
-            "EVENT_DATA_DEPENDENCIES_MISSING",
-            f"{base}.data_dependencies",
-            "Every event needs concrete data dependencies so developers and QA know which source values are required.",
-        )
-    elif any(
-        str(dependency).strip().lower().rstrip(".") in WEAK_DATA_DEPENDENCY_VALUES
-        or len(str(dependency).strip().split()) < 2
-        for dependency in data_dependencies
-    ):
-        add_issue(
-            issues,
-            "error",
-            "EVENT_DATA_DEPENDENCY_WEAK",
-            f"{base}.data_dependencies",
-            "Event data_dependencies must list concrete source values or systems, not generic placeholders.",
-        )
-    role = str(event.get("measurement_role", ""))
-    if role in NON_CONVERSION_MEASUREMENT_ROLES and event.get("key_event"):
-        add_issue(
-            issues,
-            "error",
-            "KEY_EVENT_ROLE_INVALID",
-            f"{base}.measurement_role",
-            f"Events with measurement_role '{role}' should not be marked as key events.",
-        )
-    if role == "macro_conversion" and not event.get("key_event"):
-        add_issue(
-            issues,
-            "warning",
-            "MACRO_CONVERSION_NOT_KEY_EVENT",
-            f"{base}.key_event",
-            "Macro conversions should normally be marked as key events or explicitly justified in implementation_notes.",
-        )
-    if role == "macro_conversion" and event.get("priority") != "must":
-        add_issue(
-            issues,
-            "warning",
-            "MACRO_CONVERSION_PRIORITY",
-            f"{base}.priority",
-            "Macro conversions should normally use priority='must'.",
-        )
-    check_business_question(event.get("business_question"), f"{base}.business_question", issues)
-    analysis_use = str(event.get("analysis_use", "")).strip()
-    if len(analysis_use.split()) < 5:
-        add_issue(issues, "error", "EVENT_ANALYSIS_USE_WEAK", f"{base}.analysis_use", "Each event needs a concrete reporting, optimization, or business-decision use.")
-    evidence_basis = event.get("evidence_basis", {})
-    if isinstance(evidence_basis, dict) and not evidence_basis.get("source_refs"):
-        add_issue(issues, "error", "EVENT_EVIDENCE_SOURCE_MISSING", f"{base}.evidence_basis.source_refs", "Event evidence must identify the website, brief, client file, or analyst inference it is based on.")
+def check_parameter_definition(param: dict[str, Any], index: int, issues: list[Issue]) -> None:
+    name = str(param.get("parameter_name", ""))
+    classification = param.get("classification")
+    governed_sensitive = governed_sensitive_implementation_parameter(param)
+    if not governed_sensitive:
+        check_pii_name(name, f"$.parameters[{index}].parameter_name", issues)
+    check_legacy_ua_field(name, f"$.parameters[{index}].parameter_name", issues)
+    check_official_verification(param.get("official_verification"), "ga4", f"$.parameters[{index}].official_verification", issues, required=classification in OFFICIAL_PARAMETER_CLASSES)
+    if should_lint_ga4_parameter_name(name, param):
+        check_ga4_name(name, f"$.parameters[{index}].parameter_name", "parameter", issues)
+        if name in GA4_RESERVED_PARAMETER_NAMES and classification not in OFFICIAL_PARAMETER_CLASSES:
+            add_issue(issues, "error", "GA4_RESERVED_PARAMETER_NAME", f"$.parameters[{index}].parameter_name", f"'{name}' is reserved/native in GA4 and must not be used as a custom parameter.")
+    check_item_parameter_definition(param, index, issues)
+    if param.get("pii_risk") == "high" and not governed_sensitive:
+        add_issue(issues, "error", "HIGH_PII_RISK", f"$.parameters[{index}].pii_risk", f"Parameter '{name}' has high PII risk.")
+    if param.get("cardinality_risk") == "high" and param.get("register_custom_definition"):
+        add_issue(issues, "warning", "HIGH_CARDINALITY_CUSTOM_DIMENSION", f"$.parameters[{index}]", f"Parameter '{name}' is high-cardinality and marked for custom definition registration.")
+    check_parameter_documentation(param, index, issues)
 
-    for parameter in parameters:
-        check_pii_name(str(parameter), f"{base}.parameters", issues)
-        check_legacy_ua_field(str(parameter), f"{base}.parameters", issues)
-        if parameter in LEGACY_WRAPPER_PARAMETERS:
-            add_issue(
-                issues,
-                "warning",
-                "LEGACY_WRAPPER_PARAMETER",
-                f"{base}.parameters",
-                f"Parameter '{parameter}' is a legacy wrapper pattern. Prefer direct GA4 event parameters.",
-            )
-        if parameter.startswith("items[].") and parameter not in OFFICIAL_ITEM_PARAMETERS and parameter not in parameter_names:
-            add_issue(issues, "warning", "CUSTOM_ITEM_PARAMETER_NOT_DEFINED", f"{base}.parameters", f"Custom item parameter '{parameter}' must be defined in the parameter reference.")
-        elif parameter not in parameter_names and not parameter.startswith("items[]."):
-            add_issue(issues, "warning", "PARAMETER_NOT_DEFINED", f"{base}.parameters", f"Parameter '{parameter}' is not in the parameter reference.")
 
-    event_key = data_layer.get("event_key")
-    if event_name in LEGACY_WRAPPER_EVENT_KEYS or event_key in LEGACY_WRAPPER_EVENT_KEYS:
-        add_issue(
-            issues,
-            "error",
-            "LEGACY_WRAPPER_EVENT",
-            f"{base}.data_layer.event_key",
-            "Use the GA4 event name directly instead of a wrapper event such as gtm.custom_event.",
-        )
+def check_item_parameter_definition(param: dict[str, Any], index: int, issues: list[Issue]) -> None:
+    name = str(param.get("parameter_name", ""))
+    if not name.startswith("items[]."):
+        return
+    classification = param.get("classification")
+    if name in OFFICIAL_ITEM_PARAMETERS:
+        if classification == "custom_item_parameter":
+            add_issue(issues, "warning", "OFFICIAL_ITEM_PARAMETER_MISCLASSIFIED", f"$.parameters[{index}].classification", f"'{name}' is an official GA4 item parameter; classify it as ga4_ecommerce_item_parameter.")
+        return
+    if classification in OFFICIAL_ECOMMERCE_PARAMETER_CLASSES:
+        add_issue(issues, "error", "CUSTOM_ITEM_PARAMETER_MISCLASSIFIED", f"$.parameters[{index}].classification", f"'{name}' is not an official GA4 item parameter; classify it as custom_item_parameter.")
+    elif classification != "custom_item_parameter":
+        add_issue(issues, "warning", "CUSTOM_ITEM_PARAMETER_CLASSIFICATION", f"$.parameters[{index}].classification", f"'{name}' is item-scoped and non-official; use custom_item_parameter.")
+    if param.get("scope") != "item":
+        add_issue(issues, "error", "CUSTOM_ITEM_PARAMETER_SCOPE", f"$.parameters[{index}].scope", f"'{name}' must use item scope.")
 
-    push = data_layer.get("push", {})
-    if isinstance(push, dict):
-        pushed_event = push.get("event")
-        if pushed_event in LEGACY_WRAPPER_EVENT_KEYS:
-            add_issue(
-                issues,
-                "error",
-                "LEGACY_WRAPPER_PUSH",
-                f"{base}.data_layer.push.event",
-                "dataLayer push uses a wrapper event. Push the final GA4 event name directly.",
-            )
-        for path, key in walk_keys(push, f"{base}.data_layer.push"):
-            check_pii_name(key, path, issues)
-            check_legacy_ua_field(key, path, issues)
 
-    payload_name = ga4_payload.get("event_name")
-    if payload_name and payload_name != event_name:
-        add_issue(issues, "error", "PAYLOAD_EVENT_MISMATCH", f"{base}.ga4_payload.event_name", f"Payload event '{payload_name}' does not match event_name '{event_name}'.")
-
-    payload_parameters = ga4_payload.get("parameters", {}) if isinstance(ga4_payload.get("parameters"), dict) else {}
-    for name in payload_parameters:
-        check_pii_name(name, f"{base}.ga4_payload.parameters.{name}", issues)
-        check_legacy_ua_field(name, f"{base}.ga4_payload.parameters.{name}", issues)
-
-    if event_name in ECOMMERCE_EVENTS and classification != "recommended_ecommerce":
-        add_issue(issues, "warning", "ECOMMERCE_CLASSIFICATION", f"{base}.classification", f"Official ecommerce event '{event_name}' should usually be classified as recommended_ecommerce.")
-    if classification == "recommended_ecommerce" and event_name not in ECOMMERCE_EVENTS:
-        add_issue(issues, "error", "INVALID_ECOMMERCE_EVENT", f"{base}.event_name", f"'{event_name}' is not an official GA4 ecommerce event.")
-
-    if classification == "recommended_ecommerce":
-        profile = event.get("parameter_profile")
-        expected_profile = ECOMMERCE_PROFILE_BY_EVENT.get(str(event_name))
-        if not isinstance(profile, dict):
-            add_issue(issues, "error", "ECOMMERCE_PARAMETER_PROFILE_MISSING", f"{base}.parameter_profile", "Ecommerce events need a canonical parameter profile.")
-        else:
-            profile_id = profile.get("profile_id")
-            if expected_profile and profile_id != expected_profile:
-                add_issue(
-                    issues,
-                    "error",
-                    "ECOMMERCE_PARAMETER_PROFILE_MISMATCH",
-                    f"{base}.parameter_profile.profile_id",
-                    f"{event_name} should use parameter profile '{expected_profile}'.",
-                )
-            canonical = profile.get("canonical_parameter_order", [])
-            expected_order = ECOMMERCE_PARAMETERS_BY_PROFILE.get(str(profile_id), [])
-            if expected_order and canonical != expected_order:
-                add_issue(
-                    issues,
-                    "error",
-                    "ECOMMERCE_PARAMETER_PROFILE_ORDER",
-                    f"{base}.parameter_profile.canonical_parameter_order",
-                    "Ecommerce parameter profile must use the canonical order for the profile.",
-                )
-            ordered_event_parameters = [parameter for parameter in event.get("parameters", []) if parameter in canonical]
-            canonical_present = [parameter for parameter in canonical if parameter in event.get("parameters", [])]
-            if ordered_event_parameters != canonical_present:
-                add_issue(
-                    issues,
-                    "warning",
-                    "ECOMMERCE_EVENT_PARAMETER_ORDER",
-                    f"{base}.parameters",
-                    "Ecommerce event parameters should follow the canonical profile order to keep the Event Matrix readable.",
-                )
-        official_event_parameters = EVENT_PARAMETERS_BY_EVENT.get(event_name, set())
-        for name in payload_parameters:
-            metadata = parameter_lookup.get(name)
-            if name not in official_event_parameters:
-                if metadata is None:
-                    add_issue(issues, "warning", "CUSTOM_ECOMMERCE_PARAMETER_NOT_DEFINED", f"{base}.ga4_payload.parameters.{name}", f"Custom ecommerce event parameter '{name}' must be defined in the parameter reference.")
-                elif metadata.get("classification") in OFFICIAL_ECOMMERCE_PARAMETER_CLASSES:
-                    add_issue(issues, "error", "CUSTOM_ECOMMERCE_PARAMETER_MISCLASSIFIED", f"{base}.ga4_payload.parameters.{name}", f"'{name}' is not an official parameter for {event_name}; classify it as custom_event_parameter or remove it.")
-        items = ga4_payload.get("items", [])
-        if not isinstance(items, list) or not items:
-            add_issue(issues, "error", "ECOMMERCE_ITEMS_MISSING", f"{base}.ga4_payload.items", "Ecommerce events need an items array when product/item data is available.")
-        for item_index, item in enumerate(items if isinstance(items, list) else []):
-            if not isinstance(item, dict):
-                continue
-            if "item_id" not in item and "item_name" not in item:
-                add_issue(issues, "error", "ECOMMERCE_ITEM_ID_OR_NAME", f"{base}.ga4_payload.items[{item_index}]", "Each ecommerce item needs item_id or item_name.")
-            if "currency" in item:
-                add_issue(issues, "error", "ITEM_SCOPE_CURRENCY", f"{base}.ga4_payload.items[{item_index}].currency", "currency is event-scoped, not item-scoped.")
-            for key in item:
-                parameter_name = f"items[].{key}"
-                metadata = parameter_lookup.get(parameter_name)
-                if parameter_name in OFFICIAL_ITEM_PARAMETERS:
-                    continue
-                if metadata is None:
-                    add_issue(issues, "warning", "CUSTOM_ITEM_PARAMETER_NOT_DEFINED", f"{base}.ga4_payload.items[{item_index}].{key}", f"Custom item parameter '{parameter_name}' must be defined in the parameter reference.")
-                elif metadata.get("classification") in OFFICIAL_ECOMMERCE_PARAMETER_CLASSES:
-                    add_issue(issues, "error", "CUSTOM_ITEM_PARAMETER_MISCLASSIFIED", f"{base}.ga4_payload.items[{item_index}].{key}", f"'{parameter_name}' is not an official GA4 item parameter; classify it as custom_item_parameter or remove it.")
-        flush_keys = set(data_layer.get("flush_keys", []))
-        if "ecommerce" not in flush_keys:
-            add_issue(issues, "warning", "ECOMMERCE_FLUSH_MISSING", f"{base}.data_layer.flush_keys", "Flush ecommerce before ecommerce pushes to prevent stale item data.")
-
-    if event_name in TRANSACTION_EVENTS and "transaction_id" not in payload_parameters:
-        add_issue(issues, "error", "TRANSACTION_ID_MISSING", f"{base}.ga4_payload.parameters", f"{event_name} needs transaction_id for deduplication.")
-    if event_name in VALUE_EVENTS_REQUIRE_CURRENCY and "value" in payload_parameters and "currency" not in payload_parameters:
-        add_issue(issues, "error", "CURRENCY_MISSING", f"{base}.ga4_payload.parameters", "currency is required when value is sent.")
-
-    if privacy.get("pii_risk") == "high":
-        add_issue(issues, "error", "HIGH_PII_RISK", f"{base}.privacy.pii_risk", "High PII risk must be resolved before plan approval.")
-    cardinality_notes = f"{privacy.get('notes', '')} {event.get('implementation_notes', '')}"
-    if privacy.get("cardinality_risk") == "high" and not HIGH_CARDINALITY_GOVERNANCE_RE.search(cardinality_notes):
-        add_issue(issues, "warning", "HIGH_CARDINALITY_RISK", f"{base}.privacy.cardinality_risk", "High-cardinality fields should not be registered as reporting dimensions unless justified.")
-
-    if classification in GA4_CLASSIFICATIONS and classification != "automatic" and not ga4_payload:
-        add_issue(
-            issues,
-            "warning",
-            "GA4_PAYLOAD_MISSING",
-            f"{base}.ga4_payload",
-            "GA4 recommended, ecommerce, and custom events should include a ga4_payload example unless the event is intentionally automatic-only.",
-        )
-
-    check_ga4_event_shape(event, index, ga4_catalog, issues)
-    check_custom_event_rationale(event, index, issues)
+def check_parameter_documentation(param: dict[str, Any], index: int, issues: list[Issue]) -> None:
+    name = str(param.get("parameter_name", ""))
+    classification = param.get("classification")
+    purpose = str(param.get("reporting_purpose", "")).strip()
+    normalized_purpose = purpose.lower().rstrip(".")
+    if normalized_purpose in WEAK_REPORTING_PURPOSES or len(purpose.split()) < 5:
+        add_issue(issues, "error", "PARAMETER_REPORTING_PURPOSE_WEAK", f"$.parameters[{index}].reporting_purpose", f"Parameter '{name}' needs a concrete reporting or analysis purpose.")
+    elif classification in CUSTOM_PARAMETER_CLASSIFICATIONS and not REPORTING_PURPOSE_RE.search(purpose):
+        add_issue(issues, "error", "CUSTOM_PARAMETER_REPORTING_PURPOSE_WEAK", f"$.parameters[{index}].reporting_purpose", f"Custom parameter '{name}' must state the analysis, segmentation, QA, or optimization use it supports.")
+    rules = str(param.get("value_rules", "")).strip()
+    if classification in CUSTOM_PARAMETER_CLASSIFICATIONS and (rules.lower().rstrip(".") in WEAK_VALUE_RULES or len(rules.split()) < 3):
+        add_issue(issues, "error", "CUSTOM_PARAMETER_VALUE_RULES_WEAK", f"$.parameters[{index}].value_rules", f"Custom parameter '{name}' needs concrete value rules or controlled values.")
+    availability = str(param.get("availability", ""))
+    if availability in {"requires_development", "requires_backend", "to_confirm", "unavailable"} and len(str(param.get("data_owner", "")).split()) < 2:
+        add_issue(issues, "error", "PARAMETER_DATA_OWNER_MISSING", f"$.parameters[{index}].data_owner", f"Parameter '{name}' needs a clear owner because its availability is '{availability}'.")
 
 
 def validate_plan_data(plan: dict[str, Any], schema_path: Path | None = None) -> list[Issue]:
     issues: list[Issue] = []
-    schema_path = schema_path or default_schema_path()
-    validate_schema(plan, schema_path, issues)
-
+    validate_schema(plan, schema_path or default_schema_path(), issues)
     parameters = plan.get("parameters", [])
-    parameter_lookup = {param.get("parameter_name", ""): param for param in parameters if isinstance(param, dict)}
-    ga4_catalog = load_ga4_catalog()
     events = plan.get("events", [])
-    documentation_sources = plan.get("documentation_sources_checked", [])
-
-    check_duplicates([event.get("event_id", "") for event in events if isinstance(event, dict)], "event_id", "$.events", issues)
+    parameter_lookup = {
+        param.get("parameter_name", ""): param
+        for param in parameters
+        if isinstance(param, dict)
+    }
+    check_duplicates(
+        [event.get("event_id", "") for event in events if isinstance(event, dict)],
+        "event_id",
+        "$.events",
+        issues,
+    )
     check_execution_context(plan, issues)
     check_measurement_alignment(plan, issues)
     check_measurement_strategy(plan, issues)
     check_website_coverage_map(plan, issues)
     check_not_tracked_decisions(plan, issues)
     check_screenshot_evidence(plan, issues)
-    source_urls = [
-        str(source.get("url", "")).lower()
-        for source in documentation_sources
-        if isinstance(source, dict) and source.get("source_type") == "official"
-    ]
-    has_ga4_events = any(isinstance(event, dict) and is_ga4_event(event) for event in events)
-    if has_ga4_events and not any(any(domain in url for domain in OFFICIAL_SOURCE_DOMAINS["ga4"]) for url in source_urls):
-        add_issue(
-            issues,
-            "error",
-            "GA4_OFFICIAL_SOURCE_MISSING",
-            "$.documentation_sources_checked",
-            "GA4 plans must cite at least one official Google Analytics documentation source.",
-        )
+    check_delivery_rules(plan, issues)
+    check_official_source_inventory(plan, events, issues)
     for index, param in enumerate(parameters):
-        if not isinstance(param, dict):
-            continue
-        name = str(param.get("parameter_name", ""))
-        check_pii_name(name, f"$.parameters[{index}].parameter_name", issues)
-        check_legacy_ua_field(name, f"$.parameters[{index}].parameter_name", issues)
-        classification = param.get("classification")
-        check_official_verification(
-            param.get("official_verification"),
-            "ga4",
-            f"$.parameters[{index}].official_verification",
-            issues,
-            required=classification in OFFICIAL_PARAMETER_CLASSES,
-        )
-        if should_lint_ga4_parameter_name(name, param):
-            check_ga4_name(name, f"$.parameters[{index}].parameter_name", "parameter", issues)
-            if name in GA4_RESERVED_PARAMETER_NAMES and classification not in {
-                "ga4_auto_collected_parameter",
-                "ga4_native_parameter",
-                "ga4_recommended_parameter",
-                "ga4_ecommerce_parameter",
-                "ga4_ecommerce_item_parameter",
-            }:
-                add_issue(
-                    issues,
-                    "error",
-                    "GA4_RESERVED_PARAMETER_NAME",
-                    f"$.parameters[{index}].parameter_name",
-                    f"'{name}' is reserved/native in GA4 and must not be used as a custom parameter.",
-                )
-        if name.startswith("items[]."):
-            if name in OFFICIAL_ITEM_PARAMETERS:
-                if classification == "custom_item_parameter":
-                    add_issue(issues, "warning", "OFFICIAL_ITEM_PARAMETER_MISCLASSIFIED", f"$.parameters[{index}].classification", f"'{name}' is an official GA4 item parameter; classify it as ga4_ecommerce_item_parameter.")
-            else:
-                if classification in OFFICIAL_ECOMMERCE_PARAMETER_CLASSES:
-                    add_issue(issues, "error", "CUSTOM_ITEM_PARAMETER_MISCLASSIFIED", f"$.parameters[{index}].classification", f"'{name}' is not an official GA4 item parameter; classify it as custom_item_parameter.")
-                elif classification != "custom_item_parameter":
-                    add_issue(issues, "warning", "CUSTOM_ITEM_PARAMETER_CLASSIFICATION", f"$.parameters[{index}].classification", f"'{name}' is item-scoped and non-official; use custom_item_parameter.")
-                if param.get("scope") != "item":
-                    add_issue(issues, "error", "CUSTOM_ITEM_PARAMETER_SCOPE", f"$.parameters[{index}].scope", f"'{name}' must use item scope.")
-        if param.get("pii_risk") == "high":
-            add_issue(issues, "error", "HIGH_PII_RISK", f"$.parameters[{index}].pii_risk", f"Parameter '{name}' has high PII risk.")
-        if param.get("cardinality_risk") == "high" and param.get("register_custom_definition"):
-            add_issue(issues, "warning", "HIGH_CARDINALITY_CUSTOM_DIMENSION", f"$.parameters[{index}]", f"Parameter '{name}' is high-cardinality and marked for custom definition registration.")
-        reporting_purpose = str(param.get("reporting_purpose", "")).strip()
-        normalized_purpose = reporting_purpose.lower().rstrip(".")
-        if normalized_purpose in WEAK_REPORTING_PURPOSES or len(reporting_purpose.split()) < 5:
-            add_issue(
-                issues,
-                "error",
-                "PARAMETER_REPORTING_PURPOSE_WEAK",
-                f"$.parameters[{index}].reporting_purpose",
-                f"Parameter '{name}' needs a concrete reporting or analysis purpose.",
-            )
-        elif classification in CUSTOM_PARAMETER_CLASSIFICATIONS and not REPORTING_PURPOSE_RE.search(reporting_purpose):
-            add_issue(
-                issues,
-                "error",
-                "CUSTOM_PARAMETER_REPORTING_PURPOSE_WEAK",
-                f"$.parameters[{index}].reporting_purpose",
-                f"Custom parameter '{name}' must state the analysis, segmentation, QA, or optimization use it supports.",
-            )
-        value_rules = str(param.get("value_rules", "")).strip()
-        normalized_rules = value_rules.lower().rstrip(".")
-        if classification in CUSTOM_PARAMETER_CLASSIFICATIONS and (normalized_rules in WEAK_VALUE_RULES or len(value_rules.split()) < 3):
-            add_issue(
-                issues,
-                "error",
-                "CUSTOM_PARAMETER_VALUE_RULES_WEAK",
-                f"$.parameters[{index}].value_rules",
-                f"Custom parameter '{name}' needs concrete value rules or controlled values.",
-            )
-        availability = str(param.get("availability", ""))
-        if availability in {"requires_development", "requires_backend", "to_confirm", "unavailable"} and len(str(param.get("data_owner", "")).split()) < 2:
-            add_issue(
-                issues,
-                "error",
-                "PARAMETER_DATA_OWNER_MISSING",
-                f"$.parameters[{index}].data_owner",
-                f"Parameter '{name}' needs a clear owner because its availability is '{availability}'.",
-            )
-
+        if isinstance(param, dict):
+            check_parameter_definition(param, index, issues)
+    ga4_catalog = load_ga4_catalog()
     for index, event in enumerate(events):
         if isinstance(event, dict):
             check_event(event, index, parameter_lookup, ga4_catalog, issues)
-
     return issues
-
 
 def render_text(issues: list[Issue]) -> str:
     if not issues:

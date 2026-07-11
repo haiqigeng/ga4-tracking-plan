@@ -1,6 +1,6 @@
 [project]
 name = "ga4-tracking-plan-skill"
-version = "1.0.0"
+version = "1.1.0"
 description = "GA4-only web analyst skill for human-readable tracking plans"
 requires-python = ">=3.11"
 dependencies = [
@@ -10,7 +10,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["ruff>=0.12,<1"]
+browser = ["playwright>=1.52,<2"]
+dev = [
+  "coverage>=7.9,<8",
+  "pip-audit>=2.9,<3",
+  "radon>=6,<7",
+  "ruff>=0.12,<1",
+  "vulture>=2.14,<3",
+]
 
 [tool.ruff]
 target-version = "py311"

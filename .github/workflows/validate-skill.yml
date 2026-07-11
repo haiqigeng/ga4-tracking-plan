@@ -22,11 +22,12 @@ jobs:
       - name: Install validation dependencies
         run: |
           python -m pip install -r requirements.txt
-          python -m pip install ruff
+          python -m pip install coverage ruff
       - name: Validate package
         run: |
           ruff check .
           python -m compileall -q scripts skill/scripts tests
-          python -m unittest discover -s tests
+          python -m coverage run --source=skill/scripts -m unittest discover -s tests
+          python -m coverage report --include="skill/scripts/validate_tracking_plan.py,skill/scripts/tracking_plan_validation_*.py,skill/scripts/ecommerce_matrix.py,skill/scripts/official_ga4_catalog.py,skill/scripts/generate_tracking_plan_workbook.py,skill/scripts/adapt_tracking_plan_workbook.py,skill/scripts/inspect_tracking_plan_template.py" --fail-under=80
           python scripts/check_official_catalog.py --offline
           python scripts/validate_package.py
