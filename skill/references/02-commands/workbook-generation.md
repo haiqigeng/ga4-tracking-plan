@@ -13,13 +13,21 @@ Use this workflow for the analyst-facing XLSX deliverable.
 6. After the event model is final, assign screenshot coverage: one
    representative scenario for repetitive generic events, or every materially
    different visible scenario for finite events.
-7. Capture 1920 x 1080 viewport evidence where practical. Use no labels or
+7. When screenshots are required, actively discover and attempt Playwright MCP
+   before using a fallback browser. Only skip that attempt when final image files
+   were supplied by the requester or screenshots were explicitly excluded.
+8. Capture 1920 x 1080 viewport evidence where practical. Use no labels or
    captions inside images; add only a bold red rectangle around an interaction
    area, confirmation, or error state. Page views normally need no rectangle.
-8. Put screenshot files in a `screenshots` folder beside the JSON, or pass a
+9. Record the `screenshot_capture` outcome. For blocked or partial capture,
+   write a concise notice that will appear at the top of Screenshot Register and
+   repeat it in the delivery response. Do not use `skip_allowed` as a silent
+   fallback.
+10. Put screenshot files in a `screenshots` folder beside the JSON, or pass a
    folder explicitly.
-9. Generate the default or mapped client workbook.
-10. Review every 480 x 270 preview at normal spreadsheet zoom.
+11. Generate the default or mapped client workbook. The generator rejects a
+    row marked captured when its image file is missing.
+12. Review every 480 x 270 preview at normal spreadsheet zoom.
 
 ```powershell
 python scripts/generate_tracking_plan_workbook.py plan.json --output plan.xlsx

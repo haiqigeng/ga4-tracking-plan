@@ -16,6 +16,7 @@
     "user_context",
     "events",
     "parameters",
+    "screenshot_capture",
     "screenshot_evidence",
     "not_tracked",
     "assumptions",
@@ -65,6 +66,9 @@
       "items": {
         "$ref": "#/$defs/parameter"
       }
+    },
+    "screenshot_capture": {
+      "$ref": "#/$defs/screenshotCapture"
     },
     "not_tracked": {
       "type": "array",
@@ -1712,6 +1716,59 @@
         "y2": {
           "type": "integer",
           "minimum": 0
+        }
+      }
+    },
+    "screenshotCapture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requirement",
+        "playwright_mcp_attempt",
+        "outcome",
+        "delivery_notice"
+      ],
+      "properties": {
+        "requirement": {
+          "enum": [
+            "required",
+            "not_requested"
+          ]
+        },
+        "playwright_mcp_attempt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "detail"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "succeeded",
+                "unavailable",
+                "blocked",
+                "not_required",
+                "not_recorded"
+              ]
+            },
+            "detail": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "outcome": {
+          "enum": [
+            "captured",
+            "partially_captured",
+            "blocked",
+            "not_requested"
+          ]
+        },
+        "delivery_notice": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },

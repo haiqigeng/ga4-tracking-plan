@@ -6,17 +6,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-GATED_TERMS = {
-    "account",
-    "authentication",
-    "checkout",
-    "connexion",
-    "credential",
-    "login",
-    "paiement",
-    "password",
-    "payment",
-}
 AUTHENTICATION_EVENTS = {"login", "sign_up", "password_reset"}
 AUTHENTICATED_AREA_TERMS = {
     "account dashboard",
@@ -52,7 +41,7 @@ FINITE_SCREENSHOT_EVENTS = {
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Migrate an older tracking-plan JSON file to the GA4-only v2.2 contract.")
+    parser = argparse.ArgumentParser(description="Migrate an older tracking-plan JSON file to the GA4-only v2.3 contract.")
     parser.add_argument("source", type=Path, help="Existing tracking-plan JSON or schema file.")
     parser.add_argument("--output", "-o", type=Path, required=True, help="Output JSON path.")
     return parser.parse_args()
@@ -61,14 +50,6 @@ def parse_args() -> argparse.Namespace:
 def slug(value: str) -> str:
     normalized = re.sub(r"[^A-Z0-9]+", "-", value.upper()).strip("-")
     return normalized[:72] or "EVIDENCE"
-
-
-def gated_event(event: dict[str, Any]) -> bool:
-    text = " ".join(
-        str(event.get(key, ""))
-        for key in ("event_name", "page_type", "page_or_component", "trigger", "page_url_pattern")
-    ).lower()
-    return any(term in text for term in GATED_TERMS)
 
 
 def default_evidence_basis(event: dict[str, Any]) -> dict[str, Any]:
@@ -97,7 +78,6 @@ def default_screenshot_coverage(event: dict[str, Any]) -> dict[str, Any]:
 
 
 def default_screenshot_evidence(event: dict[str, Any]) -> dict[str, Any]:
-    skip = gated_event(event)
     coverage = event.get("screenshot_coverage", default_screenshot_coverage(event))
     scenario = next(iter(coverage.get("scenarios", [])), "representative_example")
     return {
@@ -108,13 +88,9 @@ def default_screenshot_evidence(event: dict[str, Any]) -> dict[str, Any]:
         "page_or_component": str(event.get("page_or_component", "")),
         "url_or_route": str(event.get("page_url_pattern", "")),
         "capture_objective": f"Show {event.get('page_or_component', 'the relevant page or component')} for {event.get('event_name', 'the event')}.",
-        "status": "skip_allowed" if skip else "capture_required",
+        "status": "blocked",
         "shared_reason": "",
-        "notes": (
-            "Skip is allowed when approved credentials or a safe test environment are unavailable."
-            if skip
-            else "Capture a representative page state or clearly identify the tracked interaction."
-        ),
+        "notes": "Screenshot capture has not been completed. Attempt Playwright MCP and update this evidence before delivery.",
     }
 
 
@@ -269,7 +245,60 @@ def migrate_screenshot_evidence(plan: dict[str, Any], migrated_events: list[dict
             if isinstance(event, dict)
         ]
         row["scenario_id"] = scenarios[0] if scenarios else "representative_example"
+    for row in evidence:
+        if not isinstance(row, dict):
+            continue
+        if row.get("status") in {"capture_required", "skip_allowed"}:
+            row["status"] = "blocked"
+            row["file_name"] = ""
+            row["notes"] = "Screenshot capture has not been completed. Attempt Playwright MCP and update this evidence before delivery."
     plan["screenshot_evidence"] = evidence
+
+
+def migrate_screenshot_capture(plan: dict[str, Any]) -> None:
+    if isinstance(plan.get("screenshot_capture"), dict):
+        return
+    evidence = [row for row in plan.get("screenshot_evidence", []) if isinstance(row, dict)]
+    statuses = {str(row.get("status", "")) for row in evidence}
+    all_supplied = bool(evidence) and all(
+        str(row.get("status", "")) in {"captured", "shared_evidence"} and str(row.get("file_name", "")).strip()
+        for row in evidence
+    )
+    if statuses == {"not_needed"}:
+        plan["screenshot_capture"] = {
+            "requirement": "not_requested",
+            "playwright_mcp_attempt": {
+                "status": "not_required",
+                "detail": "The source plan did not request screenshot evidence.",
+            },
+            "outcome": "not_requested",
+            "delivery_notice": "Screenshots were not requested for this migrated plan.",
+        }
+    elif all_supplied:
+        plan["screenshot_capture"] = {
+            "requirement": "required",
+            "playwright_mcp_attempt": {
+                "status": "not_required",
+                "detail": "Existing screenshot files were supplied with the source plan; no new browser capture was required.",
+            },
+            "outcome": "captured",
+            "delivery_notice": "Screenshot capture is complete with images supplied by the source plan. Verify that each image is embedded before delivery.",
+        }
+    else:
+        captured = any(status in {"captured", "shared_evidence"} for status in statuses)
+        plan["screenshot_capture"] = {
+            "requirement": "required",
+            "playwright_mcp_attempt": {
+                "status": "not_recorded",
+                "detail": "The source plan does not record a Playwright MCP attempt. Run one before delivery.",
+            },
+            "outcome": "partially_captured" if captured else "blocked",
+            "delivery_notice": (
+                "Screenshot capture is partially complete: remaining evidence requires a Playwright MCP attempt before delivery."
+                if captured
+                else "Screenshot capture is blocked: a Playwright MCP attempt is required before delivery."
+            ),
+        }
 
 
 def migrate_official_sources(plan: dict[str, Any]) -> None:
@@ -283,7 +312,7 @@ def migrate_official_sources(plan: dict[str, Any]) -> None:
 
 def migrate_plan(plan: dict[str, Any]) -> dict[str, Any]:
     plan = json.loads(json.dumps(plan))
-    plan["schema_version"] = "2.2.0"
+    plan["schema_version"] = "2.3.0"
     for key in ("analytics_platforms", "custom_definitions", "key_events", "qa_cases"):
         plan.pop(key, None)
     migrate_execution_context(plan)
@@ -294,6 +323,7 @@ def migrate_plan(plan: dict[str, Any]) -> dict[str, Any]:
     migrate_coverage(plan)
     plan.setdefault("user_context", default_user_context())
     migrate_screenshot_evidence(plan, migrated_events)
+    migrate_screenshot_capture(plan)
     migrate_official_sources(plan)
     return plan
 

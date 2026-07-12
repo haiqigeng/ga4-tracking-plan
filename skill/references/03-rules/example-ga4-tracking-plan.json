@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.2.0",
+  "schema_version": "2.3.0",
   "plan_id": "generic_ecommerce_homepage",
   "execution_context": {
     "execution_mode": "greenfield_best_practice",
@@ -1627,6 +1627,15 @@
       "checked_for": "dataLayer.push implementation pattern"
     }
   ],
+  "screenshot_capture": {
+    "requirement": "required",
+    "playwright_mcp_attempt": {
+      "status": "blocked",
+      "detail": "This generic fixture has no live browser session. A real delivery must attempt Playwright MCP before screenshots are marked as blocked."
+    },
+    "outcome": "blocked",
+    "delivery_notice": "Screenshot capture is blocked in this generic fixture because no live browser session is available."
+  },
   "screenshot_evidence": [
     {
       "evidence_id": "EVIDENCE-EVT-HOME-PAGE-VIEW",
@@ -1638,9 +1647,9 @@
       "page_or_component": "Homepage document body",
       "url_or_route": "https://example.com/",
       "capture_objective": "Show Homepage document body for page_view.",
-      "status": "capture_required",
+      "status": "blocked",
       "shared_reason": "",
-      "notes": "Capture a representative page state or clearly identify the tracked interaction."
+      "notes": "Screenshot capture is blocked in this generic fixture. Capture this scenario with Playwright MCP before delivery."
     },
     {
       "evidence_id": "EVIDENCE-EVT-HOME-PROMO-VIEW",
@@ -1652,9 +1661,9 @@
       "page_or_component": "Homepage merchandising promotion module",
       "url_or_route": "https://example.com/",
       "capture_objective": "Show Homepage merchandising promotion module for view_promotion.",
-      "status": "capture_required",
+      "status": "blocked",
       "shared_reason": "",
-      "notes": "Capture a representative page state or clearly identify the tracked interaction."
+      "notes": "Screenshot capture is blocked in this generic fixture. Capture this scenario with Playwright MCP before delivery."
     },
     {
       "evidence_id": "EVIDENCE-EVT-HOME-PROMO-SELECT",
@@ -1666,9 +1675,9 @@
       "page_or_component": "Homepage merchandising promotion link or card",
       "url_or_route": "https://example.com/",
       "capture_objective": "Show Homepage merchandising promotion link or card for select_promotion.",
-      "status": "capture_required",
+      "status": "blocked",
       "shared_reason": "",
-      "notes": "Capture a representative page state or clearly identify the tracked interaction."
+      "notes": "Screenshot capture is blocked in this generic fixture. Capture this scenario with Playwright MCP before delivery."
     },
     {
       "evidence_id": "EVIDENCE-EVT-HOME-SEARCH",
@@ -1680,9 +1689,9 @@
       "page_or_component": "Homepage search form",
       "url_or_route": "https://example.com/",
       "capture_objective": "Show Homepage search form for search.",
-      "status": "capture_required",
+      "status": "blocked",
       "shared_reason": "",
-      "notes": "Capture a representative page state or clearly identify the tracked interaction."
+      "notes": "Screenshot capture is blocked in this generic fixture. Capture this scenario with Playwright MCP before delivery."
     },
     {
       "evidence_id": "EVIDENCE-EVT-HOME-CONTENT-SELECT",
@@ -1694,9 +1703,9 @@
       "page_or_component": "Homepage navigation, editorial, or service module",
       "url_or_route": "https://example.com/",
       "capture_objective": "Show Homepage navigation, editorial, or service module for select_content.",
-      "status": "capture_required",
+      "status": "blocked",
       "shared_reason": "",
-      "notes": "Capture a representative page state or clearly identify the tracked interaction."
+      "notes": "Screenshot capture is blocked in this generic fixture. Capture this scenario with Playwright MCP before delivery."
     },
     {
       "evidence_id": "EVIDENCE-EVT-HOME-ACCOUNT-ACCESS",
@@ -1708,9 +1717,9 @@
       "page_or_component": "Homepage account access entry point",
       "url_or_route": "https://example.com/",
       "capture_objective": "Show Homepage account access entry point for account_access_intent.",
-      "status": "capture_required",
+      "status": "blocked",
       "shared_reason": "",
-      "notes": "Capture the public account entry point with a bold red rectangle around the interaction area."
+      "notes": "Screenshot capture is blocked in this generic fixture. Capture the public account entry point with Playwright MCP before delivery."
     }
   ]
 }

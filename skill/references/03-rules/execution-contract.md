@@ -22,6 +22,7 @@ scope and template
 
 1. State whether the work adapts a client template or uses the default workbook.
 2. Separate observed, confirmed, inferred, recommended, and unavailable facts.
+   Actively discover Playwright MCP before declaring browser evidence unavailable.
 3. Tie every event to one journey, business question, and analysis use.
 4. Prefer GA4 automatic, enhanced-measurement, recommended, and ecommerce
    events when their semantics fit.
@@ -35,9 +36,12 @@ scope and template
 9. Exhaust practical finite values, keep multilingual controlled values in
    English, and provide a complete dataLayer example per event.
 10. After event design, map one representative screenshot for repetitive
-    generic events and all material scenarios for finite events. Never infer
-    evidence from a loosely matching filename.
-11. Generate the XLSX as the main human deliverable and keep internal reasoning
+    generic events and all material scenarios for finite events. When capture is
+    required, attempt Playwright MCP before any fallback. Never infer evidence
+    from a loosely matching filename or leave a final row pending or silently skipped.
+11. Record the `screenshot_capture` outcome. When blocked or partial, put the
+    analyst-facing notice in Screenshot Register and repeat it in the delivery reply.
+12. Generate the XLSX as the main human deliverable and keep internal reasoning
    out of visible tabs.
-12. Stop after the tracking plan. Do not perform GTM implementation or runtime
+13. Stop after the tracking plan. Do not perform GTM implementation or runtime
     testing under this skill.

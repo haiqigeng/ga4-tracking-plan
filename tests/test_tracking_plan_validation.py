@@ -51,6 +51,45 @@ class TrackingPlanValidationTests(unittest.TestCase):
         plan["screenshot_evidence"][1].update({"status": "captured", "file_name": "promotion.png"})
         self.assertIn("SCREENSHOT_ANNOTATION_MISSING", self.codes(plan))
 
+    def test_required_screenshots_need_a_playwright_mcp_attempt(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        plan["screenshot_capture"]["playwright_mcp_attempt"]["status"] = "not_required"
+        self.assertIn("PLAYWRIGHT_MCP_ATTEMPT_MISSING", self.codes(plan))
+
+    def test_requester_supplied_screenshots_can_bypass_playwright_mcp(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        plan["screenshot_capture"] = {
+            "requirement": "required",
+            "playwright_mcp_attempt": {"status": "not_required", "detail": "Final screenshots were supplied by the requester."},
+            "outcome": "captured",
+            "delivery_notice": "Screenshots supplied by the requester are ready to embed in the workbook.",
+        }
+        event_names = {event["event_id"]: event["event_name"] for event in plan["events"]}
+        for index, evidence in enumerate(plan["screenshot_evidence"], start=1):
+            evidence.update({"status": "captured", "file_name": f"supplied_{index}.png"})
+            if event_names[evidence["event_ids"][0]] != "page_view":
+                evidence["annotation"] = {"x1": 10, "y1": 10, "x2": 100, "y2": 100}
+        self.assertNotIn("PLAYWRIGHT_MCP_ATTEMPT_MISSING", self.codes(plan))
+
+    def test_blocked_screenshot_outcome_cannot_leave_pending_evidence(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        plan["screenshot_evidence"][0]["status"] = "capture_required"
+        self.assertIn("SCREENSHOT_CAPTURE_BLOCKED_MISMATCH", self.codes(plan))
+
+    def test_no_screenshot_request_needs_not_needed_event_coverage(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        plan["screenshot_capture"] = {
+            "requirement": "not_requested",
+            "playwright_mcp_attempt": {"status": "not_required", "detail": "Screenshots were explicitly excluded."},
+            "outcome": "not_requested",
+            "delivery_notice": "Screenshots were not requested for this delivery.",
+        }
+        for event in plan["events"]:
+            event["screenshot_coverage"] = {"mode": "not_needed", "scenarios": []}
+        for evidence in plan["screenshot_evidence"]:
+            evidence["status"] = "not_needed"
+        self.assertEqual(validate_plan_data(plan), [])
+
     def test_unconfirmed_parameter_needs_owner(self) -> None:
         plan = copy.deepcopy(self.fixture)
         plan["parameters"][0]["availability"] = "to_confirm"

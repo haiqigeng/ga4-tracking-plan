@@ -36,6 +36,7 @@ from tracking_plan_validation_events import (
     should_lint_ga4_parameter_name,
 )
 from tracking_plan_validation_model import Issue, add_issue
+from tracking_plan_validation_screenshot_capture import check_screenshot_capture, screenshot_capture_requirement
 
 GENERIC_SCREENSHOT_EVENTS = {"page_view", "view_item_list", "select_item", "view_item"}
 FINITE_SCREENSHOT_EVENTS = {
@@ -473,7 +474,12 @@ def check_screenshot_evidence(plan: dict[str, Any], issues: list[Issue]) -> None
                 "$.screenshot_evidence",
                 f"Screenshot '{file_name}' is reused across events without one explicit shared_evidence row.",
             )
-    check_screenshot_coverage(events, evidence_rows, issues)
+    check_screenshot_coverage(
+        events,
+        evidence_rows,
+        screenshot_capture_requirement(plan) == "not_requested",
+        issues,
+    )
 
 
 def screenshot_rows_by_event(events: list[dict[str, Any]], evidence_rows: list[dict[str, Any]], issues: list[Issue]) -> defaultdict[str, list[dict[str, Any]]]:
@@ -509,13 +515,31 @@ def check_not_needed_screenshot(index: int, scenarios: list[str], rows: list[dic
         add_issue(issues, "error", "SCREENSHOT_NOT_NEEDED_INVALID", f"$.events[{index}].screenshot_coverage", "Not-needed coverage must have no scenarios and one explicit not_needed evidence row.")
 
 
-def check_event_screenshot_mode(event: dict[str, Any], index: int, rows: list[dict[str, Any]], issues: list[Issue]) -> None:
+def check_event_screenshot_mode(
+    event: dict[str, Any],
+    index: int,
+    rows: list[dict[str, Any]],
+    screenshots_not_requested: bool,
+    issues: list[Issue],
+) -> None:
     coverage = event.get("screenshot_coverage", {})
     if not isinstance(coverage, dict):
         return
     mode = str(coverage.get("mode", ""))
     scenarios = [str(value) for value in coverage.get("scenarios", [])]
     event_name = str(event.get("event_name", ""))
+    if screenshots_not_requested:
+        if mode != "not_needed" or scenarios:
+            add_issue(
+                issues,
+                "error",
+                "SCREENSHOT_COVERAGE_NOT_REQUESTED",
+                f"$.events[{index}].screenshot_coverage",
+                "When screenshots are not requested, event screenshot coverage must be not_needed with no scenarios.",
+            )
+            return
+        check_not_needed_screenshot(index, scenarios, rows, issues)
+        return
     if event_name in GENERIC_SCREENSHOT_EVENTS and mode != "representative":
         add_issue(issues, "error", "GENERIC_SCREENSHOT_MODE_INVALID", f"$.events[{index}].screenshot_coverage.mode", f"Repetitive generic event '{event_name}' needs one representative screenshot, not one screenshot per page or item.")
     if event_name in FINITE_SCREENSHOT_EVENTS and mode != "all_material_scenarios":
@@ -528,11 +552,16 @@ def check_event_screenshot_mode(event: dict[str, Any], index: int, rows: list[di
         check_not_needed_screenshot(index, scenarios, rows, issues)
 
 
-def check_screenshot_coverage(events: list[dict[str, Any]], evidence_rows: list[dict[str, Any]], issues: list[Issue]) -> None:
+def check_screenshot_coverage(
+    events: list[dict[str, Any]],
+    evidence_rows: list[dict[str, Any]],
+    screenshots_not_requested: bool,
+    issues: list[Issue],
+) -> None:
     rows_by_event = screenshot_rows_by_event(events, evidence_rows, issues)
     for index, event in enumerate(events):
         event_id = str(event.get("event_id", ""))
-        check_event_screenshot_mode(event, index, rows_by_event[event_id], issues)
+        check_event_screenshot_mode(event, index, rows_by_event[event_id], screenshots_not_requested, issues)
 
 
 def check_official_source_inventory(plan: dict[str, Any], events: list[Any], issues: list[Issue]) -> None:
@@ -621,6 +650,7 @@ def validate_plan_data(plan: dict[str, Any], schema_path: Path | None = None) ->
     check_measurement_strategy(plan, issues)
     check_website_coverage_map(plan, issues)
     check_not_tracked_decisions(plan, issues)
+    check_screenshot_capture(plan, issues)
     check_screenshot_evidence(plan, issues)
     check_delivery_rules(plan, issues)
     check_official_source_inventory(plan, events, issues)

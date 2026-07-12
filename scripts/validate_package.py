@@ -138,8 +138,8 @@ def check_schema_and_fixture() -> None:
     errors = sorted(Draft202012Validator(schema).iter_errors(fixture), key=lambda item: list(item.path))
     if errors:
         fail("Generic GA4 fixture does not match schema:\n" + "\n".join(error.message for error in errors))
-    if fixture.get("schema_version") != "2.2.0":
-        fail("Generic fixture must use schema_version 2.2.0")
+    if fixture.get("schema_version") != "2.3.0":
+        fail("Generic fixture must use schema_version 2.3.0")
     event_ids = {event["event_id"] for event in fixture["events"]}
     covered = {event_id for evidence in fixture["screenshot_evidence"] for event_id in evidence["event_ids"]}
     if event_ids != covered:
@@ -194,6 +194,18 @@ def check_validator() -> None:
             temp_dir,
             "SCREENSHOT_FILE_MISSING",
             lambda plan: plan["screenshot_evidence"][0].update({"status": "captured", "file_name": ""}),
+        )
+        expect_code(
+            fixture,
+            temp_dir,
+            "PLAYWRIGHT_MCP_ATTEMPT_MISSING",
+            lambda plan: plan["screenshot_capture"]["playwright_mcp_attempt"].update({"status": "not_required"}),
+        )
+        expect_code(
+            fixture,
+            temp_dir,
+            "SCREENSHOT_CAPTURE_BLOCKED_MISMATCH",
+            lambda plan: plan["screenshot_evidence"][0].update({"status": "capture_required"}),
         )
         expect_code(
             fixture,
@@ -282,6 +294,7 @@ def check_migration() -> None:
     legacy["schema_version"] = "1.1.0"
     legacy["analytics_platforms"] = ["ga4"]
     legacy["qa_cases"] = []
+    legacy.pop("screenshot_capture", None)
     with tempfile.TemporaryDirectory() as raw:
         temp_dir = Path(raw)
         source = temp_dir / "legacy.json"
@@ -289,8 +302,11 @@ def check_migration() -> None:
         source.write_text(json.dumps(legacy), encoding="utf-8")
         run([sys.executable, "-B", "scripts/migrate_tracking_plan.py", str(source), "--output", str(output)], "Contract migration")
         migrated = load_json(output)
-        if migrated.get("schema_version") != "2.2.0" or "analytics_platforms" in migrated or "qa_cases" in migrated:
-            fail("Contract migration did not produce a clean v2.2 plan")
+        if migrated.get("schema_version") != "2.3.0" or "analytics_platforms" in migrated or "qa_cases" in migrated:
+            fail("Contract migration did not produce a clean v2.3 plan")
+        attempt = migrated.get("screenshot_capture", {}).get("playwright_mcp_attempt", {}).get("status")
+        if attempt != "not_recorded":
+            fail("Contract migration must mark an unrecorded Playwright MCP attempt explicitly")
 
 
 def check_release_package() -> None:

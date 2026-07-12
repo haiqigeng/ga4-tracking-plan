@@ -35,7 +35,8 @@ The validator checks structure, journey alignment, analyst purpose, evidence
 confidence, GA4 classifications, ecommerce scope, custom-event justification,
 parameter availability and ownership, template policy, website coverage,
 official verification, collection source, duplicate risk, screenshot mapping,
-privacy-sensitive names, and legacy Universal Analytics fields.
+capture outcome and Playwright MCP attempt, privacy-sensitive names, and legacy
+Universal Analytics fields.
 
 ## Website Discovery Helper
 
@@ -62,15 +63,20 @@ python scripts/discover_site_journeys_playwright.py https://www.example.com/ --b
 The Playwright helper samples rendered pages without submitting forms, logging
 in, placing orders, or mutating live state. For a gated journey, use an
 interactive browser or Playwright MCP with synthetic information. If the real
-journey cannot be completed, create no event behind authentication.
+journey cannot be completed, create no event behind authentication. When the
+tracking plan requires screenshots, actively attempt Playwright MCP first and
+record a visible blocked outcome if evidence cannot be captured.
 
 ## Contract Migration
 
-Migrate an older v1 plan to the GA4-only schema `2.2.0` contract:
+Migrate an older plan to the GA4-only schema `2.3.0` contract:
 
 ```powershell
 python scripts/migrate_tracking_plan.py old-plan.json --output plan-v2.json
 ```
+
+Migration never invents a Playwright MCP attempt. Resolve any resulting
+`not_recorded` screenshot-capture status before delivery.
 
 ## Workbook And CSV Checks
 

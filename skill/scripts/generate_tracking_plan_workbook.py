@@ -659,7 +659,12 @@ def build_screenshot_register(
     preview_dir: Path | None = None,
 ) -> None:
     ws = wb.create_sheet("05 Screenshot Register")
-    title(ws, "Screenshot Register", "Page and interaction evidence supporting the Event Matrix.", 8)
+    capture = plan["screenshot_capture"]
+    capture_outcome = str(capture["outcome"])
+    title(ws, "Screenshot Register", str(capture["delivery_notice"]), 8)
+    if capture_outcome in {"blocked", "partially_captured"}:
+        ws.cell(2, 1).fill = PatternFill("solid", fgColor=RED)
+        ws.cell(2, 1).font = Font(color="9C1C1C", bold=True, size=11)
     ws.append(["Journey", "Event(s)", "Screenshot preview", "Page / component", "URL / route", "Capture objective", "Status", "Notes"])
     header(ws, 3, 8)
     journey_names = {brief["journey_id"]: brief["journey_name"] for brief in plan["measurement_brief"]}
@@ -674,8 +679,13 @@ def build_screenshot_register(
         journeys = list(dict.fromkeys(journey_names.get(event["journey_id"], event["journey_id"]) for event in related_events))
         screenshot_path = resolve_screenshot(evidence, files_by_name)
         notes = str(evidence.get("notes", ""))
-        if evidence.get("file_name") and not screenshot_path:
-            notes = f"{notes} Evidence file not found in the selected screenshot folder.".strip()
+        status = str(evidence.get("status", ""))
+        if status in {"captured", "shared_evidence"} and not screenshot_path:
+            raise ValueError(
+                f"Screenshot evidence '{evidence['evidence_id']}' is marked as {status}, but its file "
+                f"'{evidence.get('file_name', '')}' was not found. Capture or supply the image before delivery, "
+                "or mark the capture outcome and affected evidence as blocked."
+            )
         row_number = ws.max_row + 1
         ws.append([
             " | ".join(journeys),
@@ -687,7 +697,7 @@ def build_screenshot_register(
             evidence["status"],
             notes,
         ])
-        if screenshot_path and preview_dir:
+        if status in {"captured", "shared_evidence"} and screenshot_path and preview_dir:
             image_rows.append((row_number, screenshot_path, evidence))
     for row in range(4, ws.max_row + 1):
         ws.row_dimensions[row].height = SCREENSHOT_ROW_HEIGHT

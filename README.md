@@ -33,15 +33,17 @@ analyst or developer can use.
 - Journey events scattered across a workbook.
 - Unreadable templates filled with internal or agent-oriented information.
 - Screenshots guessed from filenames or reused without a clear reason.
+- Screenshot evidence silently omitted even though the plan says it was captured.
 
 ## Procedure
 
 1. Confirm the website scope, pages, journeys, template, and naming convention.
 2. Understand the business goal, expected actions, analysis needs, and success
    signals.
-3. Inspect the available browser environment, then complete public signup and
-   authenticated customer-space journeys with synthetic information. If the
-   gated journey cannot be entered, retain a coverage gap and no gated events.
+3. Actively discover an available Playwright MCP, inspect browser readiness,
+   then complete public signup and authenticated customer-space journeys with
+   synthetic information. If the gated journey cannot be entered, retain a
+   coverage gap and no gated events.
 4. Select GA4 automatic, enhanced-measurement, recommended, and ecommerce
    events before considering custom events. Decide whether form outcomes share
    `generate_lead` or need separate success events.
@@ -52,9 +54,12 @@ analyst or developer can use.
    per event, using Google's official GTM ecommerce structure.
 7. Define connected-user state once in GTM Protocol when relevant, with GA4
    User-ID and user-property mappings kept separate from event payloads.
-8. After event design, capture one representative screenshot for repetitive
-   generic events and all materially different scenarios for finite events.
-9. Generate and validate the XLSX tracking plan.
+8. After event design, attempt screenshot capture with Playwright MCP: one
+   representative image for repetitive generic events and all materially
+   different scenarios for finite events.
+9. If capture is blocked or partial, show the reason in Screenshot Register and
+   tell the reviewer before returning the workbook.
+10. Generate and validate the XLSX tracking plan.
 
 For ecommerce customer spaces, the skill considers meaningful order, return,
 cancellation, profile, preference, and reorder outcomes. It keeps confirmed
@@ -84,7 +89,8 @@ The main output is an XLSX workbook with six tabs:
   registration needs;
 - `03 Event Matrix`: the main tracking plan grouped by journey;
 - `04 DataLayer Examples`: complete per-event GTM implementation examples;
-- `05 Screenshot Register`: explicit page and interaction evidence.
+- `05 Screenshot Register`: explicit page and interaction evidence, with a
+  visible capture notice when screenshots are incomplete or unavailable.
 
 The skill can also produce validated JSON and a long-format CSV. Machine fields
 remain outside the human Event Matrix.
@@ -132,8 +138,9 @@ Install dependencies:
 python -m pip install -r requirements.txt
 ```
 
-Playwright is optional for public static work, but an interactive browser or
-Playwright MCP is required to investigate an unconfirmed gated journey:
+When screenshots, dynamic interactions, checkout, forms, or unconfirmed gated
+journeys are in scope, the workflow attempts Playwright MCP before a fallback.
+The local preflight below checks whether a usable browser is also available:
 
 ```powershell
 python -m pip install playwright
@@ -172,6 +179,8 @@ python scripts/generate_tracking_plan_workbook.py plan.json --output plan.xlsx -
 
 Use 1920 x 1080 viewport sources where practical. XLSX previews are 480 x 270
 with no overlay text; interaction images use only a bold red rectangle.
+The generator refuses any row marked captured when the referenced image is not
+available, so a workbook cannot quietly claim that a missing screenshot exists.
 
 Export CSV:
 
@@ -234,7 +243,7 @@ values only.
 ## Versioning
 
 The GA4-only v2 contract is a breaking change from earlier multi-platform
-drafts. Schema `2.2.0` adds explicit event access context and representative or
-all-scenario screenshot coverage. Future minor releases add compatible
-analyst or scenario improvements; patch releases fix documentation,
-validation, or rendering defects.
+drafts. Schema `2.3.0` adds an explicit Playwright-MCP screenshot-capture gate
+and a visible delivery notice for blocked or partial evidence. Future minor
+releases add compatible analyst or scenario improvements; patch releases fix
+documentation, validation, or rendering defects.

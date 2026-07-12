@@ -122,6 +122,11 @@ For an unconfirmed gated journey, execute this sequence before event design:
 
 ## Playwright Decision
 
+When screenshots are required, start by actively discovering an available
+Playwright MCP. Do not conclude that browser automation is unavailable merely
+because a generic browser tool has no session. A local browser preflight is
+useful context, but it is not a substitute for the MCP attempt.
+
 Use Playwright or equivalent browser exploration when:
 
 - menus, filters, checkout, forms, account, or SPA routes are dynamic;
@@ -131,12 +136,26 @@ Use Playwright or equivalent browser exploration when:
 - the plan will be used as a real delivery and missing journeys would create
   implementation risk.
 
-Playwright is optional when the user/client scope, existing client files,
-manual browser exploration, navigation, and page templates already provide
-enough coverage for the requested scope. State this choice in the coverage map.
-It becomes required, or an equivalent interactive browser must be available,
-when an authentication-gated journey is in scope and has not been confirmed by
-client evidence.
+Playwright is optional only when screenshots were explicitly excluded or final
+screenshots were supplied by the requester. Otherwise, a required screenshot,
+dynamic journey, or unconfirmed gated journey requires a Playwright MCP attempt
+before an interactive-browser fallback. State the attempt and its outcome in
+`screenshot_capture`; do not present a preflight as a completed attempt.
+
+## Screenshot Capture Gate
+
+Before generating the workbook, record one of these outcomes:
+
+- `captured`: all required Screenshot Register rows have final embedded files.
+- `partially_captured`: both captured and blocked rows exist, with a visible
+  explanation of the missing scenarios.
+- `blocked`: every required row is blocked or not needed, and the concrete
+  reason is visible at the top of Screenshot Register and in the delivery reply.
+- `not_requested`: the requester explicitly excluded screenshots; every event
+  uses `not_needed` coverage.
+
+Never leave `capture_required` or `skip_allowed` in a final delivery. A missing
+file for a `captured` row is a delivery error, not a note for later.
 
 ## Coverage Gate
 

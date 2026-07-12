@@ -43,12 +43,20 @@ class ScreenshotEvidenceTests(unittest.TestCase):
             folder = Path(raw)
             Image.new("RGB", (1920, 1080), "red").save(folder / "page.png")
             Image.new("RGB", (1920, 1080), "blue").save(folder / "promotion.png")
+            plan["screenshot_capture"] = {
+                "requirement": "required",
+                "playwright_mcp_attempt": {"status": "succeeded", "detail": "Playwright MCP captured the supplied test evidence."},
+                "outcome": "partially_captured",
+                "delivery_notice": "Screenshot capture is partially complete for this workbook rendering test.",
+            }
             plan["screenshot_evidence"][0].update({"status": "captured", "file_name": "page.png"})
             plan["screenshot_evidence"][1].update({"status": "captured", "file_name": "promotion.png"})
             workbook = build_workbook(plan, screenshot_dir=folder, preview_dir=folder / "previews")
-            images = workbook["05 Screenshot Register"]._images
+            screenshot_register = workbook["05 Screenshot Register"]
+            images = screenshot_register._images
             self.assertEqual(len(images), 2)
             self.assertEqual({(image.width, image.height) for image in images}, {(PREVIEW_WIDTH, PREVIEW_HEIGHT)})
+            self.assertIn("Screenshot capture is partially complete", str(screenshot_register["A2"].value))
 
     def test_tall_source_requires_explicit_crop(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -66,9 +74,25 @@ class ScreenshotEvidenceTests(unittest.TestCase):
             folder = Path(raw)
             Image.new("RGB", (1920, 1080), "red").save(folder / "first.png")
             Image.new("RGB", (1920, 1080), "red").save(folder / "second.png")
+            plan["screenshot_capture"] = {
+                "requirement": "required",
+                "playwright_mcp_attempt": {"status": "succeeded", "detail": "Playwright MCP captured the supplied test evidence."},
+                "outcome": "partially_captured",
+                "delivery_notice": "Screenshot capture is partially complete for this workbook rendering test.",
+            }
             plan["screenshot_evidence"][0].update({"status": "captured", "file_name": "first.png"})
             plan["screenshot_evidence"][1].update({"status": "captured", "file_name": "second.png"})
             with self.assertRaisesRegex(ValueError, "same visual evidence"):
+                build_workbook(plan, screenshot_dir=folder, preview_dir=folder / "previews")
+
+    def test_captured_screenshot_without_a_file_is_rejected(self) -> None:
+        plan = copy.deepcopy(
+            json.loads((ROOT / "skill" / "references" / "03-rules" / "example-ga4-tracking-plan.json").read_text(encoding="utf-8"))
+        )
+        plan["screenshot_evidence"][0].update({"status": "captured", "file_name": "missing.png"})
+        with tempfile.TemporaryDirectory() as raw:
+            folder = Path(raw)
+            with self.assertRaisesRegex(ValueError, "marked as captured"):
                 build_workbook(plan, screenshot_dir=folder, preview_dir=folder / "previews")
 
 

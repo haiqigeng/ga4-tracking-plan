@@ -35,10 +35,18 @@ and apply `references/03-rules/completion-gates.md` before delivery.
 - Map broad website scope before choosing events. Use user and client evidence,
   then manual browser evidence, rendered-DOM exploration, navigation, sitemap,
   robots.txt, and static discovery in that order of analytical authority.
-- Before rendered exploration, inspect available browser/MCP capabilities and
-  the local browser environment. Prefer the eligible system default browser;
-  do not assume Chrome. Inform the user when Playwright or a browser build is
-  needed and state any fallback browser used.
+- Before rendered exploration, actively inspect available browser/MCP
+  capabilities, including a separate Playwright MCP; do not infer its absence
+  from an unavailable generic browser tool. Prefer the eligible system default
+  browser; do not assume Chrome.
+- When screenshot evidence is required, or scope includes dynamic, checkout,
+  form, account, or other interactive journeys, attempt Playwright MCP before
+  static fallback. Only bypass that attempt when final screenshots were supplied
+  by the requester or the requester explicitly excluded screenshots.
+- If Playwright MCP or a viable fallback cannot capture the required evidence,
+  set the capture outcome and affected Screenshot Register rows to `blocked`.
+  Tell the user clearly before returning the workbook; never quietly use
+  `skip_allowed`, `capture_required`, or an absent file as final evidence.
 - Treat observed, confirmed, inferred, recommended, and unavailable information
   differently. Do not present inferred journeys as observed facts.
 - Use GA4 with GTM and a dataLayer when implementation context is unknown.
@@ -109,6 +117,10 @@ and apply `references/03-rules/completion-gates.md` before delivery.
   readable 480 x 270 XLSX preview. Put no text inside the image; use only a bold
   red rectangle around an interaction or visible outcome. Require an explicit
   crop for tall or full-page sources.
+- Record `screenshot_capture` in the structured plan: the requirement, the
+  Playwright MCP attempt, the capture outcome, and a short analyst-facing
+  delivery notice. Repeat that notice in the final response when capture is
+  blocked or partial.
 - Stop after plan creation or review. Do not implement GTM, publish changes,
   audit a container, or execute runtime QA under this skill.
 
@@ -134,8 +146,9 @@ mark official verification unavailable instead of claiming it was performed.
 
 1. Confirm scope, template, execution mode, URLs, journeys, output format, and
    implementation assumptions.
-2. Inspect browser readiness, then map public and authenticated website coverage
-   using `references/03-rules/analysis-website-coverage.md`.
+2. Inspect browser readiness and actively discover Playwright MCP, then map
+   public and authenticated website coverage using
+   `references/03-rules/analysis-website-coverage.md`.
 3. Build the measurement brief: business goal, analysis questions, actions,
    success signals, constraints, evidence, and confidence.
 4. Select the applicable scenario, archetype, ecommerce, privacy, and custom-
@@ -151,8 +164,9 @@ mark official verification unavailable instead of claiming it was performed.
    human-readable implementation example per event and use Google's official
    `event + ecommerce + items` GTM structure for ecommerce.
 9. After event design, inventory representative or all-material-scenario
-   screenshot coverage, capture the final evidence, and map each row explicitly
-   to event and scenario IDs. Never guess evidence from filenames.
+   screenshot coverage, attempt capture, and map each row explicitly to event
+   and scenario IDs. Never guess evidence from filenames. If capture is blocked,
+   write the visible delivery notice before generating or returning the workbook.
 10. Validate the structured JSON, generate the workbook and optional CSV, and
     apply the completion gates.
 
@@ -210,9 +224,10 @@ visible workbook tabs.
 
 For screenshots, use one explicit shared-evidence row only when one visible
 state genuinely supports several events. Use precise crop and rectangle
-coordinates when needed. Do not place labels or captions inside images. Gated
-screenshots may be `skip_allowed` when the real journey cannot be completed,
-but no corresponding gated event may remain inferred in the plan.
+coordinates when needed. Do not place labels or captions inside images. A gated
+or otherwise unavailable capture is `blocked` only after the actual attempt;
+the Screenshot Register and final response must state the concrete reason. No
+corresponding gated event may remain inferred in the plan.
 
 When adapting a client workbook, preserve agreed sheet names, columns, colors,
 frozen panes, and protected areas as far as practical while retaining GA4

@@ -1,4 +1,4 @@
 interface:
   display_name: "GA4 Web Analyst"
   short_description: "Create clear, scalable GA4 tracking plans"
-  default_prompt: "Use $ga4-tracking-plan as a web analyst to inspect the real public and gated journeys, choose appropriate GA4 events and parameters, and create a readable tracking plan."
+  default_prompt: "Use $ga4-tracking-plan as a web analyst to inspect real journeys with Playwright MCP when screenshots are required, choose appropriate GA4 events and parameters, and create a readable tracking plan."

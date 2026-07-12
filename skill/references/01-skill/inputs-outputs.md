@@ -24,7 +24,8 @@ The primary output is a human-readable XLSX tracking plan with:
 - a Parameter Reference including availability and ownership;
 - a journey-grouped Event Matrix;
 - complete per-event dataLayer examples and GTM-to-GA4 mappings;
-- an explicit Screenshot Register with embedded previews when available.
+- an explicit Screenshot Register with embedded previews when captured, or a
+  clear analyst-facing notice when capture is blocked or excluded.
 
 Structured JSON is the source used to validate and render the human workbook.
 A long-format CSV can support review and comparison. Internal IDs and reasoning

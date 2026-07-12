@@ -41,8 +41,11 @@ A complete GA4 tracking plan must:
   completion;
 - record noisy, duplicate, unavailable, sensitive, or non-actionable choices
   that should not be tracked;
+- actively attempt Playwright MCP before final screenshot capture unless final
+  images were supplied or screenshots were explicitly excluded;
 - provide an explicit screenshot-evidence row for every event, including
-  intentional sharing, skip, not-needed, or blocked decisions;
+  intentional sharing, not-needed, or blocked decisions, and show a concrete
+  capture notice whenever evidence is blocked or partial;
 - use exactly one representative screenshot for repetitive generic events and
   cover every materially different visible scenario for finite events;
 - render readable 480 x 270 previews from 16:9 viewport sources, with no image

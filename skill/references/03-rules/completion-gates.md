@@ -47,6 +47,13 @@ Do not deliver a plan until every applicable gate passes.
 - Every event has a complete developer example or an explicit no-manual-push
   decision, with GTM paths mapped to final GA4 parameters.
 - Screenshot rows map explicitly to events and shared evidence is intentional.
+- Required screenshot capture records an actual Playwright MCP attempt unless
+  final images were supplied by the requester.
+- A blocked or partial capture has a concrete, analyst-facing notice in both
+  Screenshot Register and the delivery reply; no final row remains pending or
+  silently skipped.
+- Every `captured` or `shared_evidence` row resolves to an actual image file;
+  missing files stop workbook generation.
 - Repetitive generic events have one representative screenshot; finite events
   cover every inventoried material scenario.
 - Screenshot previews are readable at normal zoom, contain no overlay text,
