@@ -107,6 +107,31 @@ class BrowserEnvironmentTests(unittest.TestCase):
             self.assertEqual(browser_environment.playwright_status(), (False, "not installed"))
             self.assertEqual(browser_environment.bundled_channels(), {})
 
+    def test_linux_default_browser_uses_xdg_settings(self) -> None:
+        with (
+            patch.object(browser_environment.platform, "system", return_value="Linux"),
+            patch.object(browser_environment, "_command_default_browser", return_value=("firefox", "xdg-settings: firefox.desktop")) as command,
+        ):
+            result = browser_environment.detect_default_browser()
+        self.assertEqual(result[0], "firefox")
+        command.assert_called_once_with(["xdg-settings", "get", "default-web-browser"], "xdg-settings")
+
+    def test_macos_default_browser_uses_launch_services(self) -> None:
+        with (
+            patch.object(browser_environment.platform, "system", return_value="Darwin"),
+            patch.object(browser_environment, "_command_default_browser", return_value=("webkit", "LaunchServices: Safari")) as command,
+        ):
+            result = browser_environment.detect_default_browser()
+        self.assertEqual(result[0], "webkit")
+        self.assertEqual(command.call_args.args[1], "LaunchServices")
+
+    def test_command_default_browser_parses_stdout(self) -> None:
+        completed = browser_environment.subprocess.CompletedProcess(["browser"], 0, stdout="microsoft-edge.desktop\n", stderr="")
+        with patch.object(browser_environment.subprocess, "run", return_value=completed):
+            browser, source = browser_environment._command_default_browser(["browser"], "test command")
+        self.assertEqual(browser, "msedge")
+        self.assertIn("microsoft-edge.desktop", source)
+
     def test_rendered_discovery_main_records_selected_browser(self) -> None:
         class Page:
             pass
