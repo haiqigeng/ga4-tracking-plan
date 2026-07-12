@@ -23,7 +23,7 @@ from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter, quote_sheetname
 from openpyxl.worksheet.datavalidation import DataValidation
-from tracking_plan_screenshots import PREVIEW_HEIGHT, PREVIEW_WIDTH, create_screenshot_preview, resolve_screenshot, screenshot_files
+from tracking_plan_screenshots import PREVIEW_HEIGHT, PREVIEW_WIDTH, create_screenshot_preview, resolve_screenshot, screenshot_digest, screenshot_files
 from validate_tracking_plan import render_text, validate_plan_data
 
 NAVY = "263238"
@@ -61,7 +61,7 @@ CENTER = Alignment(wrap_text=True, vertical="center", horizontal="center")
 
 EVENT_SLOT_COUNT = 4
 SCREENSHOT_STATUS_OPTIONS = "capture_required,captured,shared_evidence,skip_allowed,not_needed,blocked"
-SCREENSHOT_ROW_HEIGHT = 132
+SCREENSHOT_ROW_HEIGHT = 216
 
 
 def matrix_max_col() -> int:
@@ -628,6 +628,30 @@ def build_datalayer_examples(wb: Workbook, plan: dict[str, Any]) -> None:
     style_cells(ws)
 
 
+def embed_screenshot_previews(ws, image_rows: list[tuple[int, Path, dict[str, Any]]], preview_dir: Path) -> None:
+    rendered_previews: dict[str, int] = {}
+    for row_number, screenshot_path, evidence in image_rows:
+        preview_path = create_screenshot_preview(
+            screenshot_path,
+            preview_dir / f"{row_number:03d}_{screenshot_path.stem}.png",
+            crop=evidence.get("crop"),
+            annotation=evidence.get("annotation"),
+        )
+        if not preview_path:
+            continue
+        digest = screenshot_digest(preview_path)
+        if digest in rendered_previews:
+            raise ValueError(
+                f"Screenshot rows {rendered_previews[digest]} and {row_number} render the same visual evidence. "
+                "Use one shared_evidence row or capture the actual distinct scenario."
+            )
+        rendered_previews[digest] = row_number
+        image = XLImage(str(preview_path))
+        image.width = PREVIEW_WIDTH
+        image.height = PREVIEW_HEIGHT
+        ws.add_image(image, f"C{row_number}")
+
+
 def build_screenshot_register(
     wb: Workbook,
     plan: dict[str, Any],
@@ -667,19 +691,8 @@ def build_screenshot_register(
             image_rows.append((row_number, screenshot_path, evidence))
     for row in range(4, ws.max_row + 1):
         ws.row_dimensions[row].height = SCREENSHOT_ROW_HEIGHT
-    for row_number, screenshot_path, evidence in image_rows:
-        preview_path = create_screenshot_preview(
-            screenshot_path,
-            preview_dir / f"{row_number:03d}_{screenshot_path.stem}.png",
-            crop=evidence.get("crop"),
-            annotation=evidence.get("annotation"),
-        )
-        if not preview_path:
-            continue
-        image = XLImage(str(preview_path))
-        image.width = PREVIEW_WIDTH
-        image.height = PREVIEW_HEIGHT
-        ws.add_image(image, f"C{row_number}")
+    if preview_dir:
+        embed_screenshot_previews(ws, image_rows, preview_dir)
     status_dv = DataValidation(type="list", formula1=f'"{SCREENSHOT_STATUS_OPTIONS}"', allow_blank=True)
     ws.add_data_validation(status_dv)
     status_dv.add(f"G4:G{ws.max_row + 200}")
@@ -689,7 +702,7 @@ def build_screenshot_register(
     ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"capture_required"'], fill=PatternFill("solid", fgColor=YELLOW)))
     ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"blocked"'], fill=PatternFill("solid", fgColor=RED)))
     ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"not_needed"'], fill=PatternFill("solid", fgColor=GRAY)))
-    set_widths(ws, [24, 28, 38, 26, 34, 44, 18, 46])
+    set_widths(ws, [24, 28, 72, 26, 34, 44, 18, 46])
     ws.freeze_panes = "A4"
     ws.auto_filter.ref = f"A3:H{ws.max_row}"
     style_cells(ws)

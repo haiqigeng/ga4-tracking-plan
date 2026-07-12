@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
-PREVIEW_WIDTH = 260
-PREVIEW_HEIGHT = 160
+PREVIEW_WIDTH = 480
+PREVIEW_HEIGHT = 270
+ANNOTATION_WIDTH = 6
+MIN_UNCROPPED_RATIO = 1.5
+MAX_UNCROPPED_RATIO = 2.0
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
 
 
@@ -23,6 +27,14 @@ def resolve_screenshot(evidence: dict[str, Any], files_by_name: dict[str, Path])
     return files_by_name.get(file_name) if file_name else None
 
 
+def screenshot_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _bounded_crop(image, crop: dict[str, Any] | None):
     if crop:
         x = max(0, int(crop.get("x", 0)))
@@ -33,8 +45,13 @@ def _bounded_crop(image, crop: dict[str, Any] | None):
         bottom = min(image.height, y + height)
         if right > x and bottom > y:
             return image.crop((x, y, right, bottom)), (x, y)
-    crop_height = min(image.height, max(1, int(image.width * PREVIEW_HEIGHT / PREVIEW_WIDTH)))
-    return image.crop((0, 0, image.width, crop_height)), (0, 0)
+    ratio = image.width / max(1, image.height)
+    if not MIN_UNCROPPED_RATIO <= ratio <= MAX_UNCROPPED_RATIO:
+        raise ValueError(
+            f"Screenshot aspect ratio {ratio:.2f} is not suitable for a readable 16:9 workbook preview. "
+            "Capture a viewport or provide an explicit crop; full-page top cropping is not allowed."
+        )
+    return image.copy(), (0, 0)
 
 
 def create_screenshot_preview(
@@ -76,7 +93,7 @@ def create_screenshot_preview(
                 max(0, min(PREVIEW_HEIGHT - 1, round(y2))),
             )
             if bounds[2] > bounds[0] and bounds[3] > bounds[1]:
-                draw.rectangle(bounds, outline="#D32F2F", width=3)
+                draw.rectangle(bounds, outline="#D32F2F", width=ANNOTATION_WIDTH)
 
         destination.parent.mkdir(parents=True, exist_ok=True)
         canvas.save(destination, "PNG", optimize=True)

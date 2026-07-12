@@ -22,6 +22,8 @@ Do not deliver a plan until every applicable gate passes.
   useful self-service outcomes when they were observed or client-confirmed.
 - Blocked authenticated areas remain explicit coverage gaps rather than
   speculative implementation events.
+- Every event declares public, authentication-flow, or authenticated-area
+  access, and no authenticated-area event relies on inferred evidence.
 - Confirmed order cancellation and actual refund completion use separate
   semantics.
 - Manual events do not silently duplicate automatic or enhanced measurement.
@@ -45,6 +47,10 @@ Do not deliver a plan until every applicable gate passes.
 - Every event has a complete developer example or an explicit no-manual-push
   decision, with GTM paths mapped to final GA4 parameters.
 - Screenshot rows map explicitly to events and shared evidence is intentional.
+- Repetitive generic events have one representative screenshot; finite events
+  cover every inventoried material scenario.
+- Screenshot previews are readable at normal zoom, contain no overlay text,
+  and never rely on an automatic top crop of a full-page source.
 - Workbook filters, frozen panes, widths, wrapping, and previews remain usable.
 
 ## Technical Gate

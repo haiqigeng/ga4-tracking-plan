@@ -1,6 +1,6 @@
 [project]
 name = "ga4-tracking-plan-skill"
-version = "1.1.0"
+version = "1.2.0"
 description = "GA4-only web analyst skill for human-readable tracking plans"
 requires-python = ">=3.11"
 dependencies = [

@@ -20,9 +20,12 @@ A complete GA4 tracking plan must:
   data owner, registration decision, privacy risk, and cardinality risk;
 - highlight sensitive or user-provided data and the validation it requires;
 - investigate public signup and authenticated journeys with synthetic
-  information unless the user explicitly opts out;
+  information through an interactive browser unless the user explicitly opts
+  out;
 - record blocked authenticated journeys as coverage gaps and propose customer-
   space events only when observed, synthetically observed, or client-confirmed;
+- apply the gated-evidence rule to every event, including generic page and
+  ecommerce events, rather than only named customer-space custom events;
 - define connected-user state once through a shared `user_context` protocol;
   map opaque `user_id` only to the Google tag User-ID setting and govern
   approved low-cardinality GA4 user properties separately from events;
@@ -40,6 +43,10 @@ A complete GA4 tracking plan must:
   that should not be tracked;
 - provide an explicit screenshot-evidence row for every event, including
   intentional sharing, skip, not-needed, or blocked decisions;
+- use exactly one representative screenshot for repetitive generic events and
+  cover every materially different visible scenario for finite events;
+- render readable 480 x 270 previews from 16:9 viewport sources, with no image
+  labels and only a bold red rectangle where an interaction or state needs one;
 - produce a readable workbook whose supporting tabs remain subordinate to the
   Event Matrix.
 

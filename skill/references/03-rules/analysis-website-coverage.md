@@ -79,25 +79,46 @@ Use `scripts/discover_site_journeys_playwright.py` when rendered DOM discovery
 is needed and the environment can run Playwright:
 
 ```powershell
-python scripts/discover_site_journeys_playwright.py https://www.example.com/ --output site_discovery_rendered.json
+python scripts/inspect_browser_environment.py
+python scripts/discover_site_journeys_playwright.py https://www.example.com/ --browser auto --output site_discovery_rendered.json
 ```
 
 The rendered helper samples links, forms, and buttons after page load. It does
-not submit forms, log in, place orders, or mutate live state. Treat
-credential-gated or payment-like journeys as `needs_discovery`, `blocked`, or
-`skip_allowed` unless approved test access exists.
+not submit forms, log in, place orders, or mutate live state. It is not evidence
+of a gated journey and must never be used to infer events behind authentication.
+
+The preflight detects the system default browser and eligible Playwright
+channels. Prefer the eligible default, including Microsoft Edge through
+`msedge`. If an interactive browser MCP already exists, inspect its configured
+channel first; the local preflight cannot inspect agent tools.
 
 ## Authenticated Journey Default
 
 Unless the user explicitly opts out, treat synthetic account creation and
 customer-space exploration as consented when public self-registration is
-available. Use synthetic information and investigate signup, login, account,
-order, return, wishlist, preference, loyalty, and reorder paths. Record this as
-synthetic account exploration. Do not omit these journeys merely because no
-credentials were supplied. When the environment cannot complete the flow,
-document the concrete coverage gap and required follow-up. Do not create
-implementation events for inaccessible capabilities unless they are observed
-or client-confirmed.
+available. Use an interactive browser or Playwright MCP to complete signup and
+login with synthetic information, then investigate the actual account, order,
+return, wishlist, preference, loyalty, and reorder paths. Record the actions and
+rendered gated evidence as synthetic account exploration. A static crawler or
+the presence of account links is not enough.
+
+When the real authenticated flow cannot be completed, document the concrete
+coverage gap and required follow-up. Do not propose any event from the gated
+area, including generic `page_view`, `view_item_list`, `view_item`, or
+ecommerce events. Client-confirmed capabilities may be included as confirmed,
+never as analyst inference.
+
+For an unconfirmed gated journey, execute this sequence before event design:
+
+1. Run the browser preflight and prefer the eligible system default or the
+   configured browser MCP channel.
+2. Open public registration or login and use synthetic information.
+3. Complete authentication and confirm that a gated page actually renders.
+4. Explore the visible customer navigation and each safely reachable service.
+5. Record attempted actions, representative gated URLs or states, and
+   screenshot evidence without personal information.
+6. Mark only observed outcomes as events. If any step blocks access, stop at
+   the boundary, document the gap, and add no event from beyond it.
 
 ## Playwright Decision
 
@@ -113,6 +134,9 @@ Use Playwright or equivalent browser exploration when:
 Playwright is optional when the user/client scope, existing client files,
 manual browser exploration, navigation, and page templates already provide
 enough coverage for the requested scope. State this choice in the coverage map.
+It becomes required, or an equivalent interactive browser must be available,
+when an authentication-gated journey is in scope and has not been confirmed by
+client evidence.
 
 ## Coverage Gate
 

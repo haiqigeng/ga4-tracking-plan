@@ -45,6 +45,8 @@ REQUIRED_FILES = {
     SKILL / "scripts" / "validate_tracking_plan.py",
     SKILL / "scripts" / "generate_tracking_plan_workbook.py",
     SKILL / "scripts" / "tracking_plan_screenshots.py",
+    SKILL / "scripts" / "browser_environment.py",
+    SKILL / "scripts" / "inspect_browser_environment.py",
     SKILL / "scripts" / "tracking_plan_validation_common.py",
     SKILL / "scripts" / "tracking_plan_validation_delivery.py",
     SKILL / "scripts" / "tracking_plan_validation_event_rules.py",
@@ -55,6 +57,7 @@ REQUIRED_FILES = {
     SKILL / "scripts" / "migrate_tracking_plan.py",
     ROOT / "scripts" / "inspect_tracking_plan_template.py",
     ROOT / "scripts" / "adapt_tracking_plan_workbook.py",
+    ROOT / "scripts" / "inspect_browser_environment.py",
 }
 
 EXPECTED_TABS = ["00 Overview", "01 GTM Protocol", "02 Parameter Reference", "03 Event Matrix", "04 DataLayer Examples", "05 Screenshot Register"]
@@ -135,8 +138,8 @@ def check_schema_and_fixture() -> None:
     errors = sorted(Draft202012Validator(schema).iter_errors(fixture), key=lambda item: list(item.path))
     if errors:
         fail("Generic GA4 fixture does not match schema:\n" + "\n".join(error.message for error in errors))
-    if fixture.get("schema_version") != "2.1.0":
-        fail("Generic fixture must use schema_version 2.1.0")
+    if fixture.get("schema_version") != "2.2.0":
+        fail("Generic fixture must use schema_version 2.2.0")
     event_ids = {event["event_id"] for event in fixture["events"]}
     covered = {event_id for evidence in fixture["screenshot_evidence"] for event_id in evidence["event_ids"]}
     if event_ids != covered:
@@ -246,6 +249,11 @@ def check_workbook(path: Path) -> None:
     expected_headers = ["Journey", "Event(s)", "Screenshot preview", "Page / component", "URL / route", "Capture objective", "Status", "Notes"]
     if screenshot_headers[:8] != expected_headers:
         fail(f"Unexpected Screenshot Register headers: {screenshot_headers}")
+    screenshot_sheet = wb["05 Screenshot Register"]
+    if (screenshot_sheet.column_dimensions["C"].width or 0) < 70:
+        fail("Screenshot Register preview column is too narrow for readable 480 x 270 evidence")
+    if any((screenshot_sheet.row_dimensions[row].height or 0) < 200 for row in range(4, screenshot_sheet.max_row + 1)):
+        fail("Screenshot Register rows are too short for readable 480 x 270 evidence")
 
 
 def check_generated_outputs() -> None:
@@ -281,8 +289,8 @@ def check_migration() -> None:
         source.write_text(json.dumps(legacy), encoding="utf-8")
         run([sys.executable, "-B", "scripts/migrate_tracking_plan.py", str(source), "--output", str(output)], "Contract migration")
         migrated = load_json(output)
-        if migrated.get("schema_version") != "2.1.0" or "analytics_platforms" in migrated or "qa_cases" in migrated:
-            fail("Contract migration did not produce a clean v2.1 plan")
+        if migrated.get("schema_version") != "2.2.0" or "analytics_platforms" in migrated or "qa_cases" in migrated:
+            fail("Contract migration did not produce a clean v2.2 plan")
 
 
 def check_release_package() -> None:

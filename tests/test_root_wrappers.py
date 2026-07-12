@@ -14,6 +14,7 @@ WRAPPERS = [
     "export_tracking_plan_csv.py",
     "generate_tracking_plan_workbook.py",
     "inspect_tracking_plan_template.py",
+    "inspect_browser_environment.py",
     "migrate_tracking_plan.py",
     "validate_tracking_plan.py",
 ]

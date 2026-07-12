@@ -1,12 +1,17 @@
 # Account, Support, And Content Scenario Reference
 
 For publicly available signup and customer spaces, use synthetic information to
-explore the authenticated journey unless the user explicitly opts out. Cover
+complete the real authenticated journey with an interactive browser or
+Playwright MCP unless the user explicitly opts out. Cover
 successful signup and login, password recovery, account navigation, orders,
 returns, wishlist, preferences, loyalty, and reorder capabilities when present.
 If the environment cannot complete access, record the synthetic-access gap and
 the required follow-up. Do not specify inaccessible capabilities as events
 unless they are observed or client-confirmed.
+
+Apply this evidence rule to every event behind login. Official generic events
+such as `page_view`, `view_item_list`, `view_item`, or `add_to_cart` are not
+exceptions and must not be inferred from public navigation or account labels.
 
 Use this reference for account entry, authentication context, self-service support, FAQ, editorial content, documents, videos, downloads, outbound links, and contact channels.
 

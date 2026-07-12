@@ -17,10 +17,42 @@ GATED_TERMS = {
     "password",
     "payment",
 }
+AUTHENTICATION_EVENTS = {"login", "sign_up", "password_reset"}
+AUTHENTICATED_AREA_TERMS = {
+    "account dashboard",
+    "account order",
+    "authenticated",
+    "client space",
+    "customer space",
+    "order history",
+    "profile",
+    "preferences",
+    "reorder",
+    "return",
+    "wishlist",
+}
+FINITE_SCREENSHOT_EVENTS = {
+    "header_click",
+    "menu_click",
+    "submenu_click",
+    "footer_click",
+    "login",
+    "sign_up",
+    "payment_error",
+    "checkout_error",
+    "newsletter_subscribe",
+    "contact_submit",
+    "catalog_request",
+    "start_return",
+    "cancel_order",
+    "update_profile",
+    "update_preferences",
+    "password_reset",
+}
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Migrate an older tracking-plan JSON file to the GA4-only v2.1 contract.")
+    parser = argparse.ArgumentParser(description="Migrate an older tracking-plan JSON file to the GA4-only v2.2 contract.")
     parser.add_argument("source", type=Path, help="Existing tracking-plan JSON or schema file.")
     parser.add_argument("--output", "-o", type=Path, required=True, help="Output JSON path.")
     return parser.parse_args()
@@ -47,11 +79,31 @@ def default_evidence_basis(event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def infer_access_context(event: dict[str, Any]) -> str:
+    event_name = str(event.get("event_name", ""))
+    if event_name in AUTHENTICATION_EVENTS:
+        return "authentication_flow"
+    text = " ".join(str(event.get(key, "")) for key in ("page_type", "page_or_component", "trigger", "page_url_pattern")).lower()
+    if any(term in text for term in AUTHENTICATED_AREA_TERMS):
+        return "authenticated_area"
+    return "public"
+
+
+def default_screenshot_coverage(event: dict[str, Any]) -> dict[str, Any]:
+    event_name = str(event.get("event_name", ""))
+    if event_name in FINITE_SCREENSHOT_EVENTS:
+        return {"mode": "all_material_scenarios", "scenarios": ["primary_scenario"]}
+    return {"mode": "representative", "scenarios": ["representative_example"]}
+
+
 def default_screenshot_evidence(event: dict[str, Any]) -> dict[str, Any]:
     skip = gated_event(event)
+    coverage = event.get("screenshot_coverage", default_screenshot_coverage(event))
+    scenario = next(iter(coverage.get("scenarios", [])), "representative_example")
     return {
         "evidence_id": f"EVIDENCE-{slug(str(event.get('event_id') or event.get('event_name', 'event')))}",
         "event_ids": [str(event.get("event_id", ""))],
+        "scenario_id": scenario,
         "file_name": "",
         "page_or_component": str(event.get("page_or_component", "")),
         "url_or_route": str(event.get("page_url_pattern", "")),
@@ -144,6 +196,8 @@ def migrate_events(plan: dict[str, Any]) -> list[dict[str, Any]]:
         event.pop("official_ga4_match", None)
         event.setdefault("analysis_use", str(event.get("business_question", "")))
         event.setdefault("evidence_basis", default_evidence_basis(event))
+        event.setdefault("access_context", infer_access_context(event))
+        event.setdefault("screenshot_coverage", default_screenshot_coverage(event))
         migrated_events.append(event)
     plan["events"] = migrated_events
     return migrated_events
@@ -201,7 +255,21 @@ def default_user_context() -> dict[str, Any]:
 
 def migrate_screenshot_evidence(plan: dict[str, Any], migrated_events: list[dict[str, Any]]) -> None:
     evidence = plan.get("screenshot_evidence", [])
-    plan["screenshot_evidence"] = evidence or [default_screenshot_evidence(event) for event in migrated_events]
+    if not evidence:
+        plan["screenshot_evidence"] = [default_screenshot_evidence(event) for event in migrated_events]
+        return
+    events = {str(event.get("event_id", "")): event for event in migrated_events}
+    for row in evidence:
+        if not isinstance(row, dict) or row.get("scenario_id"):
+            continue
+        related = [events.get(str(event_id)) for event_id in row.get("event_ids", [])]
+        scenarios = [
+            str(event.get("screenshot_coverage", {}).get("scenarios", ["representative_example"])[0])
+            for event in related
+            if isinstance(event, dict)
+        ]
+        row["scenario_id"] = scenarios[0] if scenarios else "representative_example"
+    plan["screenshot_evidence"] = evidence
 
 
 def migrate_official_sources(plan: dict[str, Any]) -> None:
@@ -215,7 +283,7 @@ def migrate_official_sources(plan: dict[str, Any]) -> None:
 
 def migrate_plan(plan: dict[str, Any]) -> dict[str, Any]:
     plan = json.loads(json.dumps(plan))
-    plan["schema_version"] = "2.1.0"
+    plan["schema_version"] = "2.2.0"
     for key in ("analytics_platforms", "custom_definitions", "key_events", "qa_cases"):
         plan.pop(key, None)
     migrate_execution_context(plan)

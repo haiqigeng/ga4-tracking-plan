@@ -21,6 +21,12 @@ AUTHENTICATED_ACCOUNT_EVENTS = {
 }
 CONTROLLED_VALUE_RE = re.compile(r"^[a-z0-9]+(?:_[a-z0-9]+)*$")
 CONFIRMED_EVIDENCE = {"observed", "synthetic_observation", "confirmed"}
+AUTHENTICATED_DISCOVERY = {"authenticated_observed", "client_confirmed"}
+AUTHENTICATED_CONTEXT_RE = re.compile(
+    r"authenticated|customer.?space|client.?space|espace.?client|order history|account dashboard|account area|my.?account|mon.?compte|mes.?commandes|after login|apres.?connexion|signed.?in",
+    re.I,
+)
+AUTHENTICATION_FLOW_EVENTS = {"login", "sign_up", "password_reset"}
 
 
 def _events(plan: dict[str, Any]) -> list[dict[str, Any]]:
@@ -188,6 +194,37 @@ def check_authenticated_discovery(plan: dict[str, Any], issues: list[Issue]) -> 
             "$.website_coverage_map.authenticated_journey.gap_reason",
             "A blocked authenticated journey needs a concrete access or safety reason.",
         )
+    if status == "authenticated_observed" and (not decision.get("attempted_actions") or not decision.get("evidence")):
+        add_issue(
+            issues,
+            "error",
+            "AUTHENTICATED_DISCOVERY_EVIDENCE_MISSING",
+            "$.website_coverage_map.authenticated_journey",
+            "Authenticated observation needs the synthetic actions completed and concrete evidence from the gated journey.",
+        )
+
+
+def check_event_access_context(plan: dict[str, Any], issues: list[Issue]) -> None:
+    events = _events(plan)
+    discovery_status = str(plan.get("website_coverage_map", {}).get("authenticated_journey", {}).get("discovery_status", ""))
+    for index, event in enumerate(events):
+        access_context = str(event.get("access_context", ""))
+        event_name = str(event.get("event_name", ""))
+        evidence_status = str(event.get("evidence_basis", {}).get("status", ""))
+        event_context = " ".join(str(event.get(key, "")) for key in ("page_type", "page_or_component", "page_url_pattern", "trigger"))
+        if event_name in AUTHENTICATED_ACCOUNT_EVENTS and access_context != "authenticated_area":
+            add_issue(issues, "error", "AUTHENTICATED_EVENT_CONTEXT_INVALID", f"$.events[{index}].access_context", f"Customer-space event '{event_name}' must use access_context='authenticated_area'.")
+        if event_name in AUTHENTICATION_FLOW_EVENTS and access_context != "authentication_flow":
+            add_issue(issues, "error", "AUTHENTICATION_FLOW_CONTEXT_INVALID", f"$.events[{index}].access_context", f"Authentication outcome '{event_name}' must use access_context='authentication_flow'.")
+        if access_context == "public" and event_name != "account_access_intent" and AUTHENTICATED_CONTEXT_RE.search(event_context):
+            add_issue(issues, "error", "AUTHENTICATED_CONTEXT_UNDERSTATED", f"$.events[{index}].access_context", "The event context appears to be behind login and cannot be classified as public.")
+        if access_context == "authenticated_area":
+            if discovery_status not in AUTHENTICATED_DISCOVERY:
+                add_issue(issues, "error", "UNVERIFIED_AUTHENTICATED_EVENT", f"$.events[{index}]", "Do not propose any event behind authentication unless the real gated journey was synthetically observed or client-confirmed.")
+            if evidence_status not in CONFIRMED_EVIDENCE:
+                add_issue(issues, "error", "AUTHENTICATED_EVENT_EVIDENCE_WEAK", f"$.events[{index}].evidence_basis.status", "Behind-login events must be observed, synthetically observed, or client-confirmed; inference is not allowed.")
+        if access_context == "authentication_flow" and event_name in {"login", "sign_up"} and evidence_status not in CONFIRMED_EVIDENCE:
+            add_issue(issues, "error", "AUTHENTICATION_EVENT_EVIDENCE_WEAK", f"$.events[{index}].evidence_basis.status", f"Successful {event_name} must be observed or confirmed, not inferred from the presence of a form.")
 
 
 def check_lead_mode(mode: str, mappings: list[dict[str, Any]], mapped_names: set[str], implemented_names: set[str], issues: list[Issue]) -> None:
@@ -249,8 +286,8 @@ def check_authenticated_outcome_coverage(plan: dict[str, Any], issues: list[Issu
         for event in _events(plan)
         if event.get("event_name") == "add_to_cart"
     )
-    account_events = [event for event in events if event.get("event_name") in AUTHENTICATED_ACCOUNT_EVENTS]
-    if discovery_status in {"authenticated_observed", "client_confirmed"}:
+    account_events = [event for event in events if event.get("access_context") == "authenticated_area" and event.get("event_name") != "page_view"]
+    if discovery_status in AUTHENTICATED_DISCOVERY:
         if not account_events and not has_reorder:
             add_issue(
                 issues,
@@ -258,25 +295,6 @@ def check_authenticated_outcome_coverage(plan: dict[str, Any], issues: list[Issu
                 "AUTHENTICATED_OUTCOMES_MISSING",
                 "$.events",
                 "Confirmed customer-space coverage needs meaningful observed outcomes beyond login and sign_up, or an explicit page_view-only decision.",
-            )
-        for event in account_events:
-            evidence_status = str(event.get("evidence_basis", {}).get("status", ""))
-            if evidence_status not in CONFIRMED_EVIDENCE:
-                add_issue(
-                    issues,
-                    "error",
-                    "AUTHENTICATED_EVENT_EVIDENCE_WEAK",
-                    f"$.events[{events.index(event)}].evidence_basis.status",
-                    "Authenticated customer-space events must be observed, synthetically observed, or client-confirmed.",
-                )
-    elif account_events:
-        for event in account_events:
-            add_issue(
-                issues,
-                "error",
-                "UNVERIFIED_AUTHENTICATED_EVENT",
-                f"$.events[{events.index(event)}]",
-                "Do not turn inaccessible customer-space capabilities into implementation events. Keep them as coverage gaps until observed or client-confirmed.",
             )
 
 
@@ -413,6 +431,7 @@ def check_delivery_rules(plan: dict[str, Any], issues: list[Issue]) -> None:
     check_controlled_values(plan, issues)
     check_navigation_model(plan, issues)
     check_authenticated_discovery(plan, issues)
+    check_event_access_context(plan, issues)
     check_lead_event_model(plan, issues)
     check_authenticated_outcome_coverage(plan, issues)
     check_order_cancellation_model(plan, issues)

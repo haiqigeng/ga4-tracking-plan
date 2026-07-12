@@ -122,4 +122,6 @@ A tracking plan is ready for human review when:
 - parameter names and controlled values can support future similar pages or journey variants
 - required GA4 custom dimensions or metrics are identified
 - risky fields are flagged
-- each event has an explicit screenshot-evidence, skip, or not-needed decision
+- repetitive generic events have one representative screenshot decision;
+- finite events inventory every materially different screenshot scenario;
+- each event has explicit screenshot evidence, skip, or not-needed handling

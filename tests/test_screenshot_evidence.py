@@ -41,14 +41,35 @@ class ScreenshotEvidenceTests(unittest.TestCase):
         plan = copy.deepcopy(plan)
         with tempfile.TemporaryDirectory() as raw:
             folder = Path(raw)
-            Image.new("RGB", (800, 600), "red").save(folder / "page.png")
-            Image.new("RGB", (800, 600), "blue").save(folder / "promotion.png")
+            Image.new("RGB", (1920, 1080), "red").save(folder / "page.png")
+            Image.new("RGB", (1920, 1080), "blue").save(folder / "promotion.png")
             plan["screenshot_evidence"][0].update({"status": "captured", "file_name": "page.png"})
             plan["screenshot_evidence"][1].update({"status": "captured", "file_name": "promotion.png"})
             workbook = build_workbook(plan, screenshot_dir=folder, preview_dir=folder / "previews")
             images = workbook["05 Screenshot Register"]._images
             self.assertEqual(len(images), 2)
             self.assertEqual({(image.width, image.height) for image in images}, {(PREVIEW_WIDTH, PREVIEW_HEIGHT)})
+
+    def test_tall_source_requires_explicit_crop(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            folder = Path(raw)
+            source = folder / "full-page.png"
+            Image.new("RGB", (1200, 4000), "white").save(source)
+            with self.assertRaisesRegex(ValueError, "explicit crop"):
+                create_screenshot_preview(source, folder / "preview.png")
+
+    def test_duplicate_rendered_previews_are_rejected(self) -> None:
+        plan = copy.deepcopy(
+            json.loads((ROOT / "skill" / "references" / "03-rules" / "example-ga4-tracking-plan.json").read_text(encoding="utf-8"))
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            folder = Path(raw)
+            Image.new("RGB", (1920, 1080), "red").save(folder / "first.png")
+            Image.new("RGB", (1920, 1080), "red").save(folder / "second.png")
+            plan["screenshot_evidence"][0].update({"status": "captured", "file_name": "first.png"})
+            plan["screenshot_evidence"][1].update({"status": "captured", "file_name": "second.png"})
+            with self.assertRaisesRegex(ValueError, "same visual evidence"):
+                build_workbook(plan, screenshot_dir=folder, preview_dir=folder / "previews")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.1.0",
+  "schema_version": "2.2.0",
   "plan_id": "generic_ecommerce_homepage",
   "execution_context": {
     "execution_mode": "greenfield_best_practice",
@@ -368,6 +368,7 @@
     {
       "event_id": "EVT-HOME-PAGE-VIEW",
       "journey_id": "homepage_discovery",
+      "access_context": "public",
       "event_name": "page_view",
       "classification": "automatic",
       "measurement_role": "context",
@@ -439,6 +440,12 @@
         }
       },
       "analysis_use": "How many users view the homepage and from which acquisition contexts?",
+      "screenshot_coverage": {
+        "mode": "representative",
+        "scenarios": [
+          "representative_example"
+        ]
+      },
       "evidence_basis": {
         "status": "inferred",
         "source_refs": [
@@ -450,6 +457,7 @@
     {
       "event_id": "EVT-HOME-PROMO-VIEW",
       "journey_id": "homepage_discovery",
+      "access_context": "public",
       "event_name": "view_promotion",
       "classification": "recommended_ecommerce",
       "measurement_role": "diagnostic",
@@ -570,6 +578,12 @@
         "exception_reason": ""
       },
       "analysis_use": "Which homepage promotions are exposed to users?",
+      "screenshot_coverage": {
+        "mode": "representative",
+        "scenarios": [
+          "representative_example"
+        ]
+      },
       "evidence_basis": {
         "status": "inferred",
         "source_refs": [
@@ -581,6 +595,7 @@
     {
       "event_id": "EVT-HOME-PROMO-SELECT",
       "journey_id": "homepage_discovery",
+      "access_context": "public",
       "event_name": "select_promotion",
       "classification": "recommended_ecommerce",
       "measurement_role": "micro_conversion",
@@ -701,6 +716,12 @@
         "exception_reason": ""
       },
       "analysis_use": "Which exposed promotions drive clicks?",
+      "screenshot_coverage": {
+        "mode": "representative",
+        "scenarios": [
+          "representative_example"
+        ]
+      },
       "evidence_basis": {
         "status": "inferred",
         "source_refs": [
@@ -712,6 +733,7 @@
     {
       "event_id": "EVT-HOME-SEARCH",
       "journey_id": "homepage_discovery",
+      "access_context": "public",
       "event_name": "search",
       "classification": "recommended",
       "measurement_role": "micro_conversion",
@@ -775,6 +797,12 @@
         }
       },
       "analysis_use": "What do users search for from the homepage?",
+      "screenshot_coverage": {
+        "mode": "representative",
+        "scenarios": [
+          "representative_example"
+        ]
+      },
       "evidence_basis": {
         "status": "inferred",
         "source_refs": [
@@ -786,6 +814,7 @@
     {
       "event_id": "EVT-HOME-CONTENT-SELECT",
       "journey_id": "homepage_discovery",
+      "access_context": "public",
       "event_name": "select_content",
       "classification": "recommended",
       "measurement_role": "micro_conversion",
@@ -861,6 +890,12 @@
         }
       },
       "analysis_use": "Which homepage modules or navigation paths drive user interest?",
+      "screenshot_coverage": {
+        "mode": "representative",
+        "scenarios": [
+          "representative_example"
+        ]
+      },
       "evidence_basis": {
         "status": "inferred",
         "source_refs": [
@@ -872,6 +907,7 @@
     {
       "event_id": "EVT-HOME-ACCOUNT-ACCESS",
       "journey_id": "homepage_discovery",
+      "access_context": "public",
       "event_name": "account_access_intent",
       "classification": "custom",
       "measurement_role": "micro_conversion",
@@ -937,6 +973,12 @@
         }
       },
       "analysis_use": "How often do users try to access the account area from the homepage?",
+      "screenshot_coverage": {
+        "mode": "all_material_scenarios",
+        "scenarios": [
+          "account_entry"
+        ]
+      },
       "evidence_basis": {
         "status": "inferred",
         "source_refs": [
@@ -1591,6 +1633,7 @@
       "event_ids": [
         "EVT-HOME-PAGE-VIEW"
       ],
+      "scenario_id": "representative_example",
       "file_name": "",
       "page_or_component": "Homepage document body",
       "url_or_route": "https://example.com/",
@@ -1604,6 +1647,7 @@
       "event_ids": [
         "EVT-HOME-PROMO-VIEW"
       ],
+      "scenario_id": "representative_example",
       "file_name": "",
       "page_or_component": "Homepage merchandising promotion module",
       "url_or_route": "https://example.com/",
@@ -1617,6 +1661,7 @@
       "event_ids": [
         "EVT-HOME-PROMO-SELECT"
       ],
+      "scenario_id": "representative_example",
       "file_name": "",
       "page_or_component": "Homepage merchandising promotion link or card",
       "url_or_route": "https://example.com/",
@@ -1630,6 +1675,7 @@
       "event_ids": [
         "EVT-HOME-SEARCH"
       ],
+      "scenario_id": "representative_example",
       "file_name": "",
       "page_or_component": "Homepage search form",
       "url_or_route": "https://example.com/",
@@ -1643,6 +1689,7 @@
       "event_ids": [
         "EVT-HOME-CONTENT-SELECT"
       ],
+      "scenario_id": "representative_example",
       "file_name": "",
       "page_or_component": "Homepage navigation, editorial, or service module",
       "url_or_route": "https://example.com/",
@@ -1656,13 +1703,14 @@
       "event_ids": [
         "EVT-HOME-ACCOUNT-ACCESS"
       ],
+      "scenario_id": "account_entry",
       "file_name": "",
       "page_or_component": "Homepage account access entry point",
       "url_or_route": "https://example.com/",
       "capture_objective": "Show Homepage account access entry point for account_access_intent.",
-      "status": "skip_allowed",
+      "status": "capture_required",
       "shared_reason": "",
-      "notes": "Skip is allowed when approved credentials or a safe test environment are unavailable."
+      "notes": "Capture the public account entry point with a bold red rectangle around the interaction area."
     }
   ]
 }

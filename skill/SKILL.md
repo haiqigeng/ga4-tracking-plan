@@ -35,6 +35,10 @@ and apply `references/03-rules/completion-gates.md` before delivery.
 - Map broad website scope before choosing events. Use user and client evidence,
   then manual browser evidence, rendered-DOM exploration, navigation, sitemap,
   robots.txt, and static discovery in that order of analytical authority.
+- Before rendered exploration, inspect available browser/MCP capabilities and
+  the local browser environment. Prefer the eligible system default browser;
+  do not assume Chrome. Inform the user when Playwright or a browser build is
+  needed and state any fallback browser used.
 - Treat observed, confirmed, inferred, recommended, and unavailable information
   differently. Do not present inferred journeys as observed facts.
 - Use GA4 with GTM and a dataLayer when implementation context is unknown.
@@ -62,10 +66,11 @@ and apply `references/03-rules/completion-gates.md` before delivery.
   `value_1 | value_2 | value_3` in human output. Use rules rather than lists for
   dynamic or high-cardinality values.
 - Unless the user explicitly opts out, use synthetic information to explore
-  publicly available signup and authenticated customer journeys when possible.
-  If access remains impossible, record the concrete coverage gap. Do not turn
-  inaccessible customer-space capabilities into implementation events unless
-  they are observed or client-confirmed.
+  public signup, complete authentication, and explore the real gated customer
+  journey with an interactive browser or Playwright MCP. Static and rendered-
+  DOM inventories are not authenticated evidence. If access remains impossible,
+  record the concrete gap and propose no event behind authentication. Apply
+  this rule to generic GA4 events as well as custom account events.
 - Consider variant availability on `view_item` when users switch among variants
   and shortage affects analysis. Do not add it by default to list, selection,
   or add-to-cart events. Use it on `view_cart` only for a documented persistent-
@@ -97,6 +102,13 @@ and apply `references/03-rules/completion-gates.md` before delivery.
   propose UA schema in a GA4 plan.
 - Make the XLSX readable for web analysts and developers. Keep internal
   reasoning and machine identifiers out of visible tabs.
+- Design events before final screenshot capture. Use one representative image
+  for repetitive generic events such as `page_view`, `view_item_list`,
+  `select_item`, and `view_item`; capture every materially different visible
+  scenario for finite events. Use a 1920 x 1080 source where practical and a
+  readable 480 x 270 XLSX preview. Put no text inside the image; use only a bold
+  red rectangle around an interaction or visible outcome. Require an explicit
+  crop for tall or full-page sources.
 - Stop after plan creation or review. Do not implement GTM, publish changes,
   audit a container, or execute runtime QA under this skill.
 
@@ -111,6 +123,8 @@ and apply `references/03-rules/completion-gates.md` before delivery.
 - GA4 user properties: https://developers.google.com/analytics/devguides/collection/protocol/ga4/user-properties
 - Consent mode: https://developers.google.com/tag-platform/security/guides/consent
 - PII policy: https://support.google.com/analytics/answer/6366371
+- Playwright browsers: https://playwright.dev/docs/browsers
+- Playwright MCP: https://playwright.dev/docs/getting-started-mcp
 - Universal Analytics sunset: https://support.google.com/analytics/answer/11583528
 
 Bundled catalogs are lookup aids. If live documentation cannot be checked,
@@ -120,14 +134,14 @@ mark official verification unavailable instead of claiming it was performed.
 
 1. Confirm scope, template, execution mode, URLs, journeys, output format, and
    implementation assumptions.
-2. Map website and journey coverage using
-   `references/03-rules/analysis-website-coverage.md`.
+2. Inspect browser readiness, then map public and authenticated website coverage
+   using `references/03-rules/analysis-website-coverage.md`.
 3. Build the measurement brief: business goal, analysis questions, actions,
    success signals, constraints, evidence, and confidence.
 4. Select the applicable scenario, archetype, ecommerce, privacy, and custom-
    event rules from `references/03-rules/`.
-5. Define journey-level event families, excluded event families, and the
-   intended analysis use before writing event rows.
+5. Define journey-level event families, access context, excluded event
+   families, and the intended analysis use before writing event rows.
 6. Choose GA4 official-first events and record official verification. Explain
    every custom event through the custom-event acceptance decision.
 7. Design reusable parameters with value rules, reporting purpose,
@@ -136,9 +150,9 @@ mark official verification unavailable instead of claiming it was performed.
    pushed `event` value and GA4 event name aligned. Provide one complete,
    human-readable implementation example per event and use Google's official
    `event + ecommerce + items` GTM structure for ecommerce.
-9. Create explicit screenshot-evidence rows. Link every row to one or more
-   event IDs, state the capture objective, and use an explicit skip or
-   not-needed reason when appropriate. Never guess evidence from filenames.
+9. After event design, inventory representative or all-material-scenario
+   screenshot coverage, capture the final evidence, and map each row explicitly
+   to event and scenario IDs. Never guess evidence from filenames.
 10. Validate the structured JSON, generate the workbook and optional CSV, and
     apply the completion gates.
 
@@ -167,6 +181,7 @@ Use the bundled scripts for deterministic work:
 - `diff_tracking_plans.py`: event, parameter, and evidence comparison;
 - `discover_site_journeys.py`: static coverage support;
 - `discover_site_journeys_playwright.py`: rendered-DOM coverage support;
+- `inspect_browser_environment.py`: default-browser and Playwright preflight;
 - `annotate_screenshot.py`: interaction callouts;
 - `check_official_catalog.py`: GA4 catalog freshness;
 - `inspect_tracking_plan_template.py`: client workbook structure inventory;
@@ -193,10 +208,11 @@ Do not add audience summaries, template provenance, internal rationale, QA
 case IDs, screenshot IDs, agent instructions, or runtime test scaffolding to
 visible workbook tabs.
 
-For screenshots, use one explicit shared-evidence row when one page state
-supports several events. Use precise crop and annotation coordinates when
-needed. Allow `skip_allowed` for credential-gated or unsafe journeys without
-approved test access.
+For screenshots, use one explicit shared-evidence row only when one visible
+state genuinely supports several events. Use precise crop and rectangle
+coordinates when needed. Do not place labels or captions inside images. Gated
+screenshots may be `skip_allowed` when the real journey cannot be completed,
+but no corresponding gated event may remain inferred in the plan.
 
 When adapting a client workbook, preserve agreed sheet names, columns, colors,
 frozen panes, and protected areas as far as practical while retaining GA4

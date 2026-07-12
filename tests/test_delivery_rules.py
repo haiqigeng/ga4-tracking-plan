@@ -113,6 +113,52 @@ class DeliveryRuleTests(unittest.TestCase):
         }
         self.assertNotIn("AUTHENTICATED_OUTCOMES_MISSING", self.codes(plan))
 
+    def test_generic_event_behind_login_cannot_be_inferred(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        plan["website_coverage_map"]["site_scope"] = "whole_site"
+        plan["website_coverage_map"]["authenticated_journey"] = {
+            "applicable": True,
+            "discovery_status": "attempted_blocked",
+            "attempted_actions": ["Attempted synthetic login"],
+            "evidence": ["Authentication could not be completed"],
+            "gap_reason": "The account required a real customer identifier that was unavailable.",
+        }
+        event = plan["events"][0]
+        event["access_context"] = "authenticated_area"
+        event["page_type"] = "customer_space_dashboard"
+        event["page_or_component"] = "Authenticated customer space dashboard"
+        self.assertIn("UNVERIFIED_AUTHENTICATED_EVENT", self.codes(plan))
+        self.assertIn("AUTHENTICATED_EVENT_EVIDENCE_WEAK", self.codes(plan))
+
+    def test_authenticated_generic_event_needs_real_evidence(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        plan["website_coverage_map"]["site_scope"] = "whole_site"
+        plan["website_coverage_map"]["authenticated_journey"] = {
+            "applicable": True,
+            "discovery_status": "authenticated_observed",
+            "attempted_actions": ["Created a synthetic account", "Completed login", "Opened the customer dashboard"],
+            "evidence": ["Rendered customer dashboard and order navigation observed after login"],
+            "gap_reason": "",
+        }
+        event = plan["events"][0]
+        event["access_context"] = "authenticated_area"
+        event["page_type"] = "customer_space_dashboard"
+        event["page_or_component"] = "Authenticated customer space dashboard"
+        event["evidence_basis"] = {
+            "status": "synthetic_observation",
+            "source_refs": ["Synthetic authenticated browser journey"],
+            "confidence": "high",
+        }
+        codes = self.codes(plan)
+        self.assertNotIn("UNVERIFIED_AUTHENTICATED_EVENT", codes)
+        self.assertNotIn("AUTHENTICATED_EVENT_EVIDENCE_WEAK", codes)
+
+    def test_french_customer_space_cannot_be_marked_public(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        plan["events"][0]["page_or_component"] = "Espace client mes commandes"
+        plan["events"][0]["page_url_pattern"] = "https://example.com/mon-compte/mes-commandes"
+        self.assertIn("AUTHENTICATED_CONTEXT_UNDERSTATED", self.codes(plan))
+
     def test_user_id_must_not_be_an_event_parameter(self) -> None:
         plan = copy.deepcopy(self.fixture)
         plan["events"][3]["parameters"].append("user_id")

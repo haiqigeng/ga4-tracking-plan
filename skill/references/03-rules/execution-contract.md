@@ -5,6 +5,7 @@ Use this as the canonical sequence for every GA4 plan creation or review.
 ```text
 scope and template
 -> website and journey evidence
+-> browser readiness and authenticated exploration
 -> measurement brief
 -> business questions and success signals
 -> GA4 official-event decisions
@@ -28,11 +29,15 @@ scope and template
 6. State whether each parameter is available, needs development, needs a
    backend source, remains to confirm, or is unavailable, and name its owner.
 7. Keep ecommerce parameters at their official scope and in canonical order.
-8. Exhaust practical finite values, keep multilingual controlled values in
+8. Mark every event as public, authentication-flow, or authenticated-area.
+   Behind-login events require synthetic observation or client confirmation;
+   blocked access produces a coverage gap and no gated event.
+9. Exhaust practical finite values, keep multilingual controlled values in
    English, and provide a complete dataLayer example per event.
-9. Map screenshot evidence explicitly to event IDs; never infer evidence from
-   a loosely matching filename.
-10. Generate the XLSX as the main human deliverable and keep internal reasoning
+10. After event design, map one representative screenshot for repetitive
+    generic events and all material scenarios for finite events. Never infer
+    evidence from a loosely matching filename.
+11. Generate the XLSX as the main human deliverable and keep internal reasoning
    out of visible tabs.
-11. Stop after the tracking plan. Do not perform GTM implementation or runtime
+12. Stop after the tracking plan. Do not perform GTM implementation or runtime
     testing under this skill.

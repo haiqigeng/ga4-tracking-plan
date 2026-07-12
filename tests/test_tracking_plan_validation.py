@@ -33,6 +33,24 @@ class TrackingPlanValidationTests(unittest.TestCase):
         plan["events"][0]["analysis_use"] = "reporting"
         self.assertIn("EVENT_ANALYSIS_USE_WEAK", self.codes(plan))
 
+    def test_generic_event_uses_one_representative_screenshot(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        plan["events"][0]["screenshot_coverage"] = {
+            "mode": "all_material_scenarios",
+            "scenarios": ["homepage", "content_page"],
+        }
+        self.assertIn("GENERIC_SCREENSHOT_MODE_INVALID", self.codes(plan))
+
+    def test_all_material_screenshot_scenarios_need_evidence(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        plan["events"][5]["screenshot_coverage"]["scenarios"].append("account_flyout")
+        self.assertIn("SCREENSHOT_SCENARIOS_MISSING", self.codes(plan))
+
+    def test_captured_interaction_screenshot_needs_red_rectangle(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        plan["screenshot_evidence"][1].update({"status": "captured", "file_name": "promotion.png"})
+        self.assertIn("SCREENSHOT_ANNOTATION_MISSING", self.codes(plan))
+
     def test_unconfirmed_parameter_needs_owner(self) -> None:
         plan = copy.deepcopy(self.fixture)
         plan["parameters"][0]["availability"] = "to_confirm"

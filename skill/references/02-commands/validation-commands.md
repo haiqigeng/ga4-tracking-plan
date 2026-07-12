@@ -12,6 +12,7 @@ python -m compileall -q scripts skill/scripts tests
 python -m unittest discover -s tests
 python -m coverage run --source=skill/scripts -m unittest discover -s tests
 python -m coverage report --include="skill/scripts/validate_tracking_plan.py,skill/scripts/tracking_plan_validation_*.py,skill/scripts/ecommerce_matrix.py,skill/scripts/official_ga4_catalog.py,skill/scripts/generate_tracking_plan_workbook.py,skill/scripts/adapt_tracking_plan_workbook.py,skill/scripts/inspect_tracking_plan_template.py" --fail-under=80
+python -m coverage report --include="skill/scripts/browser_environment.py,skill/scripts/discover_site_journeys_playwright.py" --fail-under=70
 python scripts/validate_package.py
 python scripts/check_official_catalog.py --offline
 git diff --check
@@ -54,17 +55,18 @@ routes materially affect whole-site coverage:
 
 ```powershell
 python -m pip install playwright
-python -m playwright install chromium
-python scripts/discover_site_journeys_playwright.py https://www.example.com/ --output path\to\site_discovery_rendered.json
+python scripts/inspect_browser_environment.py
+python scripts/discover_site_journeys_playwright.py https://www.example.com/ --browser auto --output path\to\site_discovery_rendered.json
 ```
 
 The Playwright helper samples rendered pages without submitting forms, logging
-in, placing orders, or mutating live state. Mark credential-gated evidence as
-skipped or blocked unless approved test access is available.
+in, placing orders, or mutating live state. For a gated journey, use an
+interactive browser or Playwright MCP with synthetic information. If the real
+journey cannot be completed, create no event behind authentication.
 
 ## Contract Migration
 
-Migrate an older v1 plan to the GA4-only schema `2.1.0` contract:
+Migrate an older v1 plan to the GA4-only schema `2.2.0` contract:
 
 ```powershell
 python scripts/migrate_tracking_plan.py old-plan.json --output plan-v2.json

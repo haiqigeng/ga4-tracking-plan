@@ -39,8 +39,9 @@ analyst or developer can use.
 1. Confirm the website scope, pages, journeys, template, and naming convention.
 2. Understand the business goal, expected actions, analysis needs, and success
    signals.
-3. Map website coverage, proactively explore public signup and customer-space
-   journeys with synthetic information, and distinguish evidence from assumptions.
+3. Inspect the available browser environment, then complete public signup and
+   authenticated customer-space journeys with synthetic information. If the
+   gated journey cannot be entered, retain a coverage gap and no gated events.
 4. Select GA4 automatic, enhanced-measurement, recommended, and ecommerce
    events before considering custom events. Decide whether form outcomes share
    `generate_lead` or need separate success events.
@@ -51,7 +52,8 @@ analyst or developer can use.
    per event, using Google's official GTM ecommerce structure.
 7. Define connected-user state once in GTM Protocol when relevant, with GA4
    User-ID and user-property mappings kept separate from event payloads.
-8. Map screenshot evidence explicitly to events.
+8. After event design, capture one representative screenshot for repetitive
+   generic events and all materially different scenarios for finite events.
 9. Generate and validate the XLSX tracking plan.
 
 For ecommerce customer spaces, the skill considers meaningful order, return,
@@ -94,7 +96,7 @@ This skill does not:
 - create plans for another analytics platform;
 - audit or clean a GTM container;
 - implement or publish GTM changes;
-- execute browser, DebugView, or network testing;
+- execute GTM Preview, DebugView, or network recette after implementation;
 - approve privacy or legal use;
 - preserve Universal Analytics schema;
 - maximize event count;
@@ -130,12 +132,16 @@ Install dependencies:
 python -m pip install -r requirements.txt
 ```
 
-Playwright is optional and only needed for rendered-DOM website discovery:
+Playwright is optional for public static work, but an interactive browser or
+Playwright MCP is required to investigate an unconfirmed gated journey:
 
 ```powershell
 python -m pip install playwright
-python -m playwright install chromium
+python scripts/inspect_browser_environment.py
 ```
+
+The preflight prefers the eligible system default browser, including Microsoft
+Edge through `msedge`, and reports when another browser build is needed.
 
 ## Common Commands
 
@@ -163,6 +169,9 @@ Use explicit screenshots stored beside the plan:
 ```powershell
 python scripts/generate_tracking_plan_workbook.py plan.json --output plan.xlsx --screenshot-dir screenshots
 ```
+
+Use 1920 x 1080 viewport sources where practical. XLSX previews are 480 x 270
+with no overlay text; interaction images use only a bold red rectangle.
 
 Export CSV:
 
@@ -205,6 +214,7 @@ python -m compileall -q scripts skill/scripts tests
 python -m unittest discover -s tests
 python -m coverage run --source=skill/scripts -m unittest discover -s tests
 python -m coverage report --include="skill/scripts/validate_tracking_plan.py,skill/scripts/tracking_plan_validation_*.py,skill/scripts/ecommerce_matrix.py,skill/scripts/official_ga4_catalog.py,skill/scripts/generate_tracking_plan_workbook.py,skill/scripts/adapt_tracking_plan_workbook.py,skill/scripts/inspect_tracking_plan_template.py" --fail-under=80
+python -m coverage report --include="skill/scripts/browser_environment.py,skill/scripts/discover_site_journeys_playwright.py" --fail-under=70
 python scripts/check_official_catalog.py --offline
 python scripts/validate_package.py
 git diff --check
@@ -224,7 +234,7 @@ values only.
 ## Versioning
 
 The GA4-only v2 contract is a breaking change from earlier multi-platform
-drafts. Schema `2.1.0` adds explicit lead decisions, authenticated-journey
-evidence, and connected-user context. Future minor releases add compatible
+drafts. Schema `2.2.0` adds explicit event access context and representative or
+all-scenario screenshot coverage. Future minor releases add compatible
 analyst or scenario improvements; patch releases fix documentation,
 validation, or rendering defects.

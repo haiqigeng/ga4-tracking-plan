@@ -809,6 +809,7 @@
       "required": [
         "event_id",
         "journey_id",
+        "access_context",
         "event_name",
         "classification",
         "measurement_role",
@@ -827,7 +828,8 @@
         "parameters",
         "privacy",
         "analysis_use",
-        "evidence_basis"
+        "evidence_basis",
+        "screenshot_coverage"
       ],
       "properties": {
         "event_id": {
@@ -837,6 +839,13 @@
         "journey_id": {
           "type": "string",
           "minLength": 1
+        },
+        "access_context": {
+          "enum": [
+            "public",
+            "authentication_flow",
+            "authenticated_area"
+          ]
         },
         "event_name": {
           "type": "string",
@@ -921,6 +930,9 @@
         },
         "evidence_basis": {
           "$ref": "#/$defs/evidenceBasis"
+        },
+        "screenshot_coverage": {
+          "$ref": "#/$defs/screenshotCoverage"
         }
       }
     },
@@ -1385,6 +1397,31 @@
         }
       }
     },
+    "screenshotCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "scenarios"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "representative",
+            "all_material_scenarios",
+            "not_needed"
+          ]
+        },
+        "scenarios": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{1,79}$"
+          }
+        }
+      }
+    },
     "leadEventModel": {
       "type": "object",
       "additionalProperties": false,
@@ -1684,6 +1721,7 @@
       "required": [
         "evidence_id",
         "event_ids",
+        "scenario_id",
         "file_name",
         "page_or_component",
         "url_or_route",
@@ -1705,6 +1743,10 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "scenario_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,79}$"
         },
         "file_name": {
           "type": "string"

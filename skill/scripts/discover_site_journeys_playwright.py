@@ -6,6 +6,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from browser_environment import inspect_browser_environment, resolve_browser_channel
 from discover_site_journeys import (
     SourceError,
     canonical_url,
@@ -24,7 +25,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", "-o", type=Path, required=True, help="Output JSON path.")
     parser.add_argument("--limit", type=int, default=25, help="Maximum rendered pages to inspect.")
     parser.add_argument("--timeout-ms", type=int, default=20000, help="Navigation timeout in milliseconds.")
-    parser.add_argument("--headful", action="store_true", help="Run Chromium with a visible browser window.")
+    parser.add_argument("--headful", action="store_true", help="Run the selected browser with a visible window.")
+    parser.add_argument(
+        "--browser",
+        choices=["auto", "chromium", "chrome", "msedge", "firefox", "webkit"],
+        default="auto",
+        help="Browser channel. Auto prefers the eligible system default browser.",
+    )
     return parser.parse_args()
 
 
@@ -34,10 +41,20 @@ def require_playwright():
     except ImportError as error:
         raise SystemExit(
             "Playwright is required for rendered-DOM discovery. Install it with "
-            "`python -m pip install playwright` and then run "
-            "`python -m playwright install chromium`."
+            "`python -m pip install playwright`. Then run "
+            "`python scripts/inspect_browser_environment.py` to reuse an eligible installed browser or identify the browser build still needed."
         ) from error
     return sync_playwright
+
+
+def launch_browser(playwright: Any, channel: str, headless: bool):
+    if channel in {"chrome", "msedge"}:
+        return playwright.chromium.launch(channel=channel, headless=headless)
+    if channel == "firefox":
+        return playwright.firefox.launch(headless=headless)
+    if channel == "webkit":
+        return playwright.webkit.launch(headless=headless)
+    return playwright.chromium.launch(headless=headless)
 
 
 def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -> dict[str, Any]:
@@ -90,13 +107,18 @@ def main() -> int:
     args = parse_args()
     root_url = canonical_url(args.url if "://" in args.url else f"https://{args.url}")
     sync_playwright = require_playwright()
+    browser_environment = inspect_browser_environment()
+    try:
+        browser_channel = resolve_browser_channel(args.browser, browser_environment)
+    except RuntimeError as error:
+        raise SystemExit(str(error)) from error
     pages: list[dict[str, Any]] = []
     errors: list[SourceError] = []
     seen: set[str] = set()
     queue = [root_url]
 
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=not args.headful)
+        browser = launch_browser(playwright, browser_channel, headless=not args.headful)
         context = browser.new_context()
         page = context.new_page()
         while queue and len(pages) < args.limit:
@@ -120,6 +142,12 @@ def main() -> int:
         "root_url": root_url,
         "generated_by": "discover_site_journeys_playwright.py",
         "crawl_mode": "playwright_rendered_dom",
+        "browser": {
+            "requested": args.browser,
+            "selected_channel": browser_channel,
+            "default_browser": browser_environment.get("default_browser"),
+            "default_browser_eligible": browser_environment.get("default_browser_eligible"),
+        },
         "sources_checked": [
             {
                 "source_type": "playwright_crawl",
@@ -132,7 +160,8 @@ def main() -> int:
         "journeys_discovered": summarize_journeys(pages),
         "notes": [
             "This helper samples rendered DOM pages. It does not submit forms, log in, place orders, or mutate live state.",
-            "Credential-gated, payment, account, and checkout journeys still need user-approved access or a skip note.",
+            "This crawler is not authenticated exploration. Use an interactive browser or Playwright MCP with synthetic information for gated journeys.",
+            "Never infer events behind authentication from this rendered-DOM inventory. If interactive access fails, record a coverage gap and propose no gated events.",
         ],
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
