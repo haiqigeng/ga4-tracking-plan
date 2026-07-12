@@ -5,9 +5,32 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BANNED_PARTS = {"deliverables", "generated", "release", "tracking-plan-corpus-analysis", "__pycache__"}
+BANNED_PARTS = {"deliverables", "generated", "release", "tracking-plan-corpus-analysis", "fresh-agent-evaluation-output", "__pycache__"}
 PACKAGE_ROOTS = [ROOT / "skill"]
-PACKAGE_FILES = [ROOT / "requirements.txt", ROOT / "README.md", ROOT / "LICENSE"]
+WRAPPER_NAMES = [
+    "adapt_tracking_plan_workbook.py",
+    "annotate_screenshot.py",
+    "check_official_catalog.py",
+    "diff_tracking_plans.py",
+    "discover_site_journeys.py",
+    "discover_site_journeys_playwright.py",
+    "export_tracking_plan_csv.py",
+    "generate_tracking_plan_workbook.py",
+    "init_tracking_plan.py",
+    "inspect_browser_environment.py",
+    "inspect_tracking_plan_template.py",
+    "migrate_tracking_plan.py",
+    "validate_tracking_plan.py",
+]
+PACKAGE_FILES = [
+    ROOT / "requirements.txt",
+    ROOT / "README.md",
+    ROOT / "LICENSE",
+    ROOT / "scripts" / "_run_skill_script.py",
+    ROOT / "scripts" / "check_installed_skill_sync.py",
+    ROOT / "scripts" / "validate_fresh_agent_evals.py",
+    *(ROOT / "scripts" / name for name in WRAPPER_NAMES),
+]
 
 
 def parse_args() -> argparse.Namespace:

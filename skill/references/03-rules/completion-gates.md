@@ -50,8 +50,8 @@ Do not deliver a plan until every applicable gate passes.
 - Required screenshot capture records an actual Playwright MCP attempt unless
   final images were supplied by the requester.
 - A blocked or partial capture has a concrete, analyst-facing notice in both
-  Screenshot Register and the delivery reply; no final row remains pending or
-  silently skipped.
+  Screenshot Register and the delivery reply; no final row remains unresolved
+  or silently omitted.
 - Every `captured` or `shared_evidence` row resolves to an actual image file;
   missing files stop workbook generation.
 - Repetitive generic events have one representative screenshot; finite events

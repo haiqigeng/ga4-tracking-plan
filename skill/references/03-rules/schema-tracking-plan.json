@@ -1822,10 +1822,8 @@
         },
         "status": {
           "enum": [
-            "capture_required",
             "captured",
             "shared_evidence",
-            "skip_allowed",
             "not_needed",
             "blocked"
           ]

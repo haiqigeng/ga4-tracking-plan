@@ -13,6 +13,7 @@ WRAPPERS = [
     "diff_tracking_plans.py",
     "export_tracking_plan_csv.py",
     "generate_tracking_plan_workbook.py",
+    "init_tracking_plan.py",
     "inspect_tracking_plan_template.py",
     "inspect_browser_environment.py",
     "migrate_tracking_plan.py",

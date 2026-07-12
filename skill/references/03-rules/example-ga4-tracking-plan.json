@@ -1,9 +1,9 @@
 {
-  "schema_version": "2.3.0",
+  "schema_version": "2.4.0",
   "plan_id": "generic_ecommerce_homepage",
   "execution_context": {
     "execution_mode": "greenfield_best_practice",
-    "mode_reason": "Generic fixture uses the integrated default GA4 tracking plan template without client-specific artifacts.",
+    "mode_reason": "Generic fixture uses the integrated GA4 workbook generator without client-specific artifacts.",
     "input_artifact_inventory": [
       {
         "artifact_type": "user_brief",
@@ -11,18 +11,11 @@
         "role": "Define example scope and assumptions",
         "template_relevance": "not_template",
         "confidentiality_status": "generic"
-      },
-      {
-        "artifact_type": "template_workbook",
-        "artifact_ref": "assets/ga4_tracking_plan_template.xlsx",
-        "role": "Default output template",
-        "template_relevance": "source_template",
-        "confidentiality_status": "generic"
       }
     ],
     "template_policy": {
       "mode": "default_skill_template",
-      "template_source": "assets/ga4_tracking_plan_template.xlsx",
+      "template_source": "generate_tracking_plan_workbook.py",
       "preservation_requirements": [
         "Keep default six-sheet workbook structure stable."
       ],
@@ -33,7 +26,7 @@
     },
     "template_diff_summary": {
       "status": "not_needed",
-      "summary": "Default skill template used without client-template adaptation.",
+      "summary": "Default generated workbook used without client-template adaptation.",
       "columns_added": [],
       "columns_removed": [],
       "style_or_structure_changes": []
@@ -1348,7 +1341,7 @@
       "description": "Official GA4 parameter for select_content.",
       "reporting_purpose": "Identifies selected content with a stable low-cardinality ID for module performance reporting.",
       "value_rules": "Use stable IDs or slugs.",
-      "example_value": "nav_women",
+      "example_value": "nav_category",
       "allowed_values": [],
       "source": "component metadata",
       "register_custom_definition": true,
@@ -1374,7 +1367,7 @@
       "description": "Readable selected content name.",
       "reporting_purpose": "Provides readable selected-content labels for analyst review while managing cardinality.",
       "value_rules": "Use normalized lowercase ASCII snake_case values when controlled.",
-      "example_value": "women_category",
+      "example_value": "product_category",
       "allowed_values": [],
       "source": "component metadata",
       "register_custom_definition": true,
@@ -1432,7 +1425,7 @@
       "description": "Destination URL for a selected link or module.",
       "reporting_purpose": "Validates navigation destination and supports outbound or internal path analysis after URL cleaning.",
       "value_rules": "Remove sensitive query parameters before sending.",
-      "example_value": "https://example.com/category/women",
+      "example_value": "https://example.com/category/example",
       "allowed_values": [],
       "source": "clicked element href",
       "register_custom_definition": false,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections import Counter, defaultdict
+from collections import defaultdict
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -25,7 +25,7 @@ from tracking_plan_validation_catalogs import (
     load_ga4_catalog,
     load_json,
 )
-from tracking_plan_validation_common import check_official_verification, governed_sensitive_implementation_parameter
+from tracking_plan_validation_common import check_duplicates, check_official_verification, governed_sensitive_implementation_parameter
 from tracking_plan_validation_delivery import check_delivery_rules
 from tracking_plan_validation_event_rules import check_event
 from tracking_plan_validation_events import (
@@ -36,27 +36,7 @@ from tracking_plan_validation_events import (
     should_lint_ga4_parameter_name,
 )
 from tracking_plan_validation_model import Issue, add_issue
-from tracking_plan_validation_screenshot_capture import check_screenshot_capture, screenshot_capture_requirement
-
-GENERIC_SCREENSHOT_EVENTS = {"page_view", "view_item_list", "select_item", "view_item"}
-FINITE_SCREENSHOT_EVENTS = {
-    "header_click",
-    "menu_click",
-    "submenu_click",
-    "footer_click",
-    "login",
-    "sign_up",
-    "payment_error",
-    "checkout_error",
-    "newsletter_subscribe",
-    "contact_submit",
-    "catalog_request",
-    "start_return",
-    "cancel_order",
-    "update_profile",
-    "update_preferences",
-    "password_reset",
-}
+from tracking_plan_validation_screenshot_capture import check_screenshot_capture, check_screenshot_evidence
 
 
 def parse_args() -> argparse.Namespace:
@@ -103,12 +83,6 @@ def values_at_keys(value: Any, target_keys: set[str], prefix: str = "$") -> Iter
     elif isinstance(value, list):
         for index, child in enumerate(value):
             yield from values_at_keys(child, target_keys, f"{prefix}[{index}]")
-
-
-def check_duplicates(values: list[str], label: str, path: str, issues: list[Issue]) -> None:
-    for value, count in Counter(values).items():
-        if value and count > 1:
-            add_issue(issues, "error", "DUPLICATE_ID", path, f"{label} '{value}' appears {count} times.")
 
 
 def check_execution_context(plan: dict[str, Any], issues: list[Issue]) -> None:
@@ -423,145 +397,6 @@ def check_not_tracked_decisions(plan: dict[str, Any], issues: list[Issue]) -> No
                 f"$.not_tracked[{index}].reason",
                 "Not-tracked decisions need a useful analyst rationale, such as noise, privacy risk, unavailable data, duplicate signal, or lack of business actionability.",
             )
-
-
-def check_screenshot_row(row: dict[str, Any], index: int, event_ids: set[str], covered: Counter[str], file_usage: defaultdict[str, list[dict[str, Any]]], issues: list[Issue]) -> None:
-    base = f"$.screenshot_evidence[{index}]"
-    related = [str(value) for value in row.get("event_ids", [])]
-    for event_id in related:
-        if event_id not in event_ids:
-            add_issue(issues, "error", "SCREENSHOT_EVENT_UNKNOWN", f"{base}.event_ids", f"Screenshot evidence references unknown event_id '{event_id}'.")
-        covered[event_id] += 1
-    status = str(row.get("status", ""))
-    file_name = str(row.get("file_name", "")).strip()
-    if status in {"captured", "shared_evidence"} and not file_name:
-        add_issue(issues, "error", "SCREENSHOT_FILE_MISSING", f"{base}.file_name", f"Screenshot status '{status}' requires an explicit evidence file name.")
-    if status == "shared_evidence" and len(related) < 2:
-        add_issue(issues, "error", "SCREENSHOT_SHARED_WITH_ONE_EVENT", f"{base}.event_ids", "shared_evidence must reference at least two events.")
-    if status == "shared_evidence" and len(str(row.get("shared_reason", "")).split()) < 4:
-        add_issue(issues, "error", "SCREENSHOT_SHARED_REASON_WEAK", f"{base}.shared_reason", "Shared screenshot evidence needs a clear reason describing the common page state or interaction.")
-    if file_name:
-        file_usage[file_name.lower()].append(row)
-
-
-def check_screenshot_evidence(plan: dict[str, Any], issues: list[Issue]) -> None:
-    events = [event for event in plan.get("events", []) if isinstance(event, dict)]
-    event_ids = {str(event.get("event_id", "")) for event in events}
-    evidence_rows = [row for row in plan.get("screenshot_evidence", []) if isinstance(row, dict)]
-    check_duplicates(
-        [str(row.get("evidence_id", "")) for row in evidence_rows],
-        "evidence_id",
-        "$.screenshot_evidence",
-        issues,
-    )
-
-    covered: Counter[str] = Counter()
-    file_usage: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
-    for index, row in enumerate(evidence_rows):
-        check_screenshot_row(row, index, event_ids, covered, file_usage, issues)
-
-    for event_id in sorted(event_ids):
-        if covered[event_id] == 0:
-            add_issue(issues, "error", "SCREENSHOT_EVENT_MISSING", "$.screenshot_evidence", f"Event '{event_id}' needs a screenshot-evidence row or an explicit skip/not-needed decision.")
-
-    for file_name, rows in file_usage.items():
-        related_events = {event_id for row in rows for event_id in row.get("event_ids", [])}
-        if len(rows) > 1 and len(related_events) > 1 and not all(row.get("status") == "shared_evidence" for row in rows):
-            add_issue(
-                issues,
-                "warning",
-                "SCREENSHOT_REUSE_NOT_EXPLICIT",
-                "$.screenshot_evidence",
-                f"Screenshot '{file_name}' is reused across events without one explicit shared_evidence row.",
-            )
-    check_screenshot_coverage(
-        events,
-        evidence_rows,
-        screenshot_capture_requirement(plan) == "not_requested",
-        issues,
-    )
-
-
-def screenshot_rows_by_event(events: list[dict[str, Any]], evidence_rows: list[dict[str, Any]], issues: list[Issue]) -> defaultdict[str, list[dict[str, Any]]]:
-    rows_by_event: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
-    events_by_id = {str(event.get("event_id", "")): event for event in events}
-    for row in evidence_rows:
-        for event_id in row.get("event_ids", []):
-            rows_by_event[str(event_id)].append(row)
-        related_names = {
-            str(events_by_id.get(str(event_id), {}).get("event_name", ""))
-            for event_id in row.get("event_ids", [])
-        }
-        if row.get("status") in {"captured", "shared_evidence"} and any(name and name != "page_view" for name in related_names) and not row.get("annotation"):
-            add_issue(issues, "error", "SCREENSHOT_ANNOTATION_MISSING", "$.screenshot_evidence", "Captured interaction or visible-outcome evidence needs a bold red rectangle and no overlay text. Only a pure page_view example normally omits it.")
-    return rows_by_event
-
-
-def check_representative_screenshot(index: int, scenarios: list[str], rows: list[dict[str, Any]], issues: list[Issue]) -> None:
-    row_scenarios = {str(row.get("scenario_id", "")) for row in rows}
-    if len(scenarios) != 1 or len(rows) != 1 or row_scenarios != set(scenarios):
-        add_issue(issues, "error", "REPRESENTATIVE_SCREENSHOT_INVALID", f"$.events[{index}].screenshot_coverage", "Representative screenshot coverage needs exactly one scenario and one matching evidence row.")
-
-
-def check_all_scenario_screenshots(index: int, scenarios: list[str], rows: list[dict[str, Any]], issues: list[Issue]) -> None:
-    row_scenarios = {str(row.get("scenario_id", "")) for row in rows}
-    missing = sorted(set(scenarios) - row_scenarios)
-    if not scenarios or missing:
-        add_issue(issues, "error", "SCREENSHOT_SCENARIOS_MISSING", f"$.events[{index}].screenshot_coverage.scenarios", f"All finite screenshot scenarios need evidence rows. Missing: {', '.join(missing) or 'scenario inventory'}.")
-
-
-def check_not_needed_screenshot(index: int, scenarios: list[str], rows: list[dict[str, Any]], issues: list[Issue]) -> None:
-    if scenarios or len(rows) != 1 or rows[0].get("status") != "not_needed":
-        add_issue(issues, "error", "SCREENSHOT_NOT_NEEDED_INVALID", f"$.events[{index}].screenshot_coverage", "Not-needed coverage must have no scenarios and one explicit not_needed evidence row.")
-
-
-def check_event_screenshot_mode(
-    event: dict[str, Any],
-    index: int,
-    rows: list[dict[str, Any]],
-    screenshots_not_requested: bool,
-    issues: list[Issue],
-) -> None:
-    coverage = event.get("screenshot_coverage", {})
-    if not isinstance(coverage, dict):
-        return
-    mode = str(coverage.get("mode", ""))
-    scenarios = [str(value) for value in coverage.get("scenarios", [])]
-    event_name = str(event.get("event_name", ""))
-    if screenshots_not_requested:
-        if mode != "not_needed" or scenarios:
-            add_issue(
-                issues,
-                "error",
-                "SCREENSHOT_COVERAGE_NOT_REQUESTED",
-                f"$.events[{index}].screenshot_coverage",
-                "When screenshots are not requested, event screenshot coverage must be not_needed with no scenarios.",
-            )
-            return
-        check_not_needed_screenshot(index, scenarios, rows, issues)
-        return
-    if event_name in GENERIC_SCREENSHOT_EVENTS and mode != "representative":
-        add_issue(issues, "error", "GENERIC_SCREENSHOT_MODE_INVALID", f"$.events[{index}].screenshot_coverage.mode", f"Repetitive generic event '{event_name}' needs one representative screenshot, not one screenshot per page or item.")
-    if event_name in FINITE_SCREENSHOT_EVENTS and mode != "all_material_scenarios":
-        add_issue(issues, "error", "FINITE_SCREENSHOT_MODE_INVALID", f"$.events[{index}].screenshot_coverage.mode", f"Finite event '{event_name}' needs all materially different visible scenarios listed for screenshot coverage.")
-    if mode == "representative":
-        check_representative_screenshot(index, scenarios, rows, issues)
-    elif mode == "all_material_scenarios":
-        check_all_scenario_screenshots(index, scenarios, rows, issues)
-    elif mode == "not_needed":
-        check_not_needed_screenshot(index, scenarios, rows, issues)
-
-
-def check_screenshot_coverage(
-    events: list[dict[str, Any]],
-    evidence_rows: list[dict[str, Any]],
-    screenshots_not_requested: bool,
-    issues: list[Issue],
-) -> None:
-    rows_by_event = screenshot_rows_by_event(events, evidence_rows, issues)
-    for index, event in enumerate(events):
-        event_id = str(event.get("event_id", ""))
-        check_event_screenshot_mode(event, index, rows_by_event[event_id], screenshots_not_requested, issues)
 
 
 def check_official_source_inventory(plan: dict[str, Any], events: list[Any], issues: list[Issue]) -> None:

@@ -20,56 +20,32 @@ from ecommerce_matrix import (
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.formatting.rule import CellIsRule
-from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-from openpyxl.utils import get_column_letter, quote_sheetname
+from openpyxl.styles import Font, PatternFill
+from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 from tracking_plan_screenshots import PREVIEW_HEIGHT, PREVIEW_WIDTH, create_screenshot_preview, resolve_screenshot, screenshot_digest, screenshot_files
+from tracking_plan_workbook_layout import (
+    CENTER,
+    EVENT_SLOT_COUNT,
+    GRAY,
+    GREEN,
+    RED,
+    SCREENSHOT_ROW_HEIGHT,
+    SCREENSHOT_STATUS_OPTIONS,
+    TEAL_LIGHT,
+    apply_workbook_settings,
+    header,
+    matrix_max_col,
+    matrix_value_columns,
+    section,
+    set_internal_link,
+    set_widths,
+    style_cells,
+    style_event_matrix_rows,
+    style_overview,
+    title,
+)
 from validate_tracking_plan import render_text, validate_plan_data
-
-NAVY = "263238"
-BLUE = "E7EEF5"
-LIGHT_BLUE = "F6F9FC"
-GREEN = "EAF3EA"
-YELLOW = "FFF6D8"
-GRAY = "F4F6F8"
-WHITE = "FFFFFF"
-RED = "FBEAEA"
-DARK = "404040"
-MUTED_TEXT = "6E7781"
-HEADER_TEXT = "1F2933"
-BLOCK_FILL = "EDF6EF"
-INHERITED_FILL = "EAF4FB"
-DEFAULT_FILL = "F0F7F2"
-NOT_AVAILABLE_FILL = "FFF2CC"
-NOT_APPLICABLE_FILL = "F5F6F7"
-GRID = "E7ECF2"
-GRID_DARK = "BBC8D6"
-TEAL = "2F6F7E"
-TEAL_LIGHT = "EAF6F4"
-TEAL_SECTION = "DCEFEA"
-OVERVIEW_HEADER = "F3F7F8"
-OVERVIEW_ALT = "FAFCFD"
-
-THIN = Side(style="thin", color=GRID)
-MEDIUM = Side(style="medium", color=GRID_DARK)
-BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
-BLOCK_BORDER = Border(top=MEDIUM, bottom=THIN, left=THIN, right=THIN)
-OVERVIEW_LINE = Side(style="thin", color="DDE5EA")
-OVERVIEW_BORDER = Border(bottom=OVERVIEW_LINE)
-WRAP = Alignment(wrap_text=True, vertical="top")
-CENTER = Alignment(wrap_text=True, vertical="center", horizontal="center")
-
-EVENT_SLOT_COUNT = 4
-SCREENSHOT_STATUS_OPTIONS = "capture_required,captured,shared_evidence,skip_allowed,not_needed,blocked"
-SCREENSHOT_ROW_HEIGHT = 216
-
-
-def matrix_max_col() -> int:
-    return 2 + EVENT_SLOT_COUNT
-
-
-def matrix_value_columns() -> list[int]:
-    return [3 + index for index in range(EVENT_SLOT_COUNT)]
 
 
 def parse_args() -> argparse.Namespace:
@@ -87,130 +63,6 @@ def parse_args() -> argparse.Namespace:
 
 def load_plan(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8-sig"))
-
-
-def set_widths(ws, widths: list[int]) -> None:
-    for idx, width in enumerate(widths, 1):
-        ws.column_dimensions[get_column_letter(idx)].width = width
-
-
-def style_cells(ws) -> None:
-    for row in ws.iter_rows():
-        for cell in row:
-            cell.alignment = WRAP
-            cell.border = BORDER
-    ws.sheet_view.showGridLines = False
-
-
-def style_overview(ws, max_col: int) -> None:
-    style_cells(ws)
-    ws.sheet_view.showGridLines = False
-    ws.freeze_panes = None
-    ws.sheet_properties.tabColor = "95C8C1"
-    ws.sheet_view.zoomScale = 90
-    ws.sheet_view.zoomScaleNormal = 90
-
-    section_labels = {
-        "Document Summary",
-        "Sheet Contents",
-        "Version History",
-    }
-    header_labels = {"#"}
-    label_columns = {1, 3, 5, 7}
-
-    for row in range(1, ws.max_row + 1):
-        label = ws.cell(row, 1).value
-        if row not in {1, 2}:
-            ws.row_dimensions[row].height = 24
-        for col in range(1, max_col + 1):
-            cell = ws.cell(row, col)
-            cell.alignment = WRAP
-            cell.border = OVERVIEW_BORDER
-            if cell.hyperlink:
-                cell.font = Font(color=TEAL, bold=True, underline="single", size=10)
-            elif row not in {1, 2}:
-                cell.font = Font(color=DARK, size=10)
-
-        if label in section_labels:
-            ws.row_dimensions[row].height = 26
-            for col in range(1, max_col + 1):
-                cell = ws.cell(row, col)
-                cell.fill = PatternFill("solid", fgColor=TEAL_SECTION)
-                cell.font = Font(color=TEAL, bold=True, size=12)
-                cell.alignment = Alignment(vertical="center")
-                cell.border = Border(top=Side(style="medium", color=TEAL), bottom=OVERVIEW_LINE)
-        elif label in header_labels or (label == "Version" and ws.cell(row, 2).value == "Date"):
-            ws.row_dimensions[row].height = 22
-            for col in range(1, max_col + 1):
-                cell = ws.cell(row, col)
-                cell.fill = PatternFill("solid", fgColor=OVERVIEW_HEADER)
-                cell.font = Font(color=HEADER_TEXT, bold=True, size=10)
-                cell.alignment = Alignment(wrap_text=True, vertical="center")
-                cell.border = Border(top=OVERVIEW_LINE, bottom=OVERVIEW_LINE)
-        elif row > 2 and any(ws.cell(row, col).value not in (None, "") for col in range(1, max_col + 1)):
-            fill = OVERVIEW_ALT if row % 2 == 0 else WHITE
-            for col in range(1, max_col + 1):
-                cell = ws.cell(row, col)
-                cell.fill = PatternFill("solid", fgColor=fill)
-                if col in label_columns and cell.value not in (None, ""):
-                    cell.font = Font(color=MUTED_TEXT, bold=True, size=10)
-
-    for row in [4, 5]:
-        if row <= ws.max_row:
-            ws.row_dimensions[row].height = 30
-            for col in range(1, max_col + 1):
-                ws.cell(row, col).fill = PatternFill("solid", fgColor=LIGHT_BLUE if col in label_columns else WHITE)
-                ws.cell(row, col).border = BORDER
-                if col not in label_columns and ws.cell(row, col).value not in (None, ""):
-                    ws.cell(row, col).font = Font(color=HEADER_TEXT, bold=True, size=10)
-
-    ws.cell(1, 1).fill = PatternFill("solid", fgColor=TEAL)
-    ws.cell(1, 1).font = Font(color=WHITE, bold=True, size=20)
-    ws.cell(1, 1).alignment = Alignment(vertical="center")
-    ws.row_dimensions[1].height = 38
-    ws.cell(2, 1).fill = PatternFill("solid", fgColor=TEAL_LIGHT)
-    ws.cell(2, 1).font = Font(color=TEAL, size=11)
-    ws.cell(2, 1).alignment = Alignment(wrap_text=True, vertical="center")
-    ws.row_dimensions[2].height = 30
-
-
-def title(ws, text: str, subtitle: str, max_col: int) -> None:
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=max_col)
-    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=max_col)
-    ws.cell(1, 1, text)
-    ws.cell(2, 1, subtitle)
-    ws.cell(1, 1).fill = PatternFill("solid", fgColor=NAVY)
-    ws.cell(1, 1).font = Font(color=WHITE, bold=True, size=15)
-    ws.cell(2, 1).fill = PatternFill("solid", fgColor=LIGHT_BLUE)
-    ws.cell(2, 1).font = Font(color=DARK)
-    ws.cell(1, 1).alignment = Alignment(vertical="center")
-    ws.cell(2, 1).alignment = WRAP
-    ws.row_dimensions[1].height = 26
-    ws.row_dimensions[2].height = 34
-
-
-def section(ws, row: int, label: str, max_col: int) -> None:
-    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=max_col)
-    cell = ws.cell(row, 1, label)
-    cell.fill = PatternFill("solid", fgColor=BLOCK_FILL)
-    cell.font = Font(color=HEADER_TEXT, bold=True)
-    cell.alignment = Alignment(vertical="center")
-    for col in range(1, max_col + 1):
-        ws.cell(row, col).border = BLOCK_BORDER
-
-
-def header(ws, row: int, max_col: int, fill: str = NAVY) -> None:
-    for col in range(1, max_col + 1):
-        cell = ws.cell(row, col)
-        cell.fill = PatternFill("solid", fgColor=fill)
-        cell.font = Font(color=WHITE if fill == NAVY else "000000", bold=True)
-        cell.alignment = CENTER
-        cell.border = BORDER
-
-
-def set_internal_link(cell, sheet_name: str) -> None:
-    cell.hyperlink = f"#{quote_sheetname(sheet_name)}!A1"
-    cell.font = Font(color="2F6F7E", bold=True, underline="single")
 
 
 def join_values(values: list[Any] | None) -> str:
@@ -242,53 +94,6 @@ def transport_event_name(event: dict[str, Any]) -> str:
     if isinstance(ga4_payload, dict) and ga4_payload.get("event_name"):
         return str(ga4_payload["event_name"])
     return str(event.get("event_name", ""))
-
-
-def style_matrix_value_cell(cell, availability: str) -> None:
-    if cell.value in (None, ""):
-        return
-    if availability == "not_applicable":
-        cell.fill = PatternFill("solid", fgColor=NOT_APPLICABLE_FILL)
-        cell.font = Font(color=MUTED_TEXT, italic=True)
-    elif availability == "not_available":
-        cell.fill = PatternFill("solid", fgColor=NOT_AVAILABLE_FILL)
-        cell.font = Font(color=DARK)
-    elif availability == "event_level_used":
-        cell.fill = PatternFill("solid", fgColor=INHERITED_FILL)
-        cell.font = Font(color=DARK, italic=True)
-    elif availability == "send_default_quantity":
-        cell.fill = PatternFill("solid", fgColor=DEFAULT_FILL)
-        cell.font = Font(color=DARK)
-
-
-def style_event_matrix_rows(ws) -> None:
-    value_columns = matrix_value_columns()
-    max_col = matrix_max_col()
-    for row in range(6, ws.max_row + 1):
-        is_block = str(ws.cell(row, 1).value or "").startswith("J-")
-        if is_block:
-            for col in range(1, max_col + 1):
-                cell = ws.cell(row, col)
-                cell.fill = PatternFill("solid", fgColor=BLOCK_FILL)
-                cell.border = BLOCK_BORDER
-                cell.font = Font(color=HEADER_TEXT, bold=True)
-                cell.alignment = Alignment(wrap_text=True, vertical="center")
-            ws.row_dimensions[row].height = 24
-            continue
-
-        parameter = str(ws.cell(row, 1).value or "")
-        for col in range(1, max_col + 1):
-            ws.cell(row, col).fill = PatternFill("solid", fgColor=WHITE)
-        for col in value_columns:
-            value = str(ws.cell(row, col).value or "")
-            if value == "not_applicable":
-                style_matrix_value_cell(ws.cell(row, col), "not_applicable")
-            elif value == "not_available":
-                style_matrix_value_cell(ws.cell(row, col), "not_available")
-            elif value.startswith("event-level "):
-                style_matrix_value_cell(ws.cell(row, col), "event_level_used")
-            elif parameter == "items[].quantity" and value == "1":
-                style_matrix_value_cell(ws.cell(row, col), "send_default_quantity")
 
 
 def parameter_value(event: dict[str, Any], parameter: str) -> str:
@@ -326,18 +131,6 @@ def parameter_value(event: dict[str, Any], parameter: str) -> str:
         return compact_json(current)
 
     return "-"
-
-
-def apply_workbook_settings(wb: Workbook) -> None:
-    for ws in wb.worksheets:
-        for row in ws.iter_rows():
-            for cell in row:
-                if isinstance(cell.value, str) and len(cell.value) > 80:
-                    ws.row_dimensions[cell.row].height = max(ws.row_dimensions[cell.row].height or 15, 42)
-        ws.sheet_properties.pageSetUpPr.fitToPage = True
-        ws.page_setup.fitToWidth = 1
-        ws.page_setup.fitToHeight = 0
-    wb.active = 0
 
 
 def parameter_value_rules(parameter: dict[str, Any]) -> str:
@@ -708,8 +501,6 @@ def build_screenshot_register(
     status_dv.add(f"G4:G{ws.max_row + 200}")
     ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"captured"'], fill=PatternFill("solid", fgColor=GREEN)))
     ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"shared_evidence"'], fill=PatternFill("solid", fgColor=TEAL_LIGHT)))
-    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"skip_allowed"'], fill=PatternFill("solid", fgColor=NOT_AVAILABLE_FILL)))
-    ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"capture_required"'], fill=PatternFill("solid", fgColor=YELLOW)))
     ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"blocked"'], fill=PatternFill("solid", fgColor=RED)))
     ws.conditional_formatting.add(f"G4:G{ws.max_row + 200}", CellIsRule(operator="equal", formula=['"not_needed"'], fill=PatternFill("solid", fgColor=GRAY)))
     set_widths(ws, [24, 28, 72, 26, 34, 44, 18, 46])

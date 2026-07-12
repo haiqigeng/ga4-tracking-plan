@@ -124,4 +124,4 @@ A tracking plan is ready for human review when:
 - risky fields are flagged
 - repetitive generic events have one representative screenshot decision;
 - finite events inventory every materially different screenshot scenario;
-- each event has explicit screenshot evidence, skip, or not-needed handling
+- each event has captured, shared, blocked, or not-needed screenshot handling

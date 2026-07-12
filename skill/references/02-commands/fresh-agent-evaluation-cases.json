@@ -1,0 +1,95 @@
+{
+  "version": "1.0",
+  "purpose": "Reproducible fresh-agent acceptance cases for the GA4 tracking-plan skill.",
+  "pass_rule": {
+    "blocking_criteria": "all_pass",
+    "quality_criteria_minimum_ratio": 0.9,
+    "prohibited_outcomes": "all_absent"
+  },
+  "cases": [
+    {
+      "case_id": "whole_site_ecommerce",
+      "category": "whole_site_ecommerce",
+      "title": "Whole-site ecommerce and customer-space plan",
+      "prompt": "Start with no prior context. Create a human-readable GA4 and GTM tracking plan for https://shop.example.com with no client template. Scope is the whole website. Supplied browser evidence confirms home, navigation, search, product lists with color and size filters, product detail with variant switching and availability, cart, checkout, payment refusal, purchase confirmation, signup, login, order history, order detail, return start, confirmed order cancellation, profile update, preferences, wishlist, and reorder. Screenshots are required, but Playwright MCP is unavailable in this evaluation environment. Decide all other details as a web analyst.",
+      "required_outcomes": [
+        {"criterion_id": "journey_coherence", "severity": "blocking", "description": "Events and parameters form coherent public, commerce, checkout, and authenticated journeys tied to business and analysis needs."},
+        {"criterion_id": "official_ecommerce", "severity": "blocking", "description": "GA4 ecommerce events use official event semantics and complete applicable event and item parameter structures."},
+        {"criterion_id": "diagnostic_branches", "severity": "quality", "description": "Payment refusal, confirmed cancellation, and refund are modeled as distinct outcomes with appropriate event judgement."},
+        {"criterion_id": "availability_scope", "severity": "quality", "description": "Variant availability is considered on view_item and is not added indiscriminately to list and selection events."},
+        {"criterion_id": "gated_evidence", "severity": "blocking", "description": "Authenticated events rely only on the supplied observed customer-space evidence."},
+        {"criterion_id": "screenshot_block", "severity": "blocking", "description": "Required screenshots are visibly blocked with the unavailable Playwright MCP attempt and an analyst-facing notice."},
+        {"criterion_id": "human_workbook", "severity": "blocking", "description": "The main delivery is a readable six-tab XLSX without agent-only fields in visible tabs."}
+      ],
+      "prohibited_outcomes": [
+        {"criterion_id": "ua_schema", "description": "Universal Analytics fields or event model are proposed."},
+        {"criterion_id": "failed_purchase", "description": "purchase is used for a failed payment."},
+        {"criterion_id": "silent_screenshot_omission", "description": "The workbook claims complete screenshot evidence or silently omits the blocked state."}
+      ]
+    },
+    {
+      "case_id": "lead_model_judgement",
+      "category": "lead_generation",
+      "title": "Distinct lead outcomes",
+      "prompt": "Start with no prior context. Design the GA4 event model for https://services.example.com. Observed successful outcomes are newsletter subscription, contact request, catalogue request, and appointment request. Marketing reports newsletter growth separately, sales owns contact and appointment leads, and operations owns catalogue fulfilment. No client naming convention exists. Screenshots are explicitly excluded.",
+      "required_outcomes": [
+        {"criterion_id": "lead_decision", "severity": "blocking", "description": "The plan explicitly decides whether generate_lead can consolidate outcomes and explains the business ownership tradeoff."},
+        {"criterion_id": "distinct_outcomes", "severity": "blocking", "description": "Separate governed success events are used where reporting meaning and ownership differ."},
+        {"criterion_id": "shared_parameters", "severity": "quality", "description": "Reusable form and lead parameters are governed without free-text or personal-data leakage."},
+        {"criterion_id": "not_requested_screenshots", "severity": "blocking", "description": "Screenshot requirement, evidence rows, and event coverage consistently use not_requested or not_needed semantics."}
+      ],
+      "prohibited_outcomes": [
+        {"criterion_id": "double_count_leads", "description": "generate_lead and separate success events fire for the same outcome without explicit duplicate governance."},
+        {"criterion_id": "fake_screenshots", "description": "Captured screenshot files or a Playwright attempt are invented."}
+      ]
+    },
+    {
+      "case_id": "protected_client_template",
+      "category": "client_template",
+      "title": "Formula-bearing client workbook",
+      "prompt": "Start with no prior context. Adapt a GA4 plan to a client workbook. The inspection inventory reports formulas, sheet protection, Excel tables, data validations, comments, and images on the mapped Event Matrix sheet. The client has not approved destructive replacement. Other client sheets must remain unchanged.",
+      "required_outcomes": [
+        {"criterion_id": "inspect_first", "severity": "blocking", "description": "The template inventory is treated as a precondition to adaptation."},
+        {"criterion_id": "safe_refusal", "severity": "blocking", "description": "Mapped hazardous sheets are not replaced without explicit analyst approval."},
+        {"criterion_id": "safe_options", "severity": "quality", "description": "The response offers a new mapped sheet, an approved cleaned copy, or explicit destructive authorization as clear alternatives."},
+        {"criterion_id": "unmapped_preserved", "severity": "blocking", "description": "Unmapped client sheets and content remain unchanged."}
+      ],
+      "prohibited_outcomes": [
+        {"criterion_id": "formula_loss", "description": "Formulas or protected workbook features are silently cleared."},
+        {"criterion_id": "approval_inference", "description": "Destructive approval is inferred from the request."}
+      ]
+    },
+    {
+      "case_id": "required_screenshots_unavailable",
+      "category": "screenshot_evidence",
+      "title": "Required screenshot capture is unavailable",
+      "prompt": "Start with no prior context. A GA4 plan has already been designed for https://content.example.com and screenshots are required. Tool discovery confirms Playwright MCP is unavailable and the eligible fallback browser cannot capture the interaction. No screenshots were supplied.",
+      "required_outcomes": [
+        {"criterion_id": "attempt_recorded", "severity": "blocking", "description": "The actual Playwright MCP and fallback outcome is recorded rather than inferred from preflight alone."},
+        {"criterion_id": "blocked_rows", "severity": "blocking", "description": "Affected Screenshot Register rows use blocked with concrete reasons."},
+        {"criterion_id": "delivery_notice", "severity": "blocking", "description": "The workbook and final reply both show the blocked capture notice."},
+        {"criterion_id": "event_integrity", "severity": "quality", "description": "The measurement model remains explicit about observed versus inferred event evidence."}
+      ],
+      "prohibited_outcomes": [
+        {"criterion_id": "legacy_pending_state", "description": "capture_required or skip_allowed is used as a final state."},
+        {"criterion_id": "invented_capture", "description": "A filename or captured status is invented."}
+      ]
+    },
+    {
+      "case_id": "navigation_and_values",
+      "category": "controlled_values",
+      "title": "Reusable navigation and multilingual values",
+      "prompt": "Start with no prior context. Create a GA4 interaction model for a multilingual corporate website at https://business.example.com. The client prefers separate header, menu, submenu, and footer events. Observed French labels include Services, Equipe, A propos, Contact, and Mentions legales. The website will add English and German markets next year. Screenshots are explicitly excluded.",
+      "required_outcomes": [
+        {"criterion_id": "surface_events", "severity": "blocking", "description": "Reusable surface events follow the client preference instead of forcing select_content for navigation."},
+        {"criterion_id": "english_values", "severity": "blocking", "description": "Controlled values are English lowercase ASCII snake_case and reusable across markets."},
+        {"criterion_id": "finite_values", "severity": "quality", "description": "Observed finite values are exhausted and rendered with readable pipe separators."},
+        {"criterion_id": "scalable_parameters", "severity": "quality", "description": "Navigation parameters support future markets without embedding translated labels as event names."}
+      ],
+      "prohibited_outcomes": [
+        {"criterion_id": "accented_controlled_values", "description": "Accented or space-separated translated labels are used as controlled analytics values."},
+        {"criterion_id": "one_event_per_link", "description": "A separate event name is created for every individual navigation link."}
+      ]
+    }
+  ]
+}

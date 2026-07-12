@@ -2,6 +2,17 @@
 
 Use this file to decide which local checks to run and when.
 
+## Contents
+
+- [Package Checks](#package-checks)
+- [Tracking Plan Scaffold](#tracking-plan-scaffold)
+- [Tracking Plan JSON Checks](#tracking-plan-json-checks)
+- [Website Discovery Helper](#website-discovery-helper)
+- [Contract Migration](#contract-migration)
+- [Workbook And CSV Checks](#workbook-and-csv-checks)
+- [Fresh-Agent Acceptance](#fresh-agent-acceptance)
+- [Release Package](#release-package)
+
 ## Package Checks
 
 Run before committing or releasing the reusable skill package:
@@ -11,8 +22,15 @@ ruff check .
 python -m compileall -q scripts skill/scripts tests
 python -m unittest discover -s tests
 python -m coverage run --source=skill/scripts -m unittest discover -s tests
-python -m coverage report --include="skill/scripts/validate_tracking_plan.py,skill/scripts/tracking_plan_validation_*.py,skill/scripts/ecommerce_matrix.py,skill/scripts/official_ga4_catalog.py,skill/scripts/generate_tracking_plan_workbook.py,skill/scripts/adapt_tracking_plan_workbook.py,skill/scripts/inspect_tracking_plan_template.py" --fail-under=80
+python -m coverage report --include="skill/scripts/validate_tracking_plan.py" --fail-under=90
+python -m coverage report --include="skill/scripts/ecommerce_matrix.py" --fail-under=95
+python -m coverage report --include="skill/scripts/adapt_tracking_plan_workbook.py" --fail-under=90
+python -m coverage report --include="skill/scripts/inspect_tracking_plan_template.py" --fail-under=90
+python -m coverage report --include="skill/scripts/init_tracking_plan.py" --fail-under=90
+python -m coverage report --include="skill/scripts/tracking_plan_workbook_layout.py" --fail-under=85
+python -m coverage report --include="skill/scripts/validate_tracking_plan.py,skill/scripts/tracking_plan_validation_*.py,skill/scripts/ecommerce_matrix.py,skill/scripts/official_ga4_catalog.py,skill/scripts/generate_tracking_plan_workbook.py,skill/scripts/tracking_plan_workbook_layout.py,skill/scripts/adapt_tracking_plan_workbook.py,skill/scripts/inspect_tracking_plan_template.py,skill/scripts/init_tracking_plan.py" --fail-under=88
 python -m coverage report --include="skill/scripts/browser_environment.py,skill/scripts/discover_site_journeys_playwright.py" --fail-under=70
+python scripts/validate_fresh_agent_evals.py
 python scripts/validate_package.py
 python scripts/check_official_catalog.py --offline
 git diff --check
@@ -21,6 +39,18 @@ git status --short
 
 If Python is unavailable, run the non-Python checks and state the Python
 blocker.
+
+## Tracking Plan Scaffold
+
+Create the smallest useful page-context draft before website discovery:
+
+```powershell
+python scripts/init_tracking_plan.py https://www.example.com/ --journey-name "Initial journey" --output plan.json
+```
+
+The default draft remains blocked on the Playwright MCP screenshot attempt.
+Use `--screenshots not_requested` only after the requester explicitly excludes
+screenshots.
 
 ## Tracking Plan JSON Checks
 
@@ -69,7 +99,7 @@ record a visible blocked outcome if evidence cannot be captured.
 
 ## Contract Migration
 
-Migrate an older plan to the GA4-only schema `2.3.0` contract:
+Migrate an older plan to the GA4-only schema `2.4.0` contract:
 
 ```powershell
 python scripts/migrate_tracking_plan.py old-plan.json --output plan-v2.json
@@ -89,6 +119,17 @@ python scripts/export_tracking_plan_csv.py path\to\tracking-plan.json --output p
 
 Generated files should remain outside the reusable skill package unless they
 are deliberate, generic examples.
+
+## Fresh-Agent Acceptance
+
+Validate the reusable clean-session cases before release:
+
+```powershell
+python scripts/validate_fresh_agent_evals.py
+python scripts/validate_fresh_agent_evals.py --results path\to\fresh-agent-results.json
+```
+
+Follow `fresh-agent-evaluation.md`; keep run artifacts outside the repository.
 
 ## Release Package
 

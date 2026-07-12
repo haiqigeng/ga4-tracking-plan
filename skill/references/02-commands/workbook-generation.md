@@ -14,15 +14,15 @@ Use this workflow for the analyst-facing XLSX deliverable.
    representative scenario for repetitive generic events, or every materially
    different visible scenario for finite events.
 7. When screenshots are required, actively discover and attempt Playwright MCP
-   before using a fallback browser. Only skip that attempt when final image files
+   before using a fallback browser. Only bypass that attempt when final image files
    were supplied by the requester or screenshots were explicitly excluded.
 8. Capture 1920 x 1080 viewport evidence where practical. Use no labels or
    captions inside images; add only a bold red rectangle around an interaction
    area, confirmation, or error state. Page views normally need no rectangle.
 9. Record the `screenshot_capture` outcome. For blocked or partial capture,
    write a concise notice that will appear at the top of Screenshot Register and
-   repeat it in the delivery response. Do not use `skip_allowed` as a silent
-   fallback.
+   repeat it in the delivery response. Use `blocked`, never an unresolved final
+   status, when required evidence cannot be captured.
 10. Put screenshot files in a `screenshots` folder beside the JSON, or pass a
    folder explicitly.
 11. Generate the default or mapped client workbook. The generator rejects a
@@ -43,8 +43,11 @@ python scripts/adapt_tracking_plan_workbook.py plan.json client-template.xlsx --
 
 The optional mapping is a JSON object whose keys are canonical sheet names and
 whose values are client sheet names. Unmapped client-owned sheets are retained.
-Review the adapted workbook because formulas, protected ranges, and unusual
-merged layouts can require analyst judgement.
+Mapped sheets containing formulas, protection, tables, data validations,
+comments, or images are blocked from replacement by default. Prefer a new
+mapped sheet or an approved cleaned copy. Use
+`--allow-destructive-template-overwrite` only after explicit analyst approval,
+then review the adapted workbook for structure and content loss.
 
 Use `scripts/annotate_screenshot.py` when an interaction target needs a red
 rectangle. The utility does not add text. Store crop and annotation coordinates

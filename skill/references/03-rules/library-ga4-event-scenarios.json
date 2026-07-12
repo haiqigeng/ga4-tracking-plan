@@ -6,7 +6,7 @@
     "generator_version": "1.0.0",
     "official_source_last_updated": "2026-06-26"
   },
-  "scope": "GA4 web tracking-plan scenario library for human analysts and Codex-assisted tracking plan generation.",
+  "scope": "GA4 web tracking-plan scenario library for human analysts and AI-agent-assisted tracking plan generation.",
   "source_priority": "Official Google documentation first. Trusted practitioner sources only for custom-event patterns and implementation judgement.",
   "value_convention": "For controlled analytics values, use lowercase ASCII snake_case, remove accents/diacritics, and list finite options with pipes. Preserve official IDs, ISO codes, numeric values, URLs, and raw native/user-entered fields only when required and privacy-safe.",
   "sources": [
@@ -234,7 +234,7 @@
     {
       "event": "sort_apply",
       "scenario": "listing pages, catalogs, search results",
-      "use_when": "User changes result ordering.",
+      "use_when": "A user changes the active result sorting rule.",
       "prefer_official_if": "No direct recommended event fits.",
       "parameters": "sort_type, previous_sort_type, result_count, listing_type"
     },
@@ -367,14 +367,14 @@
     {
       "event": "calculator_start",
       "scenario": "loan, mortgage, insurance, savings calculators",
-      "use_when": "User begins using a calculator/tool.",
+      "use_when": "A user begins a business-relevant calculator or simulator.",
       "prefer_official_if": "No direct recommended event fits.",
       "parameters": "tool_name, tool_category, entry_point"
     },
     {
       "event": "calculator_complete",
       "scenario": "calculators and simulators",
-      "use_when": "User reaches a calculated result.",
+      "use_when": "A user completes a business-relevant calculator or simulator and sees a result.",
       "prefer_official_if": "Use generate_lead if result submission creates a lead.",
       "parameters": "tool_name, result_type, value_band"
     },
@@ -402,7 +402,7 @@
     {
       "event": "appointment_booked",
       "scenario": "appointment booking",
-      "use_when": "Appointment booking is confirmed.",
+      "use_when": "An appointment booking is successfully confirmed for the user.",
       "prefer_official_if": "Use generate_lead if booked appointment is modeled as a lead.",
       "parameters": "appointment_type, location_id, lead_source"
     },
@@ -445,6 +445,22 @@
       "typical_custom_events": "filter_apply, sort_apply, size_guide_open, stock_alert_signup, payment_error, view_order_history, view_order, start_return, cancel_order, update_profile, update_preferences, password_reset",
       "primary_parameters": "currency, value, transaction_id, items, items[].item_id, items[].item_name, items[].item_category, items[].item_variant, items[].availability_status, items[].price, items[].quantity",
       "notes": "Use official ecommerce event names and items array. Clear ecommerce before pushes. Use custom item availability on view_item when variant shortage matters, and on view_cart only for persistent carts with live inventory. Keep confirmed cancellation separate from official refund completion."
+    },
+    {
+      "scenario": "Account / authenticated customer space",
+      "website_examples": "customer portal, member area, order self-service, profile and preferences",
+      "official_events": "page_view, sign_up, login, search, select_content, add_to_wishlist, add_to_cart, begin_checkout, purchase, refund",
+      "typical_custom_events": "account_access_intent, view_order_history, view_order, start_return, cancel_order, update_profile, update_preferences, password_reset",
+      "primary_parameters": "account_section, entry_point, login_status, customer_status, order_status, return_scope, cancellation_stage",
+      "notes": "Explore the real authenticated journey with synthetic information. Propose no gated event from labels or public navigation alone, and keep order cancellation separate from refund completion."
+    },
+    {
+      "scenario": "Subscription / membership",
+      "website_examples": "publisher subscription, paid membership, gated content, digital service plan",
+      "official_events": "page_view, select_content, sign_up, login, begin_checkout, add_payment_info, purchase, refund, generate_lead",
+      "typical_custom_events": "paywall_view, subscription_offer_select, pricing_plan_select, subscription_cancel",
+      "primary_parameters": "content_id, content_type, paywall_type, subscription_offer, plan_id, billing_period, access_status, cancellation_reason",
+      "notes": "Use official commerce events when payment is transacted. Add paywall, offer, or cancellation events only when they support acquisition, conversion, or retention decisions."
     },
     {
       "scenario": "Internal promotions / offer cards",

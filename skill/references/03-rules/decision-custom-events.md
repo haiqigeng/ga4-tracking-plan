@@ -2,6 +2,16 @@
 
 Use this reference before proposing custom events. A custom event is acceptable only when GA4 automatic, enhanced-measurement, recommended, or ecommerce events do not answer the analysis need cleanly.
 
+## Contents
+
+- [Decision Rules](#decision-rules)
+- [GA4 Official-First Replacements](#ga4-official-first-replacements)
+- [Common Custom Events](#common-custom-events)
+- [Navigation Event Choice](#navigation-event-choice)
+- [Select Item, View Item, Filter, Sort](#select-item-view-item-filter-sort)
+- [Naming And Values](#naming-and-values)
+- [Required Custom Rationale](#required-custom-rationale)
+
 ## Decision Rules
 
 1. Name the business action first, not the clicked element.

@@ -15,6 +15,14 @@ exceptions and must not be inferred from public navigation or account labels.
 
 Use this reference for account entry, authentication context, self-service support, FAQ, editorial content, documents, videos, downloads, outbound links, and contact channels.
 
+## Contents
+
+- [Analyst Rules](#analyst-rules)
+- [Event Selection](#event-selection)
+- [Suggested Parameters](#suggested-parameters)
+- [DataLayer Pattern](#datalayer-pattern)
+- [Implementation Notes](#implementation-notes)
+
 ## Analyst Rules
 
 - Prefer official enhanced measurement for scroll, file downloads, outbound clicks, site search, and video interactions when it is enabled and sufficient.

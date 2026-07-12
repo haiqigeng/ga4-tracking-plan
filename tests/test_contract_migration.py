@@ -22,7 +22,7 @@ class ContractMigrationTests(unittest.TestCase):
         legacy["events"][0].update({"primary_platform": "ga4", "platform_mappings": [], "qa": {}})
         migrated = migrate_plan(legacy)
 
-        self.assertEqual(migrated["schema_version"], "2.3.0")
+        self.assertEqual(migrated["schema_version"], "2.4.0")
         self.assertNotIn("analytics_platforms", migrated)
         self.assertNotIn("qa_cases", migrated)
         self.assertNotIn("primary_platform", migrated["events"][0])

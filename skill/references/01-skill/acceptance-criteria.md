@@ -39,6 +39,9 @@ A complete GA4 tracking plan must:
   signup when those capabilities exist;
 - distinguish backend-confirmed order cancellation from official refund
   completion;
+- inspect client templates before adaptation and refuse destructive replacement
+  of formulas, protection, tables, validations, comments, or images without
+  explicit analyst approval;
 - record noisy, duplicate, unavailable, sensitive, or non-actionable choices
   that should not be tracked;
 - actively attempt Playwright MCP before final screenshot capture unless final
@@ -46,6 +49,8 @@ A complete GA4 tracking plan must:
 - provide an explicit screenshot-evidence row for every event, including
   intentional sharing, not-needed, or blocked decisions, and show a concrete
   capture notice whenever evidence is blocked or partial;
+- use only `captured`, `shared_evidence`, `not_needed`, or `blocked` as final
+  screenshot evidence states;
 - use exactly one representative screenshot for repetitive generic events and
   cover every materially different visible scenario for finite events;
 - render readable 480 x 270 previews from 16:9 viewport sources, with no image

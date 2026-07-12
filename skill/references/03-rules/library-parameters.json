@@ -124,7 +124,7 @@
           "scope": "event",
           "type": "string",
           "classification": "custom_event_parameter",
-          "value_rules": "Controlled English group such as utility | women | lingerie | shoes | men | services | legal | social.",
+          "value_rules": "Controlled English group such as utility | primary | products | services | support | legal | social.",
           "registration_default": "custom_dimension_when_used_for_reporting"
         },
         {

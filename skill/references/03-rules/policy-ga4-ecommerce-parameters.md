@@ -91,4 +91,4 @@ live inventory and can become unavailable before purchase.
 
 ## Supplemental CSV Deliverables
 
-When visual density is a concern or the user requests a diffable secondary artifact, produce the long-format CSV from `scripts/export_tracking_plan_csv.py`. It repeats event context for each parameter and includes `parameter_scope`, `requirement`, `expected_value`, `availability`, and `scope_rule`. Do not use the CSV as a replacement for the default XLSX workbook template unless the user explicitly asks for CSV-only output.
+When visual density is a concern or the user requests a diffable secondary artifact, produce the long-format CSV from `scripts/export_tracking_plan_csv.py`. It repeats event context for each parameter and includes `parameter_scope`, `requirement`, `expected_value`, `availability`, and `scope_rule`. Do not use the CSV as a replacement for the standard generated XLSX workbook unless the user explicitly asks for CSV-only output.

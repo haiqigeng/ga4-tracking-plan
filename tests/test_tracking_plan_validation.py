@@ -73,7 +73,7 @@ class TrackingPlanValidationTests(unittest.TestCase):
 
     def test_blocked_screenshot_outcome_cannot_leave_pending_evidence(self) -> None:
         plan = copy.deepcopy(self.fixture)
-        plan["screenshot_evidence"][0]["status"] = "capture_required"
+        plan["screenshot_evidence"][0].update({"status": "captured", "file_name": "page.png"})
         self.assertIn("SCREENSHOT_CAPTURE_BLOCKED_MISMATCH", self.codes(plan))
 
     def test_no_screenshot_request_needs_not_needed_event_coverage(self) -> None:

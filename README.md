@@ -116,7 +116,6 @@ This skill does not:
 - `skill/references/03-rules/`: analyst judgement, scenarios, policies, and
   the GA4 contract.
 - `skill/scripts/`: installed runtime tools.
-- `skill/assets/`: default workbook template.
 - `scripts/`: repository wrappers and release maintenance.
 - `tests/`: unit and integration regression tests.
 
@@ -131,6 +130,11 @@ Copy `skill/` to:
 ```text
 %USERPROFILE%\.codex\skills\ga4-tracking-plan
 ```
+
+For another AI agent, place `skill/` in that agent's supported skill or
+instruction directory and load `SKILL.md` as the entry point. The workflow,
+references, JSON contract, and Python tools are agent-neutral;
+`skill/agents/openai.yaml` is optional OpenAI interface metadata.
 
 Install dependencies:
 
@@ -152,6 +156,16 @@ Edge through `msedge`, and reports when another browser build is needed.
 
 ## Common Commands
 
+Create a focused initial JSON draft:
+
+```powershell
+python scripts/init_tracking_plan.py https://www.example.com/ --journey-name "Initial journey" --output plan.json
+```
+
+The default draft keeps the Playwright MCP screenshot gate unresolved. Use
+`--screenshots not_requested` only when the requester explicitly excludes
+screenshots.
+
 Validate a plan:
 
 ```powershell
@@ -170,6 +184,12 @@ Inspect and use a client workbook template:
 python scripts/inspect_tracking_plan_template.py client-template.xlsx --output template-inventory.json
 python scripts/adapt_tracking_plan_workbook.py plan.json client-template.xlsx --mapping sheet-mapping.json --output plan.xlsx
 ```
+
+Adaptation stops before replacing a mapped sheet that contains formulas,
+protection, tables, data validations, comments, or images. Prefer mapping to a
+new sheet or using an approved cleaned copy. The explicit
+`--allow-destructive-template-overwrite` option is reserved for documented
+analyst approval.
 
 Use explicit screenshots stored beside the plan:
 
@@ -222,16 +242,25 @@ ruff check .
 python -m compileall -q scripts skill/scripts tests
 python -m unittest discover -s tests
 python -m coverage run --source=skill/scripts -m unittest discover -s tests
-python -m coverage report --include="skill/scripts/validate_tracking_plan.py,skill/scripts/tracking_plan_validation_*.py,skill/scripts/ecommerce_matrix.py,skill/scripts/official_ga4_catalog.py,skill/scripts/generate_tracking_plan_workbook.py,skill/scripts/adapt_tracking_plan_workbook.py,skill/scripts/inspect_tracking_plan_template.py" --fail-under=80
+python -m coverage report --include="skill/scripts/validate_tracking_plan.py" --fail-under=90
+python -m coverage report --include="skill/scripts/ecommerce_matrix.py" --fail-under=95
+python -m coverage report --include="skill/scripts/adapt_tracking_plan_workbook.py" --fail-under=90
+python -m coverage report --include="skill/scripts/inspect_tracking_plan_template.py" --fail-under=90
+python -m coverage report --include="skill/scripts/init_tracking_plan.py" --fail-under=90
+python -m coverage report --include="skill/scripts/tracking_plan_workbook_layout.py" --fail-under=85
+python -m coverage report --include="skill/scripts/validate_tracking_plan.py,skill/scripts/tracking_plan_validation_*.py,skill/scripts/ecommerce_matrix.py,skill/scripts/official_ga4_catalog.py,skill/scripts/generate_tracking_plan_workbook.py,skill/scripts/tracking_plan_workbook_layout.py,skill/scripts/adapt_tracking_plan_workbook.py,skill/scripts/inspect_tracking_plan_template.py,skill/scripts/init_tracking_plan.py" --fail-under=88
 python -m coverage report --include="skill/scripts/browser_environment.py,skill/scripts/discover_site_journeys_playwright.py" --fail-under=70
+python scripts/validate_fresh_agent_evals.py
 python scripts/check_official_catalog.py --offline
 python scripts/validate_package.py
 git diff --check
 ```
 
-The GitHub workflows run the package on Windows and Ubuntu. A scheduled workflow
-checks whether the official GA4 recommended-event page has drifted from the
-bundled catalog.
+The GitHub workflows run the package on Windows and Ubuntu. The reusable
+fresh-agent suite covers ecommerce, lead-model judgement, protected client
+templates, screenshot failure, and multilingual navigation. A scheduled
+workflow checks whether the official GA4 recommended-event page has drifted
+from the bundled catalog.
 
 ## Privacy And Safety
 
@@ -243,7 +272,7 @@ values only.
 ## Versioning
 
 The GA4-only v2 contract is a breaking change from earlier multi-platform
-drafts. Schema `2.3.0` adds an explicit Playwright-MCP screenshot-capture gate
-and a visible delivery notice for blocked or partial evidence. Future minor
-releases add compatible analyst or scenario improvements; patch releases fix
+drafts. Schema `2.4.0` permits only final screenshot evidence states and uses
+the generated workbook as the default template source. Future minor releases
+add compatible analyst or scenario improvements; patch releases fix
 documentation, validation, or rendering defects.

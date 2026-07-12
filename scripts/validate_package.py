@@ -29,7 +29,6 @@ REQUIRED_FILES = {
     ROOT / "pyproject.toml",
     SKILL / "SKILL.md",
     SKILL / "agents" / "openai.yaml",
-    SKILL / "assets" / "ga4_tracking_plan_template.xlsx",
     RULES / "execution-contract.md",
     RULES / "completion-gates.md",
     RULES / "policy-ga4-boundaries.md",
@@ -42,7 +41,10 @@ REQUIRED_FILES = {
     COMMANDS / "validation-commands.md",
     COMMANDS / "workbook-generation.md",
     COMMANDS / "official-catalog-maintenance.md",
+    COMMANDS / "fresh-agent-evaluation.md",
+    COMMANDS / "fresh-agent-evaluation-cases.json",
     SKILL / "scripts" / "validate_tracking_plan.py",
+    SKILL / "scripts" / "init_tracking_plan.py",
     SKILL / "scripts" / "generate_tracking_plan_workbook.py",
     SKILL / "scripts" / "tracking_plan_screenshots.py",
     SKILL / "scripts" / "browser_environment.py",
@@ -50,6 +52,8 @@ REQUIRED_FILES = {
     SKILL / "scripts" / "tracking_plan_validation_common.py",
     SKILL / "scripts" / "tracking_plan_validation_delivery.py",
     SKILL / "scripts" / "tracking_plan_validation_event_rules.py",
+    SKILL / "scripts" / "tracking_plan_validation_screenshot_capture.py",
+    SKILL / "scripts" / "tracking_plan_workbook_layout.py",
     SKILL / "scripts" / "official_ga4_catalog.py",
     SKILL / "scripts" / "inspect_tracking_plan_template.py",
     SKILL / "scripts" / "adapt_tracking_plan_workbook.py",
@@ -58,11 +62,20 @@ REQUIRED_FILES = {
     ROOT / "scripts" / "inspect_tracking_plan_template.py",
     ROOT / "scripts" / "adapt_tracking_plan_workbook.py",
     ROOT / "scripts" / "inspect_browser_environment.py",
+    ROOT / "scripts" / "init_tracking_plan.py",
+    ROOT / "scripts" / "validate_fresh_agent_evals.py",
 }
 
 EXPECTED_TABS = ["00 Overview", "01 GTM Protocol", "02 Parameter Reference", "03 Event Matrix", "04 DataLayer Examples", "05 Screenshot Register"]
 TEXT_SUFFIXES = {".md", ".py", ".json", ".yaml", ".yml", ".toml", ".txt", ".ps1"}
-BANNED_PATH_PARTS = {"deliverables", "generated", "release", "tracking-plan-corpus-analysis", "__pycache__"}
+LOCAL_ARTIFACT_PARTS = {
+    "deliverables",
+    "generated",
+    "release",
+    "tracking-plan-corpus-analysis",
+    "fresh-agent-evaluation-output",
+    "__pycache__",
+}
 SECRET_PATTERNS = {
     "Google API key": re.compile(r"AIza[0-9A-Za-z_-]{30,}"),
     "GitHub token": re.compile(r"gh[pousr]_[A-Za-z0-9]{30,}"),
@@ -138,8 +151,11 @@ def check_schema_and_fixture() -> None:
     errors = sorted(Draft202012Validator(schema).iter_errors(fixture), key=lambda item: list(item.path))
     if errors:
         fail("Generic GA4 fixture does not match schema:\n" + "\n".join(error.message for error in errors))
-    if fixture.get("schema_version") != "2.3.0":
-        fail("Generic fixture must use schema_version 2.3.0")
+    if fixture.get("schema_version") != "2.4.0":
+        fail("Generic fixture must use schema_version 2.4.0")
+    final_screenshot_statuses = schema["$defs"]["screenshotEvidence"]["properties"]["status"]["enum"]
+    if final_screenshot_statuses != ["captured", "shared_evidence", "not_needed", "blocked"]:
+        fail(f"Screenshot evidence enum contains non-final states: {final_screenshot_statuses}")
     event_ids = {event["event_id"] for event in fixture["events"]}
     covered = {event_id for evidence in fixture["screenshot_evidence"] for event_id in evidence["event_ids"]}
     if event_ids != covered:
@@ -205,7 +221,7 @@ def check_validator() -> None:
             fixture,
             temp_dir,
             "SCREENSHOT_CAPTURE_BLOCKED_MISMATCH",
-            lambda plan: plan["screenshot_evidence"][0].update({"status": "capture_required"}),
+            lambda plan: plan["screenshot_evidence"][0].update({"status": "captured", "file_name": "page.png"}),
         )
         expect_code(
             fixture,
@@ -281,11 +297,35 @@ def check_generated_outputs() -> None:
             if expected not in csv_text.splitlines()[0]:
                 fail(f"CSV output is missing {expected}")
 
-    check_workbook(SKILL / "assets" / "ga4_tracking_plan_template.xlsx")
-
-
 def check_catalog() -> None:
     run([sys.executable, "-B", "scripts/check_official_catalog.py", "--offline"], "Offline official catalog check")
+
+
+def check_plan_initializer() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        output = Path(raw) / "plan.json"
+        run(
+            [
+                sys.executable,
+                "-B",
+                "scripts/init_tracking_plan.py",
+                "https://example.com/start",
+                "--output",
+                str(output),
+                "--journey-name",
+                "Example journey",
+                "--screenshots",
+                "not_requested",
+            ],
+            "Plan initializer",
+        )
+        issues = validator_issues(load_json(output), Path(raw))
+        if issues:
+            fail(f"Initialized no-screenshot plan has validator issues: {issues}")
+
+
+def check_fresh_agent_evaluations() -> None:
+    run([sys.executable, "-B", "scripts/validate_fresh_agent_evals.py"], "Fresh-agent evaluation manifest")
 
 
 def check_migration() -> None:
@@ -302,8 +342,8 @@ def check_migration() -> None:
         source.write_text(json.dumps(legacy), encoding="utf-8")
         run([sys.executable, "-B", "scripts/migrate_tracking_plan.py", str(source), "--output", str(output)], "Contract migration")
         migrated = load_json(output)
-        if migrated.get("schema_version") != "2.3.0" or "analytics_platforms" in migrated or "qa_cases" in migrated:
-            fail("Contract migration did not produce a clean v2.3 plan")
+        if migrated.get("schema_version") != "2.4.0" or "analytics_platforms" in migrated or "qa_cases" in migrated:
+            fail("Contract migration did not produce a clean v2.4 plan")
         attempt = migrated.get("screenshot_capture", {}).get("playwright_mcp_attempt", {}).get("status")
         if attempt != "not_recorded":
             fail("Contract migration must mark an unrecorded Playwright MCP attempt explicitly")
@@ -317,20 +357,39 @@ def check_release_package() -> None:
             names = archive.namelist()
         if not any(name.endswith("skill/SKILL.md") for name in names):
             fail("Release package is missing skill/SKILL.md")
+        required_commands = {
+            "scripts/_run_skill_script.py",
+            "scripts/check_installed_skill_sync.py",
+            "scripts/validate_fresh_agent_evals.py",
+            "scripts/validate_tracking_plan.py",
+        }
+        if not required_commands <= set(names):
+            fail("Release package is missing self-contained root command wrappers")
         for name in names:
-            if any(part in BANNED_PATH_PARTS for part in Path(name).parts):
+            if any(part in LOCAL_ARTIFACT_PARTS for part in Path(name).parts):
                 fail(f"Release package contains banned path: {name}")
 
 
+def tracked_paths() -> set[Path]:
+    result = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+    )
+    return {Path(value.decode("utf-8")) for value in result.stdout.split(b"\0") if value}
+
+
 def check_privacy_and_cleanliness() -> None:
+    for relative in tracked_paths():
+        if any(part in LOCAL_ARTIFACT_PARTS for part in relative.parts):
+            fail(f"Repository tracks a local artifact path: {relative}")
     for path in ROOT.rglob("*"):
         if not path.is_file() or ".git" in path.parts:
             continue
         relative = path.relative_to(ROOT)
-        if "__pycache__" in relative.parts or path.suffix.lower() in {".pyc", ".pyo"}:
+        if any(part in LOCAL_ARTIFACT_PARTS for part in relative.parts) or path.suffix.lower() in {".pyc", ".pyo"}:
             continue
-        if any(part in BANNED_PATH_PARTS - {"__pycache__"} for part in relative.parts):
-            fail(f"Repository contains generated or release-only path: {relative}")
         if path.suffix.lower() == ".xlsx":
             check_xlsx_privacy(path, relative)
             continue
@@ -387,6 +446,8 @@ CHECKS = [
     check_validator,
     check_generated_outputs,
     check_catalog,
+    check_plan_initializer,
+    check_fresh_agent_evaluations,
     check_migration,
     check_release_package,
     check_privacy_and_cleanliness,

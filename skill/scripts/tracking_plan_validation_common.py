@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from datetime import date
 from typing import Any, Iterable
 
@@ -10,6 +11,12 @@ from tracking_plan_validation_catalogs import (
     WEAK_BUSINESS_QUESTIONS,
 )
 from tracking_plan_validation_model import Issue, add_issue
+
+
+def check_duplicates(values: list[str], label: str, path: str, issues: list[Issue]) -> None:
+    for value, count in Counter(values).items():
+        if value and count > 1:
+            add_issue(issues, "error", "DUPLICATE_ID", path, f"{label} '{value}' appears {count} times.")
 
 
 def walk_keys(value: Any, prefix: str = "$") -> Iterable[tuple[str, str]]:

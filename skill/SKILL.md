@@ -31,7 +31,7 @@ and apply `references/03-rules/completion-gates.md` before delivery.
   expected actions, business goals, analysis needs, success signals, available
   data, constraints, and open questions.
 - Use `client_template_adaptation` when a usable client structure exists;
-  otherwise use `greenfield_best_practice` and the bundled XLSX template.
+  otherwise use `greenfield_best_practice` and generate the standard workbook.
 - Map broad website scope before choosing events. Use user and client evidence,
   then manual browser evidence, rendered-DOM exploration, navigation, sitemap,
   robots.txt, and static discovery in that order of analytical authority.
@@ -45,8 +45,8 @@ and apply `references/03-rules/completion-gates.md` before delivery.
   by the requester or the requester explicitly excluded screenshots.
 - If Playwright MCP or a viable fallback cannot capture the required evidence,
   set the capture outcome and affected Screenshot Register rows to `blocked`.
-  Tell the user clearly before returning the workbook; never quietly use
-  `skip_allowed`, `capture_required`, or an absent file as final evidence.
+  Tell the user clearly before returning the workbook; never leave an
+  unresolved state or absent file presented as final evidence.
 - Treat observed, confirmed, inferred, recommended, and unavailable information
   differently. Do not present inferred journeys as observed facts.
 - Use GA4 with GTM and a dataLayer when implementation context is unknown.
@@ -189,6 +189,7 @@ mark official verification unavailable instead of claiming it was performed.
 
 Use the bundled scripts for deterministic work:
 
+- `init_tracking_plan.py`: focused JSON scaffold with an explicit screenshot gate;
 - `validate_tracking_plan.py`: schema and analyst-rule validation;
 - `generate_tracking_plan_workbook.py`: human XLSX generation;
 - `export_tracking_plan_csv.py`: long-format review export;
@@ -204,7 +205,8 @@ Use the bundled scripts for deterministic work:
 
 ## Workbook Contract
 
-Use `assets/ga4_tracking_plan_template.xlsx` when no client template is supplied.
+Use `generate_tracking_plan_workbook.py` as the single source of truth when no
+client template is supplied.
 Keep six human-facing tabs:
 
 - `00 Overview`: document details, navigation, and version history only;
@@ -231,4 +233,6 @@ corresponding gated event may remain inferred in the plan.
 
 When adapting a client workbook, preserve agreed sheet names, columns, colors,
 frozen panes, and protected areas as far as practical while retaining GA4
-measurement correctness.
+measurement correctness. Inspect the workbook first. Do not replace mapped
+sheets containing formulas, protection, tables, validations, comments, or
+images unless the analyst explicitly approves destructive overwrite.

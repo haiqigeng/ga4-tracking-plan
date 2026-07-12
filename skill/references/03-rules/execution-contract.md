@@ -38,7 +38,7 @@ scope and template
 10. After event design, map one representative screenshot for repetitive
     generic events and all material scenarios for finite events. When capture is
     required, attempt Playwright MCP before any fallback. Never infer evidence
-    from a loosely matching filename or leave a final row pending or silently skipped.
+    from a loosely matching filename or leave a final row unresolved or silently omitted.
 11. Record the `screenshot_capture` outcome. When blocked or partial, put the
     analyst-facing notice in Screenshot Register and repeat it in the delivery reply.
 12. Generate the XLSX as the main human deliverable and keep internal reasoning

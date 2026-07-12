@@ -14,6 +14,52 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def inspect_sheet_safety(sheet) -> dict:
+    formula_count = 0
+    formula_cells: list[str] = []
+    comment_count = 0
+    comment_cells: list[str] = []
+    for row in sheet.iter_rows():
+        for cell in row:
+            if isinstance(cell.value, str) and cell.value.startswith("="):
+                formula_count += 1
+                if len(formula_cells) < 20:
+                    formula_cells.append(cell.coordinate)
+            if cell.comment:
+                comment_count += 1
+                if len(comment_cells) < 20:
+                    comment_cells.append(cell.coordinate)
+    table_names = sorted(str(name) for name in sheet.tables.keys())
+    data_validation_count = len(sheet.data_validations.dataValidation)
+    return {
+        "formula_count": formula_count,
+        "formula_cells": formula_cells,
+        "sheet_protected": bool(sheet.protection.sheet),
+        "table_count": len(table_names),
+        "table_names": table_names,
+        "data_validation_count": data_validation_count,
+        "comment_count": comment_count,
+        "comment_cells": comment_cells,
+        "image_count": len(sheet._images),
+    }
+
+
+def hazards_from_safety(safety: dict) -> list[str]:
+    labels = {
+        "formula_count": "formula cells",
+        "sheet_protected": "sheet protection",
+        "table_count": "Excel tables",
+        "data_validation_count": "data validations",
+        "comment_count": "cell comments",
+        "image_count": "embedded images",
+    }
+    return [labels[key] for key in labels if safety[key]]
+
+
+def destructive_overwrite_hazards(sheet) -> list[str]:
+    return hazards_from_safety(inspect_sheet_safety(sheet))
+
+
 def inspect_workbook(path: Path) -> dict:
     workbook = load_workbook(path, read_only=False, data_only=False)
     sheets = []
@@ -23,6 +69,7 @@ def inspect_workbook(path: Path) -> dict:
             values = [str(value).strip() for value in row if value not in (None, "")]
             if len(values) >= 2:
                 header_candidates.append(values[:20])
+        safety = inspect_sheet_safety(sheet)
         sheets.append(
             {
                 "sheet_name": sheet.title,
@@ -37,14 +84,8 @@ def inspect_workbook(path: Path) -> dict:
                     if value.width is not None
                 },
                 "header_candidates": header_candidates,
-                "formula_count": sum(
-                    1
-                    for row in sheet.iter_rows()
-                    for cell in row
-                    if isinstance(cell.value, str) and cell.value.startswith("=")
-                ),
-                "comment_count": sum(1 for row in sheet.iter_rows() for cell in row if cell.comment),
-                "image_count": len(sheet._images),
+                **safety,
+                "destructive_overwrite_hazards": hazards_from_safety(safety),
             }
         )
     return {
