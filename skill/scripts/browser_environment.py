@@ -132,10 +132,10 @@ def playwright_status() -> tuple[bool, str]:
         return True, "installed"
 
 
-def bundled_channels() -> dict[str, str]:
+def bundled_channels() -> tuple[dict[str, str], str]:
     available, _ = playwright_status()
     if not available:
-        return {}
+        return {}, "Playwright Python is not installed."
     try:
         from playwright.sync_api import sync_playwright
 
@@ -145,16 +145,17 @@ def bundled_channels() -> dict[str, str]:
                 "firefox": Path(playwright.firefox.executable_path),
                 "webkit": Path(playwright.webkit.executable_path),
             }
-            return {name: str(path) for name, path in candidates.items() if path.is_file()}
-    except Exception:
-        return {}
+            return {name: str(path) for name, path in candidates.items() if path.is_file()}, ""
+    except Exception as error:
+        return {}, f"{type(error).__name__}: {error}"
 
 
 def inspect_browser_environment() -> dict[str, Any]:
     default_browser, default_source = detect_default_browser()
     python_available, playwright_version = playwright_status()
     channels = installed_branded_channels()
-    channels.update({name: path for name, path in bundled_channels().items() if name not in channels})
+    bundled, probe_error = bundled_channels()
+    channels.update({name: path for name, path in bundled.items() if name not in channels})
     eligible_default = default_browser in channels and default_browser in SUPPORTED_CHANNELS
     recommended = default_browser if eligible_default else next((name for name in ("msedge", "chrome", "firefox", "chromium", "webkit") if name in channels), "")
     if not python_available:
@@ -169,6 +170,7 @@ def inspect_browser_environment() -> dict[str, Any]:
         "default_browser_source": default_source,
         "default_browser_eligible": eligible_default,
         "playwright_python": playwright_version,
+        "playwright_probe_error": probe_error,
         "installed_channels": channels,
         "recommended_channel": recommended,
         "readiness": readiness,

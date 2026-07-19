@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from tracking_plan_contract import event_ga4_payload, event_parameter_names, parameter_allowed_values
+from tracking_plan_validation_datalayer import check_developer_examples
 from tracking_plan_validation_model import Issue, add_issue
 
 NAVIGATION_EVENTS = {"header_click", "menu_click", "submenu_click", "footer_click"}
@@ -19,88 +21,90 @@ AUTHENTICATED_ACCOUNT_EVENTS = {
     "update_preferences",
     "add_to_wishlist",
 }
-CONTROLLED_VALUE_RE = re.compile(r"^[a-z0-9]+(?:_[a-z0-9]+)*$")
 CONFIRMED_EVIDENCE = {"observed", "synthetic_observation", "confirmed"}
 AUTHENTICATED_DISCOVERY = {"authenticated_observed", "client_confirmed"}
+RECOMMENDED_EVIDENCE = "recommended"
+OFFICIAL_RECOMMENDATION_CLASSIFICATIONS = {"recommended", "recommended_ecommerce"}
+RECOMMENDATION_BASES = {
+    "official_capability",
+    "observed_public_affordance",
+    "client_brief",
+    "documented_sector_pattern",
+}
+WHOLE_SITE_RETAIL_EVENT_DECISIONS = {
+    "view_item_list",
+    "select_item",
+    "view_item",
+    "add_to_cart",
+    "view_cart",
+    "remove_from_cart",
+    "begin_checkout",
+    "add_shipping_info",
+    "add_payment_info",
+    "purchase",
+    "refund",
+    "start_return",
+    "cancel_order",
+}
 AUTHENTICATED_CONTEXT_RE = re.compile(
     r"authenticated|customer.?space|client.?space|espace.?client|order history|account dashboard|account area|my.?account|mon.?compte|mes.?commandes|after login|apres.?connexion|signed.?in",
     re.I,
 )
 AUTHENTICATION_FLOW_EVENTS = {"login", "sign_up", "password_reset"}
-
-
 def _events(plan: dict[str, Any]) -> list[dict[str, Any]]:
     return [event for event in plan.get("events", []) if isinstance(event, dict)]
 
 
-def check_developer_examples(plan: dict[str, Any], issues: list[Issue]) -> None:
-    for index, event in enumerate(_events(plan)):
-        base = f"$.events[{index}]"
-        classification = str(event.get("classification", ""))
-        data_layer = event.get("data_layer")
-        if classification in {"automatic", "enhanced_measurement"} and not data_layer:
-            continue
-        if not isinstance(data_layer, dict) or not isinstance(data_layer.get("push"), dict) or not data_layer.get("push"):
-            add_issue(
-                issues,
-                "error",
-                "DATALAYER_EXAMPLE_MISSING",
-                f"{base}.data_layer",
-                "Every manually collected event needs a complete dataLayer.push example for developers.",
-            )
-            continue
+def _accepted_custom_event_names(plan: dict[str, Any]) -> set[str]:
+    return {
+        str(item.get("event_name", ""))
+        for item in plan.get("measurement_strategy", {}).get("custom_event_acceptance", [])
+        if isinstance(item, dict) and item.get("event_name")
+    }
 
-        event_name = str(event.get("event_name", ""))
-        push = data_layer["push"]
-        if push.get("event") != event_name:
-            add_issue(
-                issues,
-                "error",
-                "DATALAYER_TRIGGER_MISMATCH",
-                f"{base}.data_layer.push.event",
-                "The GTM dataLayer event key must match the final GA4 event name.",
-            )
-        if len(str(data_layer.get("mapping_notes", "")).split()) < 5:
-            add_issue(
-                issues,
-                "error",
-                "DATALAYER_MAPPING_MISSING",
-                f"{base}.data_layer.mapping_notes",
-                "Every manual event needs a developer-readable GTM-to-GA4 mapping note.",
-            )
-        if classification == "recommended_ecommerce":
-            ecommerce = push.get("ecommerce")
-            if not isinstance(ecommerce, dict):
-                add_issue(
-                    issues,
-                    "error",
-                    "GTM_ECOMMERCE_WRAPPER_MISSING",
-                    f"{base}.data_layer.push.ecommerce",
-                    "Use Google's GTM ecommerce format: event plus a nested ecommerce object and items array.",
-                )
-            elif not isinstance(ecommerce.get("items"), list):
-                add_issue(
-                    issues,
-                    "error",
-                    "GTM_ECOMMERCE_ITEMS_MISSING",
-                    f"{base}.data_layer.push.ecommerce.items",
-                    "Official GTM ecommerce examples need ecommerce.items as an array.",
-                )
-            if "ecommerce" not in set(data_layer.get("flush_keys", [])):
-                add_issue(
-                    issues,
-                    "error",
-                    "GTM_ECOMMERCE_RESET_MISSING",
-                    f"{base}.data_layer.flush_keys",
-                    "Clear the previous ecommerce object before the event push.",
-                )
+
+def _is_governed_recommendation(event: dict[str, Any], accepted_custom_names: set[str]) -> bool:
+    if str(event.get("evidence_basis", {}).get("status", "")) != RECOMMENDED_EVIDENCE:
+        return False
+    classification = str(event.get("classification", ""))
+    if classification in OFFICIAL_RECOMMENDATION_CLASSIFICATIONS:
+        return str(event.get("official_verification", {}).get("status", "")) == "verified"
+    return classification == "custom" and str(event.get("event_name", "")) in accepted_custom_names
+
+
+def _check_recommendation_guardrails(event: dict[str, Any], index: int, issues: list[Issue]) -> None:
+    evidence = event.get("evidence_basis", {})
+    if str(evidence.get("confidence", "")) == "high":
+        add_issue(
+            issues,
+            "error",
+            "UNOBSERVED_RECOMMENDATION_CONFIDENCE_HIGH",
+            f"$.events[{index}].evidence_basis.confidence",
+            "An unobserved recommendation must use low or medium confidence, never high confidence.",
+        )
+    if evidence.get("basis_type") not in RECOMMENDATION_BASES:
+        add_issue(
+            issues,
+            "error",
+            "UNOBSERVED_RECOMMENDATION_BASIS_MISSING",
+            f"$.events[{index}].evidence_basis.basis_type",
+            "An unobserved recommendation needs a structured official, observed-affordance, client-brief, or documented-sector basis.",
+        )
+    if evidence.get("confirmation_required") is not True or not str(evidence.get("confirmation_owner", "")).strip():
+        add_issue(
+            issues,
+            "error",
+            "UNOBSERVED_RECOMMENDATION_CONFIRMATION_MISSING",
+            f"$.events[{index}].evidence_basis",
+            "An unobserved recommendation must explicitly require confirmation and name the responsible data owner.",
+        )
 
 
 def check_controlled_values(plan: dict[str, Any], issues: list[Issue]) -> None:
     for index, parameter in enumerate(plan.get("parameters", [])):
         if not isinstance(parameter, dict):
             continue
-        allowed = parameter.get("allowed_values", [])
+        allowed = parameter_allowed_values(parameter)
         rules = str(parameter.get("value_rules", ""))
         path = f"$.parameters[{index}]"
         if "|" in rules and not allowed:
@@ -108,19 +112,9 @@ def check_controlled_values(plan: dict[str, Any], issues: list[Issue]) -> None:
                 issues,
                 "error",
                 "CONTROLLED_VALUES_NOT_STRUCTURED",
-                f"{path}.allowed_values",
-                "Finite pipe-separated values must also be stored in allowed_values so human output can render them consistently.",
+                f"{path}.value_domain.entries",
+                "Finite pipe-separated values must also be stored as evidence-bearing value-domain entries so human output can render them consistently.",
             )
-        for value_index, value in enumerate(allowed if isinstance(allowed, list) else []):
-            text = str(value)
-            if not CONTROLLED_VALUE_RE.fullmatch(text):
-                add_issue(
-                    issues,
-                    "error",
-                    "CONTROLLED_VALUE_NOT_ENGLISH_ASCII",
-                    f"{path}.allowed_values[{value_index}]",
-                    "Controlled multilingual values must use English lowercase ASCII snake_case.",
-                )
 
 
 def check_navigation_model(plan: dict[str, Any], issues: list[Issue]) -> None:
@@ -145,13 +139,13 @@ def check_navigation_model(plan: dict[str, Any], issues: list[Issue]) -> None:
             )
 
     for event in nav_events:
-        missing = sorted(NAVIGATION_PARAMETERS - set(event.get("parameters", [])))
+        missing = sorted(NAVIGATION_PARAMETERS - set(event_parameter_names(event)))
         if missing:
             add_issue(
                 issues,
                 "error",
                 "NAVIGATION_PARAMETERS_MISSING",
-                f"$.events[{events.index(event)}].parameters",
+                f"$.events[{events.index(event)}].parameter_bindings",
                 f"Navigation events need the shared parameters: {', '.join(missing)}.",
             )
 
@@ -159,23 +153,17 @@ def check_navigation_model(plan: dict[str, Any], issues: list[Issue]) -> None:
 def check_authenticated_discovery(plan: dict[str, Any], issues: list[Issue]) -> None:
     if plan.get("website_coverage_map", {}).get("site_scope") != "whole_site":
         return
-    auth_text = " ".join(
-        str(value)
-        for brief in plan.get("measurement_brief", [])
-        if isinstance(brief, dict)
-        for value in [brief.get("journey_id"), brief.get("journey_name"), brief.get("page_type"), brief.get("scope")]
-    ).lower()
-    if not re.search(r"account|login|sign.?up|authentication|customer.space|client.space", auth_text):
-        return
-    decision = plan.get("website_coverage_map", {}).get("authenticated_journey", {})
-    if not isinstance(decision, dict) or not decision.get("applicable"):
+    decision = plan.get("website_coverage_map", {}).get("authenticated_journey")
+    if not isinstance(decision, dict) or "applicable" not in decision:
         add_issue(
             issues,
             "error",
             "AUTHENTICATED_DISCOVERY_DECISION_MISSING",
             "$.website_coverage_map.authenticated_journey",
-            "Whole-site account scope needs an explicit authenticated-journey discovery decision.",
+            "Whole-site scope needs an explicit authenticated-journey applicability decision.",
         )
+        return
+    if not decision.get("applicable"):
         return
     status = str(decision.get("discovery_status", ""))
     if status == "not_attempted":
@@ -186,7 +174,7 @@ def check_authenticated_discovery(plan: dict[str, Any], issues: list[Issue]) -> 
             "$.website_coverage_map.authenticated_journey.discovery_status",
             "Attempt safe synthetic signup or authenticated exploration unless the user explicitly excludes it.",
         )
-    if status == "attempted_blocked" and len(str(decision.get("gap_reason", "")).split()) < 4:
+    if status == "attempted_blocked" and not str(decision.get("gap_reason", "")).strip():
         add_issue(
             issues,
             "error",
@@ -207,6 +195,7 @@ def check_authenticated_discovery(plan: dict[str, Any], issues: list[Issue]) -> 
 def check_event_access_context(plan: dict[str, Any], issues: list[Issue]) -> None:
     events = _events(plan)
     discovery_status = str(plan.get("website_coverage_map", {}).get("authenticated_journey", {}).get("discovery_status", ""))
+    accepted_custom_names = _accepted_custom_event_names(plan)
     for index, event in enumerate(events):
         access_context = str(event.get("access_context", ""))
         event_name = str(event.get("event_name", ""))
@@ -219,12 +208,37 @@ def check_event_access_context(plan: dict[str, Any], issues: list[Issue]) -> Non
         if access_context == "public" and event_name != "account_access_intent" and AUTHENTICATED_CONTEXT_RE.search(event_context):
             add_issue(issues, "error", "AUTHENTICATED_CONTEXT_UNDERSTATED", f"$.events[{index}].access_context", "The event context appears to be behind login and cannot be classified as public.")
         if access_context == "authenticated_area":
-            if discovery_status not in AUTHENTICATED_DISCOVERY:
-                add_issue(issues, "error", "UNVERIFIED_AUTHENTICATED_EVENT", f"$.events[{index}]", "Do not propose any event behind authentication unless the real gated journey was synthetically observed or client-confirmed.")
-            if evidence_status not in CONFIRMED_EVIDENCE:
-                add_issue(issues, "error", "AUTHENTICATED_EVENT_EVIDENCE_WEAK", f"$.events[{index}].evidence_basis.status", "Behind-login events must be observed, synthetically observed, or client-confirmed; inference is not allowed.")
+            governed_recommendation = _is_governed_recommendation(event, accepted_custom_names)
+            if discovery_status not in AUTHENTICATED_DISCOVERY and not governed_recommendation:
+                add_issue(
+                    issues,
+                    "error",
+                    "UNVERIFIED_AUTHENTICATED_EVENT",
+                    f"$.events[{index}]",
+                    "An unobserved authenticated event must be an officially verified or explicitly accepted custom recommendation, not an inference.",
+                )
+            if evidence_status not in CONFIRMED_EVIDENCE and not governed_recommendation:
+                add_issue(
+                    issues,
+                    "error",
+                    "AUTHENTICATED_EVENT_EVIDENCE_WEAK",
+                    f"$.events[{index}].evidence_basis.status",
+                    "Behind-login events must be observed, confirmed, or governed recommendations; inferred evidence is not allowed.",
+                )
+            if governed_recommendation:
+                _check_recommendation_guardrails(event, index, issues)
         if access_context == "authentication_flow" and event_name in {"login", "sign_up"} and evidence_status not in CONFIRMED_EVIDENCE:
-            add_issue(issues, "error", "AUTHENTICATION_EVENT_EVIDENCE_WEAK", f"$.events[{index}].evidence_basis.status", f"Successful {event_name} must be observed or confirmed, not inferred from the presence of a form.")
+            governed_recommendation = _is_governed_recommendation(event, accepted_custom_names)
+            if not governed_recommendation:
+                add_issue(
+                    issues,
+                    "error",
+                    "AUTHENTICATION_EVENT_EVIDENCE_WEAK",
+                    f"$.events[{index}].evidence_basis.status",
+                    f"Successful {event_name} must be observed, confirmed, or retained as an officially verified recommendation; inference from a form is invalid.",
+                )
+            else:
+                _check_recommendation_guardrails(event, index, issues)
 
 
 def check_lead_mode(mode: str, mappings: list[dict[str, Any]], mapped_names: set[str], implemented_names: set[str], issues: list[Issue]) -> None:
@@ -269,63 +283,72 @@ def check_lead_event_model(plan: dict[str, Any], issues: list[Issue]) -> None:
 def check_authenticated_outcome_coverage(plan: dict[str, Any], issues: list[Issue]) -> None:
     if plan.get("website_coverage_map", {}).get("site_scope") != "whole_site":
         return
-    brief_text = " ".join(
-        str(value)
-        for brief in plan.get("measurement_brief", [])
-        if isinstance(brief, dict)
-        for value in brief.values()
-    ).lower()
-    has_customer_space = bool(re.search(r"customer.?space|client.?space|authenticated|account.*order|order history|returns?", brief_text))
-    if not has_customer_space:
+    if not plan.get("website_coverage_map", {}).get("authenticated_journey", {}).get("applicable"):
         return
     events = _events(plan)
     names = {str(event.get("event_name", "")) for event in events}
-    discovery_status = str(plan.get("website_coverage_map", {}).get("authenticated_journey", {}).get("discovery_status", ""))
     has_reorder = "add_to_cart" in names and any(
         re.search(r"reorder|order history|previous order", f"{event.get('trigger', '')} {event.get('analysis_use', '')}", re.I)
         for event in _events(plan)
         if event.get("event_name") == "add_to_cart"
     )
     account_events = [event for event in events if event.get("access_context") == "authenticated_area" and event.get("event_name") != "page_view"]
-    if discovery_status in AUTHENTICATED_DISCOVERY:
-        if not account_events and not has_reorder:
-            add_issue(
-                issues,
-                "error",
-                "AUTHENTICATED_OUTCOMES_MISSING",
-                "$.events",
-                "Confirmed customer-space coverage needs meaningful observed outcomes beyond login and sign_up, or an explicit page_view-only decision.",
-            )
-
-
-def check_order_cancellation_model(plan: dict[str, Any], issues: list[Issue]) -> None:
-    brief_text = " ".join(
-        str(value)
-        for brief in plan.get("measurement_brief", [])
-        if isinstance(brief, dict)
-        for value in brief.values()
-    ).lower()
-    if not re.search(r"cancel(?:lation|led| order)|order cancellation", brief_text):
-        return
-    journey_ids = {
-        str(brief.get("journey_id", ""))
-        for brief in plan.get("measurement_brief", [])
-        if isinstance(brief, dict) and re.search(r"cancel(?:lation|led| order)|order cancellation", " ".join(str(value) for value in brief.values()).lower())
-    }
-    covered = {
-        str(item.get("journey_id", ""))
-        for item in plan.get("website_coverage_map", {}).get("journeys_covered", [])
-        if isinstance(item, dict) and item.get("coverage_status") == "covered" and item.get("tracking_plan_decision") == "included"
-    }
-    names = {str(event.get("event_name", "")) for event in _events(plan)}
-    if journey_ids & covered and "cancel_order" not in names:
+    if not account_events and not has_reorder:
         add_issue(
             issues,
             "error",
-            "ORDER_CANCELLATION_EVENT_MISSING",
+            "AUTHENTICATED_OUTCOMES_MISSING",
             "$.events",
-            "A scoped order-cancellation journey needs backend-confirmed cancel_order; keep refund for actual refund completion.",
+            "Whole-site customer-space coverage needs meaningful outcomes beyond login and sign_up. If access is blocked, retain applicable official or accepted custom outcomes as recommendations instead of omitting the journey.",
         )
+
+
+def _explicit_event_exclusions(plan: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    decisions: dict[str, dict[str, Any]] = {}
+    for item in plan.get("not_tracked", []):
+        if not isinstance(item, dict):
+            continue
+        interaction = str(item.get("interaction", "")).lower()
+        for event_name in WHOLE_SITE_RETAIL_EVENT_DECISIONS:
+            if re.search(rf"(?<![a-z0-9_]){re.escape(event_name)}(?![a-z0-9_])", interaction):
+                decisions[event_name] = item
+    return decisions
+
+
+def check_whole_site_ecommerce_coverage(plan: dict[str, Any], issues: list[Issue]) -> None:
+    if plan.get("website_coverage_map", {}).get("site_scope") != "whole_site":
+        return
+    events = _events(plan)
+    event_names = {str(event.get("event_name", "")) for event in events}
+    selected_family_ids = {
+        str(item.get("family_id", ""))
+        for item in plan.get("measurement_strategy", {}).get("selected_event_families", [])
+        if isinstance(item, dict)
+    }
+    if not any(event.get("classification") == "recommended_ecommerce" for event in events) and not selected_family_ids.intersection({"ecommerce", "online_sales"}):
+        return
+
+    exclusions = _explicit_event_exclusions(plan)
+    for event_name in sorted(WHOLE_SITE_RETAIL_EVENT_DECISIONS):
+        if event_name in event_names:
+            continue
+        exclusion = exclusions.get(event_name)
+        if not exclusion:
+            add_issue(
+                issues,
+                "error",
+                "WHOLE_SITE_ECOMMERCE_EVENT_DECISION_MISSING",
+                "$.events",
+                f"Whole-site physical retail needs '{event_name}' as an observed, confirmed, or recommended event, or an explicit confirmed-not-applicable decision naming that event.",
+            )
+        elif exclusion.get("reason_code") != "not_applicable_confirmed":
+            add_issue(
+                issues,
+                "error",
+                "ECOMMERCE_EVENT_EXCLUSION_UNCONFIRMED",
+                "$.not_tracked",
+                f"'{event_name}' may be excluded from a whole-site retail plan only with reason_code='not_applicable_confirmed'; blocked discovery must remain a recommendation.",
+            )
 
 
 def check_ga4_user_id(context: dict[str, Any], parameters: dict[str, dict[str, Any]], events: list[dict[str, Any]], issues: list[Issue]) -> None:
@@ -333,12 +356,12 @@ def check_ga4_user_id(context: dict[str, Any], parameters: dict[str, dict[str, A
     if not isinstance(user_id, dict) or not user_id.get("enabled"):
         return
     metadata = parameters.get("user_id", {})
-    if user_id.get("source_path") != "user_context.user_id":
-        add_issue(issues, "error", "USER_ID_SOURCE_PATH_INVALID", "$.user_context.ga4_user_id.source_path", "GA4 User-ID should read from user_context.user_id.")
+    if user_id.get("source_path") != "user.user_id":
+        add_issue(issues, "error", "USER_ID_SOURCE_PATH_INVALID", "$.user_context.ga4_user_id.source_path", "GA4 User-ID should read from user.user_id.")
     if metadata.get("scope") != "implementation" or metadata.get("classification") != "implementation_variable" or metadata.get("register_custom_definition"):
         add_issue(issues, "error", "USER_ID_PARAMETER_GOVERNANCE_INVALID", "$.parameters", "user_id must be an implementation variable, must not be an event/user property, and must never be registered as a custom definition.")
     for index, event in enumerate(events):
-        if "user_id" in event.get("parameters", []) or "user_id" in event.get("ga4_payload", {}).get("parameters", {}):
+        if "user_id" in event_parameter_names(event) or "user_id" in event_ga4_payload(event).get("parameters", {}):
             add_issue(issues, "error", "USER_ID_EVENT_PARAMETER_INVALID", f"$.events[{index}]", "Set user_id through the Google tag configuration, never as an event parameter.")
 
 
@@ -350,8 +373,6 @@ def check_user_properties(context: dict[str, Any], parameters: dict[str, dict[st
         metadata = parameters.get(name, {})
         if metadata.get("scope") != "user" or metadata.get("classification") != "custom_user_property":
             add_issue(issues, "error", "USER_PROPERTY_PARAMETER_INVALID", f"$.user_context.user_properties[{index}]", f"User property '{name}' needs user scope and custom_user_property classification.")
-        if list(mapping.get("allowed_values", [])) != list(metadata.get("allowed_values", [])):
-            add_issue(issues, "error", "USER_PROPERTY_VALUES_MISMATCH", f"$.user_context.user_properties[{index}].allowed_values", f"User property '{name}' must reuse the Parameter Reference controlled values.")
 
 
 def check_advertising_user_data(context: dict[str, Any], issues: list[Issue]) -> None:
@@ -372,8 +393,8 @@ def check_user_context(plan: dict[str, Any], issues: list[Issue]) -> None:
     context = plan.get("user_context", {})
     if not isinstance(context, dict) or context.get("status") == "not_applicable":
         return
-    if context.get("data_layer_object") != "user_context":
-        add_issue(issues, "error", "USER_CONTEXT_OBJECT_INVALID", "$.user_context.data_layer_object", "Use user_context for GA4-safe authenticated context; reserve user_data for separately governed advertising user data.")
+    if context.get("data_layer_object") != "user":
+        add_issue(issues, "error", "USER_CONTEXT_OBJECT_INVALID", "$.user_context.data_layer_object", "Use user for GA4-safe authenticated context; reserve user_data for separately governed advertising user data.")
     parameters = {str(item.get("parameter_name", "")): item for item in plan.get("parameters", []) if isinstance(item, dict)}
     check_ga4_user_id(context, parameters, _events(plan), issues)
     check_user_properties(context, parameters, issues)
@@ -382,19 +403,16 @@ def check_user_context(plan: dict[str, Any], issues: list[Issue]) -> None:
 
 def check_availability_scope(plan: dict[str, Any], issues: list[Issue]) -> None:
     for index, event in enumerate(_events(plan)):
-        if "items[].availability_status" not in set(event.get("parameters", [])):
+        if "items[].availability_status" not in set(event_parameter_names(event)):
             continue
         name = str(event.get("event_name", ""))
-        if name == "view_item":
-            continue
-        notes = f"{event.get('implementation_notes', '')} {event.get('analysis_use', '')}".lower()
-        if name == "view_cart" and "persistent" in notes and ("live inventory" in notes or "real-time" in notes):
+        if name in {"view_item", "view_cart"}:
             continue
         add_issue(
             issues,
             "error",
             "AVAILABILITY_STATUS_SCOPE_INVALID",
-            f"$.events[{index}].parameters",
+            f"$.events[{index}].parameter_bindings",
             "Default variant availability belongs on view_item. Use it on view_cart only for a documented persistent-cart, live-inventory case; do not add it to list, selection, or add-to-cart events by default.",
         )
 
@@ -415,13 +433,13 @@ def check_payment_failure_branch(plan: dict[str, Any], issues: list[Issue]) -> N
         )
         return
     for event in failures:
-        missing = sorted(PAYMENT_FAILURE_PARAMETERS - set(event.get("parameters", [])))
+        missing = sorted(PAYMENT_FAILURE_PARAMETERS - set(event_parameter_names(event)))
         if missing:
             add_issue(
                 issues,
                 "error",
                 "PAYMENT_FAILURE_PARAMETERS_MISSING",
-                f"$.events[{events.index(event)}].parameters",
+                f"$.events[{events.index(event)}].parameter_bindings",
                 f"Payment failure events need controlled parameters: {', '.join(missing)}.",
             )
 
@@ -434,7 +452,7 @@ def check_delivery_rules(plan: dict[str, Any], issues: list[Issue]) -> None:
     check_event_access_context(plan, issues)
     check_lead_event_model(plan, issues)
     check_authenticated_outcome_coverage(plan, issues)
-    check_order_cancellation_model(plan, issues)
     check_user_context(plan, issues)
     check_availability_scope(plan, issues)
     check_payment_failure_branch(plan, issues)
+    check_whole_site_ecommerce_coverage(plan, issues)

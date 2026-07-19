@@ -7,7 +7,6 @@ from openpyxl.utils import get_column_letter, quote_sheetname
 NAVY = "263238"
 LIGHT_BLUE = "F6F9FC"
 GREEN = "EAF3EA"
-YELLOW = "FFF6D8"
 GRAY = "F4F6F8"
 WHITE = "FFFFFF"
 RED = "FBEAEA"
@@ -45,11 +44,15 @@ OVERVIEW_LABEL_COLUMNS = {1, 3, 5, 7}
 
 
 def matrix_max_col() -> int:
-    return 2 + EVENT_SLOT_COUNT
+    return 2 + (EVENT_SLOT_COUNT * 2)
 
 
 def matrix_value_columns() -> list[int]:
-    return [3 + index for index in range(EVENT_SLOT_COUNT)]
+    return [3 + (index * 2) for index in range(EVENT_SLOT_COUNT)]
+
+
+def matrix_status_columns() -> list[int]:
+    return [column + 1 for column in matrix_value_columns()]
 
 
 def set_widths(ws, widths: list[int]) -> None:
@@ -217,7 +220,13 @@ def _style_matrix_block_row(ws, row: int, max_col: int) -> None:
     ws.row_dimensions[row].height = 24
 
 
-def _style_matrix_data_row(ws, row: int, max_col: int, value_columns: list[int]) -> None:
+def _style_matrix_data_row(
+    ws,
+    row: int,
+    max_col: int,
+    value_columns: list[int],
+    status_columns: list[int],
+) -> None:
     parameter = str(ws.cell(row, 1).value or "")
     for column in range(1, max_col + 1):
         ws.cell(row, column).fill = PatternFill("solid", fgColor=WHITE)
@@ -232,25 +241,58 @@ def _style_matrix_data_row(ws, row: int, max_col: int, value_columns: list[int])
         elif parameter == "items[].quantity" and value == "1":
             availability = "send_default_quantity"
         style_matrix_value_cell(cell, availability)
+    for column in status_columns:
+        cell = ws.cell(row, column)
+        cell.fill = PatternFill("solid", fgColor=LIGHT_BLUE)
+        cell.font = Font(color=MUTED_TEXT, size=9)
+        value = str(cell.value or "")
+        if "not available" in value.lower() or "indisponible" in value.lower():
+            cell.fill = PatternFill("solid", fgColor=NOT_AVAILABLE_FILL)
+        elif "not applicable" in value.lower() or "non applicable" in value.lower():
+            cell.fill = PatternFill("solid", fgColor=NOT_APPLICABLE_FILL)
 
 
 def style_event_matrix_rows(ws) -> None:
     value_columns = matrix_value_columns()
+    status_columns = matrix_status_columns()
     max_col = matrix_max_col()
     for row in range(6, ws.max_row + 1):
         if str(ws.cell(row, 1).value or "").startswith("J-"):
             _style_matrix_block_row(ws, row, max_col)
         else:
-            _style_matrix_data_row(ws, row, max_col, value_columns)
+            _style_matrix_data_row(ws, row, max_col, value_columns, status_columns)
 
 
 def apply_workbook_settings(workbook: Workbook) -> None:
     for worksheet in workbook.worksheets:
-        for row in worksheet.iter_rows():
+        for row_index, row in enumerate(worksheet.iter_rows(), 1):
+            required_height = worksheet.row_dimensions[row_index].height or 15
             for cell in row:
-                if isinstance(cell.value, str) and len(cell.value) > 80:
-                    worksheet.row_dimensions[cell.row].height = max(worksheet.row_dimensions[cell.row].height or 15, 42)
+                if not isinstance(cell.value, str) or not cell.value:
+                    continue
+                column_width = worksheet.column_dimensions[get_column_letter(cell.column)].width or 13
+                characters_per_line = max(8, int(column_width * 1.15))
+                estimated_lines = sum(
+                    max(1, (len(line) + characters_per_line - 1) // characters_per_line)
+                    for line in cell.value.split("\n")
+                )
+                required_height = max(required_height, min(409, (estimated_lines * 13.5) + 4))
+            worksheet.row_dimensions[row_index].height = required_height
         worksheet.sheet_properties.pageSetUpPr.fitToPage = True
         worksheet.page_setup.fitToWidth = 1
-        worksheet.page_setup.fitToHeight = 0
+        worksheet.page_setup.fitToHeight = 0 if worksheet.title in {"03 Event Matrix", "05 Screenshot Register"} else 1
+        worksheet.sheet_view.zoomScale = worksheet.sheet_view.zoomScale or 90
+        worksheet.sheet_view.zoomScaleNormal = worksheet.sheet_view.zoomScaleNormal or 90
+        if worksheet.title == "00 Overview":
+            worksheet.page_setup.orientation = worksheet.ORIENTATION_PORTRAIT
+            worksheet.page_setup.paperSize = worksheet.PAPERSIZE_A4
+        else:
+            worksheet.page_setup.orientation = worksheet.ORIENTATION_LANDSCAPE
+            worksheet.page_setup.paperSize = worksheet.PAPERSIZE_A3
+            worksheet.page_margins.left = 0.25
+            worksheet.page_margins.right = 0.25
+            worksheet.page_margins.top = 0.5
+            worksheet.page_margins.bottom = 0.5
+            worksheet.print_options.horizontalCentered = True
+            worksheet.print_title_rows = "1:5" if worksheet.title == "03 Event Matrix" else "1:3"
     workbook.active = 0

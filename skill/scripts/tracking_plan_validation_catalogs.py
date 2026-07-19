@@ -176,22 +176,14 @@ POTENTIAL_DUPLICATE_EVENTS = {
     "search",
 }
 MANUAL_COLLECTION_SOURCES = {"manual_gtm", "data_layer", "gtag", "sdk", "server_side"}
-WEAK_TEMPLATE_REASON_RE = re.compile(r"^(n/a|none|no|not applicable|tbd|same)$", re.I)
 NON_CONVERSION_MEASUREMENT_ROLES = {"context", "diagnostic"}
 OFFICIAL_SOURCE_DOMAINS = {
-    "ga4": ("developers.google.com/analytics", "support.google.com/analytics"),
+    "google_measurement": (
+        "developers.google.com/analytics",
+        "support.google.com/analytics",
+        "developers.google.com/tag-platform",
+    ),
 }
-CUSTOM_RATIONALE_RE = re.compile(
-    r"(custom|no official|no native|no recommended|no standard|not sufficient|insufficient|"
-    r"does not fit|doesn't fit|does not cover|not covered|business[- ]specific|diagnostic|"
-    r"intent|before login|before sign[_ -]?up|before conversion|pre[-_ ]conversion|funnel friction)",
-    re.IGNORECASE,
-)
-WEAK_BUSINESS_QUESTION_RE = re.compile(
-    r"^\s*(track|measure|capture|send|fire|record)\s+(a\s+|the\s+)?"
-    r"(click|event|interaction|page\s*view|button|link|cta|tag)\b",
-    re.IGNORECASE,
-)
 WEAK_BUSINESS_QUESTIONS = {
     "which link was clicked?",
     "which button was clicked?",
@@ -264,12 +256,6 @@ WEAK_DATA_DEPENDENCY_VALUES = {
     "variable",
     "variables",
 }
-REPORTING_PURPOSE_RE = re.compile(
-    r"(analysis|analy[sz]e|report|segment|compare|funnel|conversion|qa|debug|diagnostic|"
-    r"merchandising|journey|audience|attribute|attribution|revenue|product|cart|lead|"
-    r"content|search|navigation|performance|optimization|optimisation)",
-    re.IGNORECASE,
-)
 LOW_SIGNAL_CUSTOM_EVENT_NAMES = {
     "button_click",
     "click_banner",

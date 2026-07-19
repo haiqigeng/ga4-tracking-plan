@@ -47,6 +47,13 @@ class DiscoverSiteJourneysTests(unittest.TestCase):
         self.assertEqual(journeys[0]["journey_id"], "content_navigation")
         self.assertEqual(journeys[0]["key_interactions"], ["page view"])
 
+    def test_static_discovery_fails_closed_when_no_page_is_usable(self) -> None:
+        pages = [{"url": "https://example.com/", "fetch_error": "timeout"}]
+        outcome, usable, notice = discovery.discovery_outcome(pages, [])
+
+        self.assertEqual((outcome, usable), ("blocked", 0))
+        self.assertIn("no usable page", notice)
+
 
 if __name__ == "__main__":
     unittest.main()

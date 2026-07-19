@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.4.0",
+  "schema_version": "3.0.0",
   "plan_id": "generic_ecommerce_homepage",
   "execution_context": {
     "execution_mode": "greenfield_best_practice",
@@ -17,19 +17,12 @@
       "mode": "default_skill_template",
       "template_source": "generate_tracking_plan_workbook.py",
       "preservation_requirements": [
-        "Keep default six-sheet workbook structure stable."
+        "Keep the five core human sheets stable and include Screenshot Register only when screenshots are requested."
       ],
       "allowed_changes": [
         "Populate rows and screenshot evidence rows from the structured plan."
       ],
       "template_diff_required": false
-    },
-    "template_diff_summary": {
-      "status": "not_needed",
-      "summary": "Default generated workbook used without client-template adaptation.",
-      "columns_added": [],
-      "columns_removed": [],
-      "style_or_structure_changes": []
     }
   },
   "document": {
@@ -37,7 +30,7 @@
     "version": "v0.1",
     "owner": "TBD",
     "notes": "Generic fixture for validating the skill contract, workbook generator, and analyst-readable output.",
-    "publish_date": "2026-06-26"
+    "publish_date": "2026-07-11"
   },
   "measurement_brief": [
     {
@@ -277,10 +270,6 @@
       ],
       "gap_reason": "Authentication and customer-space pages are outside the selected homepage fixture scope."
     },
-    "playwright_recommendation": {
-      "status": "not_needed",
-      "reason": "The fixture validates a selected homepage template, not a dynamic whole-site crawl."
-    },
     "journeys_discovered": [
       {
         "journey_id": "homepage_discovery",
@@ -305,11 +294,23 @@
         "decision": "include_in_plan",
         "decision_reason": "Cart, checkout, and product-listing journeys are intentionally outside this fixture."
       }
-    ]
+    ],
+    "browser_exploration": {
+      "requirement": "not_needed",
+      "playwright_mcp_attempt": {
+        "status": "not_required",
+        "detail": "The source plan marked live browser exploration as not needed."
+      },
+      "selected_browser": "",
+      "journey_discovery_status": "not_needed",
+      "value_discovery_status": "not_needed",
+      "evidence_refs": [],
+      "detail": "The fixture validates a selected homepage template, not a dynamic whole-site crawl."
+    }
   },
   "user_context": {
     "status": "planned",
-    "data_layer_object": "user_context",
+    "data_layer_object": "user",
     "push_timing": [
       "initial page load when authentication state is known",
       "immediately after successful login",
@@ -317,34 +318,24 @@
     ],
     "ga4_user_id": {
       "enabled": true,
-      "source_path": "user_context.user_id",
+      "source_path": "user.user_id",
       "signed_out_behavior": "set_null_on_logout",
       "mapping_rule": "Map only to the Google tag user_id setting. Do not send it as an event parameter, user property, or custom dimension."
     },
     "user_properties": [
       {
         "parameter_name": "login_status",
-        "source_path": "user_context.login_status",
-        "allowed_values": [
-          "logged_in",
-          "logged_out"
-        ],
+        "source_path": "user.login_status",
         "register_in_ga4": true
       },
       {
         "parameter_name": "customer_status",
-        "source_path": "user_context.customer_status",
-        "allowed_values": [
-          "new",
-          "returning",
-          "unknown"
-        ],
+        "source_path": "user.customer_status",
         "register_in_ga4": true
       },
       {
         "parameter_name": "account_type",
-        "source_path": "user_context.account_type",
-        "allowed_values": [],
+        "source_path": "user.account_type",
         "register_in_ga4": true
       }
     ],
@@ -360,7 +351,6 @@
   "events": [
     {
       "event_id": "EVT-HOME-PAGE-VIEW",
-      "journey_id": "homepage_discovery",
       "access_context": "public",
       "event_name": "page_view",
       "classification": "automatic",
@@ -380,36 +370,29 @@
       ],
       "key_event": false,
       "priority": "must",
-      "parameters": [
-        "page_location",
-        "page_title",
-        "page_referrer",
-        "page_data.template"
-      ],
       "data_layer": {
         "event_key": "page_view",
         "flush_keys": [
-          "page_data"
+          "page"
         ],
         "push": {
-          "event": "page_view",
-          "page_data": {
-            "location": "https://example.com/",
-            "title": "%document_title%",
-            "template": "homepage"
+          "page": {
+            "page_location": "https://example.com/",
+            "page_title": "%document_title%",
+            "page_referrer": "%document_referrer%",
+            "page_template": "homepage",
+            "nav_language": "en",
+            "nav_environment": "production"
+          },
+          "user": {
+            "user_id": "%opaque_user_id_or_null%",
+            "login_status": "logged_out",
+            "customer_status": "unknown",
+            "account_type": "%account_type_or_null%"
           }
         },
-        "mapping_notes": "If GA4 automatic page_view is sufficient, do not duplicate it. Use manual page_view only for controlled SPA routing or enriched page context."
-      },
-      "ga4_payload": {
-        "event_name": "page_view",
-        "parameters": {
-          "page_location": "%current_url%",
-          "page_title": "%document_title%",
-          "page_referrer": "%document_referrer%",
-          "page_template": "homepage"
-        },
-        "items": []
+        "mapping_notes": "If GA4 automatic page_view is sufficient, do not duplicate it. Use manual page_view only for controlled SPA routing or enriched page context.",
+        "consent_timing": "core_context_before_cmp_ready"
       },
       "privacy": {
         "pii_risk": "low",
@@ -420,9 +403,16 @@
       "implementation_notes": "Avoid duplicate page_view if enhanced measurement already sends the correct event.",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 event semantics and required parameter scope checked for page_view."
+        "scope_note": "Official GA4 event semantics and required parameter scope checked for page_view.",
+        "source_section": "Events measurement and parameters > Page views > page_view",
+        "source_locator": "page_view",
+        "trigger_source_section": "Events measurement and parameters > Page views > page_view",
+        "canonical_wording": "This event signifies that the page loaded or the active site changed the browser history state.",
+        "trigger_source_locator": "page_view",
+        "source_id": "support_analytics_answer_9216061",
+        "trigger_source_id": "support_analytics_answer_9216061",
+        "translation_status": "not_needed",
+        "canonical_trigger_wording": "Each time the page loads or the browser history state is changed by the active site."
       },
       "collection_strategy": {
         "collection_source": "ga4_automatic",
@@ -445,11 +435,78 @@
           "Journey coverage: homepage_discovery"
         ],
         "confidence": "medium"
-      }
+      },
+      "event_summary": "This event signifies that the page loaded or the active site changed the browser history state.",
+      "journey_ids": [
+        "homepage_discovery"
+      ],
+      "journey_stage": "context",
+      "display_order": 1,
+      "parameter_bindings": [
+        {
+          "parameter_name": "page_location",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Segments traffic and QA by the viewed URL after sensitive query parameters are removed.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "",
+          "official_source_locator": ""
+        },
+        {
+          "parameter_name": "page_title",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Supports page-level reporting and DebugView validation with a readable page label.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "",
+          "official_source_locator": ""
+        },
+        {
+          "parameter_name": "page_referrer",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Supports navigation and acquisition context analysis for page views.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "",
+          "official_source_locator": ""
+        },
+        {
+          "parameter_name": "page_template",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Segments homepage behavior by page template for journey analysis.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "",
+          "official_source_locator": ""
+        },
+        {
+          "parameter_name": "nav_language",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Segments behavior by the active website language across page and interaction events.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "",
+          "official_source_locator": ""
+        },
+        {
+          "parameter_name": "nav_environment",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Separates production traffic from staging or development data during analysis and implementation review.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "",
+          "official_source_locator": ""
+        }
+      ]
     },
     {
       "event_id": "EVT-HOME-PROMO-VIEW",
-      "journey_id": "homepage_discovery",
       "access_context": "public",
       "event_name": "view_promotion",
       "classification": "recommended_ecommerce",
@@ -469,15 +526,6 @@
       ],
       "key_event": false,
       "priority": "should",
-      "parameters": [
-        "creative_name",
-        "creative_slot",
-        "promotion_id",
-        "promotion_name",
-        "items",
-        "items[].item_id",
-        "items[].item_name"
-      ],
       "data_layer": {
         "event_key": "view_promotion",
         "flush_keys": [
@@ -498,22 +546,8 @@
             ]
           }
         },
-        "mapping_notes": "Rows in the tracking plan use official GA4 parameter names. ecommerce.* is only the GTM source object."
-      },
-      "ga4_payload": {
-        "event_name": "view_promotion",
-        "parameters": {
-          "promotion_id": "%promotion_id%",
-          "promotion_name": "%promotion_name%",
-          "creative_name": "%creative_name%",
-          "creative_slot": "%creative_slot%"
-        },
-        "items": [
-          {
-            "item_id": "%promotion_item_id%",
-            "item_name": "%promotion_item_name%"
-          }
-        ]
+        "mapping_notes": "Rows in the tracking plan use official GA4 parameter names. ecommerce.* is only the GTM source object.",
+        "consent_timing": "after_cmp_ready"
       },
       "privacy": {
         "pii_risk": "low",
@@ -524,9 +558,16 @@
       "implementation_notes": "Use one consolidated view_promotion definition and list allowed promotion values rather than one event per banner.",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 ecommerce event and event-level parameter scope checked for view_promotion."
+        "scope_note": "Official GA4 ecommerce event and event-level parameter scope checked for view_promotion.",
+        "source_section": "Online sales > view_promotion",
+        "source_locator": "view_promotion",
+        "trigger_source_section": "Implementation > Apply promotions",
+        "canonical_wording": "This event signifies a promotion was viewed from a list.",
+        "trigger_source_locator": "Instruction immediately preceding the view_promotion implementation example",
+        "source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+        "trigger_source_id": "developers_analytics_devguides_collection_ga4_ecommerce",
+        "translation_status": "not_needed",
+        "canonical_trigger_wording": "Promotion impressions are typically measured with the initial screen view by sending the view_promotion event with an items parameter to specify the promoted item."
       },
       "collection_strategy": {
         "collection_source": "data_layer",
@@ -535,40 +576,6 @@
           "reason": "Manual dataLayer collection is scoped to this explicit business interaction.",
           "dedupe_rule": "Fire once per qualifying user action and avoid parallel automatic or enhanced-measurement collection."
         }
-      },
-      "parameter_profile": {
-        "profile_id": "promotion_profile",
-        "profile_source": "skill/scripts/ecommerce_matrix.py official GA4 ecommerce profile",
-        "canonical_parameter_order": [
-          "creative_name",
-          "creative_slot",
-          "promotion_id",
-          "promotion_name",
-          "items",
-          "items[].item_id",
-          "items[].item_name",
-          "items[].affiliation",
-          "items[].coupon",
-          "items[].discount",
-          "items[].index",
-          "items[].item_brand",
-          "items[].item_category",
-          "items[].item_category2",
-          "items[].item_category3",
-          "items[].item_category4",
-          "items[].item_category5",
-          "items[].item_list_id",
-          "items[].item_list_name",
-          "items[].item_variant",
-          "items[].location_id",
-          "items[].price",
-          "items[].quantity",
-          "items[].creative_name",
-          "items[].creative_slot",
-          "items[].promotion_id",
-          "items[].promotion_name"
-        ],
-        "exception_reason": ""
       },
       "analysis_use": "Which homepage promotions are exposed to users?",
       "screenshot_coverage": {
@@ -583,11 +590,88 @@
           "Journey coverage: homepage_discovery"
         ],
         "confidence": "medium"
-      }
+      },
+      "event_summary": "This event signifies a promotion was viewed from a list.",
+      "journey_ids": [
+        "homepage_discovery"
+      ],
+      "journey_stage": "consideration",
+      "display_order": 2,
+      "parameter_bindings": [
+        {
+          "parameter_name": "creative_name",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Selected for the documented analysis use of view_promotion.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+          "official_source_locator": "creative_name"
+        },
+        {
+          "parameter_name": "creative_slot",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Selected for the documented analysis use of view_promotion.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+          "official_source_locator": "creative_slot"
+        },
+        {
+          "parameter_name": "promotion_id",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Selected for the documented analysis use of view_promotion.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+          "official_source_locator": "promotion_id"
+        },
+        {
+          "parameter_name": "promotion_name",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Selected for the documented analysis use of view_promotion.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+          "official_source_locator": "promotion_name"
+        },
+        {
+          "parameter_name": "items",
+          "requirement": "required",
+          "condition": "",
+          "inclusion_reason": "GA4 marks this parameter as required for view_promotion: The items for the event.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+          "official_source_locator": "items"
+        },
+        {
+          "parameter_name": "items[].item_id",
+          "requirement": "conditional",
+          "condition": "The ID of the item. *One of item_id or item_name is required.",
+          "inclusion_reason": "GA4 marks this parameter as conditional for view_promotion: The ID of the item. *One of item_id or item_name is required.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+          "official_source_locator": "items[].item_id"
+        },
+        {
+          "parameter_name": "items[].item_name",
+          "requirement": "conditional",
+          "condition": "The name of the item. *One of item_id or item_name is required.",
+          "inclusion_reason": "GA4 marks this parameter as conditional for view_promotion: The name of the item. *One of item_id or item_name is required.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+          "official_source_locator": "items[].item_name"
+        }
+      ]
     },
     {
       "event_id": "EVT-HOME-PROMO-SELECT",
-      "journey_id": "homepage_discovery",
       "access_context": "public",
       "event_name": "select_promotion",
       "classification": "recommended_ecommerce",
@@ -607,15 +691,6 @@
       ],
       "key_event": false,
       "priority": "should",
-      "parameters": [
-        "creative_name",
-        "creative_slot",
-        "promotion_id",
-        "promotion_name",
-        "items",
-        "items[].item_id",
-        "items[].item_name"
-      ],
       "data_layer": {
         "event_key": "select_promotion",
         "flush_keys": [
@@ -636,22 +711,8 @@
             ]
           }
         },
-        "mapping_notes": "Use the same promotion identifiers as view_promotion for impression-to-click analysis."
-      },
-      "ga4_payload": {
-        "event_name": "select_promotion",
-        "parameters": {
-          "promotion_id": "%promotion_id%",
-          "promotion_name": "%promotion_name%",
-          "creative_name": "%creative_name%",
-          "creative_slot": "%creative_slot%"
-        },
-        "items": [
-          {
-            "item_id": "%promotion_item_id%",
-            "item_name": "%promotion_item_name%"
-          }
-        ]
+        "mapping_notes": "Use the same promotion identifiers as view_promotion for impression-to-click analysis.",
+        "consent_timing": "after_cmp_ready"
       },
       "privacy": {
         "pii_risk": "low",
@@ -662,9 +723,16 @@
       "implementation_notes": "Keep this as an ecommerce promotion event, not a generic click event.",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 ecommerce event and event-level parameter scope checked for select_promotion."
+        "scope_note": "Official GA4 ecommerce event and event-level parameter scope checked for select_promotion.",
+        "source_section": "Online sales > select_promotion",
+        "source_locator": "select_promotion",
+        "trigger_source_section": "Implementation > Apply promotions",
+        "canonical_wording": "This event signifies a promotion was selected from a list.",
+        "trigger_source_locator": "Instruction immediately preceding the select_promotion implementation example",
+        "source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+        "trigger_source_id": "developers_analytics_devguides_collection_ga4_ecommerce",
+        "translation_status": "not_needed",
+        "canonical_trigger_wording": "To indicate a user clicked on a promotion, send a select_promotion event with that item as an item parameter."
       },
       "collection_strategy": {
         "collection_source": "data_layer",
@@ -673,40 +741,6 @@
           "reason": "Manual dataLayer collection is scoped to this explicit business interaction.",
           "dedupe_rule": "Fire once per qualifying user action and avoid parallel automatic or enhanced-measurement collection."
         }
-      },
-      "parameter_profile": {
-        "profile_id": "promotion_profile",
-        "profile_source": "skill/scripts/ecommerce_matrix.py official GA4 ecommerce profile",
-        "canonical_parameter_order": [
-          "creative_name",
-          "creative_slot",
-          "promotion_id",
-          "promotion_name",
-          "items",
-          "items[].item_id",
-          "items[].item_name",
-          "items[].affiliation",
-          "items[].coupon",
-          "items[].discount",
-          "items[].index",
-          "items[].item_brand",
-          "items[].item_category",
-          "items[].item_category2",
-          "items[].item_category3",
-          "items[].item_category4",
-          "items[].item_category5",
-          "items[].item_list_id",
-          "items[].item_list_name",
-          "items[].item_variant",
-          "items[].location_id",
-          "items[].price",
-          "items[].quantity",
-          "items[].creative_name",
-          "items[].creative_slot",
-          "items[].promotion_id",
-          "items[].promotion_name"
-        ],
-        "exception_reason": ""
       },
       "analysis_use": "Which exposed promotions drive clicks?",
       "screenshot_coverage": {
@@ -721,11 +755,88 @@
           "Journey coverage: homepage_discovery"
         ],
         "confidence": "medium"
-      }
+      },
+      "event_summary": "This event signifies a promotion was selected from a list.",
+      "journey_ids": [
+        "homepage_discovery"
+      ],
+      "journey_stage": "consideration",
+      "display_order": 3,
+      "parameter_bindings": [
+        {
+          "parameter_name": "creative_name",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Selected for the documented analysis use of select_promotion.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+          "official_source_locator": "creative_name"
+        },
+        {
+          "parameter_name": "creative_slot",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Selected for the documented analysis use of select_promotion.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+          "official_source_locator": "creative_slot"
+        },
+        {
+          "parameter_name": "promotion_id",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Selected for the documented analysis use of select_promotion.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+          "official_source_locator": "promotion_id"
+        },
+        {
+          "parameter_name": "promotion_name",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Selected for the documented analysis use of select_promotion.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+          "official_source_locator": "promotion_name"
+        },
+        {
+          "parameter_name": "items",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Selected for the documented analysis use of select_promotion.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+          "official_source_locator": "items"
+        },
+        {
+          "parameter_name": "items[].item_id",
+          "requirement": "conditional",
+          "condition": "The ID of the item. *One of item_id or item_name is required.",
+          "inclusion_reason": "GA4 marks this parameter as conditional for select_promotion: The ID of the item. *One of item_id or item_name is required.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+          "official_source_locator": "items[].item_id"
+        },
+        {
+          "parameter_name": "items[].item_name",
+          "requirement": "conditional",
+          "condition": "The name of the item. *One of item_id or item_name is required.",
+          "inclusion_reason": "GA4 marks this parameter as conditional for select_promotion: The name of the item. *One of item_id or item_name is required.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+          "official_source_locator": "items[].item_name"
+        }
+      ]
     },
     {
       "event_id": "EVT-HOME-SEARCH",
-      "journey_id": "homepage_discovery",
       "access_context": "public",
       "event_name": "search",
       "classification": "recommended",
@@ -743,10 +854,6 @@
       ],
       "key_event": false,
       "priority": "must",
-      "parameters": [
-        "search_term",
-        "page_data.template"
-      ],
       "data_layer": {
         "event_key": "search",
         "flush_keys": [
@@ -756,17 +863,13 @@
           "event": "search",
           "event_data": {
             "search_term": "%scrubbed_search_term%"
+          },
+          "page": {
+            "page_template": "homepage"
           }
         },
-        "mapping_notes": "Send the official GA4 search_term parameter after PII scrubbing."
-      },
-      "ga4_payload": {
-        "event_name": "search",
-        "parameters": {
-          "search_term": "%scrubbed_search_term%",
-          "page_template": "homepage"
-        },
-        "items": []
+        "mapping_notes": "Send event_data.search_term after PII scrubbing and map page.page_template without renaming either parameter.",
+        "consent_timing": "after_cmp_ready"
       },
       "privacy": {
         "pii_risk": "medium",
@@ -777,9 +880,16 @@
       "implementation_notes": "Use the official recommended search event instead of a custom search_submit event.",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 event semantics and required parameter scope checked for search."
+        "scope_note": "Official GA4 event semantics and required parameter scope checked for search.",
+        "source_section": "For all properties > search",
+        "source_locator": "search",
+        "trigger_source_section": "For all properties > search",
+        "canonical_wording": "Log this event to indicate when the user has performed a search. You can use this event to identify what users are searching for on your website or app. For example, you could send this event when a user views a search results page after performing a search.",
+        "trigger_source_locator": "search",
+        "source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+        "trigger_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+        "translation_status": "not_needed",
+        "canonical_trigger_wording": "Log this event to indicate when the user has performed a search. You can use this event to identify what users are searching for on your website or app. For example, you could send this event when a user views a search results page after performing a search."
       },
       "collection_strategy": {
         "collection_source": "data_layer",
@@ -802,11 +912,38 @@
           "Journey coverage: homepage_discovery"
         ],
         "confidence": "medium"
-      }
+      },
+      "event_summary": "Log this event to indicate when the user has performed a search. You can use this event to identify what users are searching for on your website or app. For example, you could send this event when a user views a search results page after performing a search.",
+      "journey_ids": [
+        "homepage_discovery"
+      ],
+      "journey_stage": "discovery",
+      "display_order": 4,
+      "parameter_bindings": [
+        {
+          "parameter_name": "search_term",
+          "requirement": "required",
+          "condition": "",
+          "inclusion_reason": "GA4 marks this parameter as required for search: The term that was searched for.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+          "official_source_locator": "search_term"
+        },
+        {
+          "parameter_name": "page_template",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Segments homepage behavior by page template for journey analysis.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "",
+          "official_source_locator": ""
+        }
+      ]
     },
     {
       "event_id": "EVT-HOME-CONTENT-SELECT",
-      "journey_id": "homepage_discovery",
       "access_context": "public",
       "event_name": "select_content",
       "classification": "recommended",
@@ -826,13 +963,6 @@
       ],
       "key_event": false,
       "priority": "should",
-      "parameters": [
-        "content_type",
-        "content_id",
-        "content_name",
-        "cta_location",
-        "link_url"
-      ],
       "data_layer": {
         "event_key": "select_content",
         "flush_keys": [
@@ -848,18 +978,8 @@
             "link_url": "%destination_url%"
           }
         },
-        "mapping_notes": "Group similar navigation/content clicks into one select_content event with controlled values."
-      },
-      "ga4_payload": {
-        "event_name": "select_content",
-        "parameters": {
-          "content_type": "category_navigation | editorial_module | service_link",
-          "content_id": "%stable_content_id%",
-          "content_name": "%normalized_content_name%",
-          "cta_location": "header | hero | body | footer",
-          "link_url": "%destination_url%"
-        },
-        "items": []
+        "mapping_notes": "Group similar navigation/content clicks into one select_content event with controlled values.",
+        "consent_timing": "after_cmp_ready"
       },
       "privacy": {
         "pii_risk": "low",
@@ -870,9 +990,16 @@
       "implementation_notes": "Do not create one custom event per homepage link when this consolidated event is sufficient.",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 event semantics and required parameter scope checked for select_content."
+        "scope_note": "Official GA4 event semantics and required parameter scope checked for select_content.",
+        "source_section": "For all properties > select_content",
+        "source_locator": "select_content",
+        "trigger_source_section": "For all properties > select_content",
+        "canonical_wording": "This event signifies that a user has selected some content of a certain type. This event can help you identify popular content and categories of content on your website or app.",
+        "trigger_source_locator": "select_content",
+        "source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+        "trigger_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+        "translation_status": "not_needed",
+        "canonical_trigger_wording": "This event signifies that a user has selected some content of a certain type. This event can help you identify popular content and categories of content on your website or app."
       },
       "collection_strategy": {
         "collection_source": "data_layer",
@@ -895,11 +1022,68 @@
           "Journey coverage: homepage_discovery"
         ],
         "confidence": "medium"
-      }
+      },
+      "event_summary": "This event signifies that a user has selected some content of a certain type. This event can help you identify popular content and categories of content on your website or app.",
+      "journey_ids": [
+        "homepage_discovery"
+      ],
+      "journey_stage": "context",
+      "display_order": 5,
+      "parameter_bindings": [
+        {
+          "parameter_name": "content_type",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Selected for the documented analysis use of select_content.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+          "official_source_locator": "content_type"
+        },
+        {
+          "parameter_name": "content_id",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Selected for the documented analysis use of select_content.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+          "official_source_locator": "content_id"
+        },
+        {
+          "parameter_name": "content_name",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Provides readable selected-content labels for analyst review while managing cardinality.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "",
+          "official_source_locator": ""
+        },
+        {
+          "parameter_name": "cta_location",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Compares CTA performance by page area or component location.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "",
+          "official_source_locator": ""
+        },
+        {
+          "parameter_name": "link_url",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Validates navigation destination and supports outbound or internal path analysis after URL cleaning.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "",
+          "official_source_locator": ""
+        }
+      ]
     },
     {
       "event_id": "EVT-HOME-ACCOUNT-ACCESS",
-      "journey_id": "homepage_discovery",
       "access_context": "public",
       "event_name": "account_access_intent",
       "classification": "custom",
@@ -918,10 +1102,6 @@
       ],
       "key_event": false,
       "priority": "could",
-      "parameters": [
-        "cta_location",
-        "cta_text"
-      ],
       "data_layer": {
         "event_key": "account_access_intent",
         "flush_keys": [
@@ -934,15 +1114,8 @@
             "cta_text": "%normalized_cta_text%"
           }
         },
-        "mapping_notes": "Use the official login event only when a login actually succeeds."
-      },
-      "ga4_payload": {
-        "event_name": "account_access_intent",
-        "parameters": {
-          "cta_location": "header | menu",
-          "cta_text": "%normalized_cta_text%"
-        },
-        "items": []
+        "mapping_notes": "Use the official login event only when a login actually succeeds.",
+        "consent_timing": "after_cmp_ready"
       },
       "privacy": {
         "pii_risk": "low",
@@ -953,9 +1126,9 @@
       "implementation_notes": "This is custom because the official login event should represent successful authentication, not an account-link click.",
       "official_verification": {
         "status": "not_applicable",
-        "source_url": "https://support.google.com/analytics/answer/13316687",
-        "checked_date": "2026-06-29",
-        "scope_note": "Custom GA4 event; official alternatives are documented in custom_event_acceptance."
+        "scope_note": "Custom GA4 event; official alternatives are documented in custom_event_acceptance.",
+        "source_id": "support_analytics_answer_13316687",
+        "translation_status": "not_needed"
       },
       "collection_strategy": {
         "collection_source": "data_layer",
@@ -978,7 +1151,35 @@
           "Journey coverage: homepage_discovery"
         ],
         "confidence": "medium"
-      }
+      },
+      "event_summary": "This event signifies that a user clicks the account access entry point before the login result is known.",
+      "journey_ids": [
+        "homepage_discovery"
+      ],
+      "journey_stage": "context",
+      "display_order": 6,
+      "parameter_bindings": [
+        {
+          "parameter_name": "cta_location",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Compares CTA performance by page area or component location.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "",
+          "official_source_locator": ""
+        },
+        {
+          "parameter_name": "cta_text",
+          "requirement": "optional",
+          "condition": "",
+          "inclusion_reason": "Supports account-access intent analysis by comparing CTA wording without collecting personal data.",
+          "availability": "to_confirm",
+          "data_owner": "Web analyst and development team",
+          "official_source_id": "",
+          "official_source_locator": ""
+        }
+      ]
     }
   ],
   "parameters": [
@@ -988,12 +1189,10 @@
       "scope": "event",
       "type": "string",
       "classification": "ga4_auto_collected_parameter",
-      "required": "optional",
-      "description": "Current page URL.",
+      "description": "The complete URL of the webpage that someone visited on your website.",
       "reporting_purpose": "Segments traffic and QA by the viewed URL after sensitive query parameters are removed.",
       "value_rules": "Use the current URL after removing sensitive query parameters.",
       "example_value": "https://example.com/",
-      "allowed_values": [],
       "source": "browser location",
       "register_custom_definition": false,
       "cardinality_risk": "medium",
@@ -1001,12 +1200,19 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 event parameter scope checked for page_location."
+        "scope_note": "Official GA4 event parameter scope checked for page_location.",
+        "source_section": "Page / Screen > page_location",
+        "source_locator": "page_location",
+        "canonical_wording": "The complete URL of the webpage that someone visited on your website.",
+        "source_id": "support_analytics_table_13594742",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "governed_rule",
+        "entries": [],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "page_title",
@@ -1014,12 +1220,10 @@
       "scope": "event",
       "type": "string",
       "classification": "ga4_auto_collected_parameter",
-      "required": "optional",
-      "description": "Browser document title.",
+      "description": "The HTML page title that you set on your website. The page_title parameter can override the title HTML tag.",
       "reporting_purpose": "Supports page-level reporting and DebugView validation with a readable page label.",
       "value_rules": "Use the page title generated by the CMS or browser.",
       "example_value": "Homepage",
-      "allowed_values": [],
       "source": "document.title",
       "register_custom_definition": false,
       "cardinality_risk": "medium",
@@ -1027,12 +1231,19 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 event parameter scope checked for page_title."
+        "scope_note": "Official GA4 event parameter scope checked for page_title.",
+        "source_section": "Page / Screen > page_title",
+        "source_locator": "page_title",
+        "canonical_wording": "The HTML page title that you set on your website. The page_title parameter can override the title HTML tag.",
+        "source_id": "support_analytics_table_13594742",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "governed_rule",
+        "entries": [],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "page_referrer",
@@ -1040,12 +1251,10 @@
       "scope": "event",
       "type": "string",
       "classification": "ga4_auto_collected_parameter",
-      "required": "optional",
-      "description": "Previous page URL or external referrer when available.",
+      "description": "The referring URL, which is the user's previous URL and can be your website's domain or other domains.",
       "reporting_purpose": "Supports navigation and acquisition context analysis for page views.",
       "value_rules": "Use browser referrer after removing sensitive query parameters when possible.",
       "example_value": "https://www.google.com/",
-      "allowed_values": [],
       "source": "document.referrer",
       "register_custom_definition": false,
       "cardinality_risk": "medium",
@@ -1053,45 +1262,176 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 event parameter scope checked for page_referrer."
+        "scope_note": "Official GA4 event parameter scope checked for page_referrer.",
+        "source_section": "Page / Screen > page_referrer",
+        "source_locator": "page_referrer",
+        "canonical_wording": "The referring URL, which is the user's previous URL and can be your website's domain or other domains.",
+        "source_id": "support_analytics_table_13594742",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "governed_rule",
+        "entries": [],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
-      "parameter_name": "page_data.template",
+      "parameter_name": "page_template",
       "display_name": "Page template",
-      "scope": "implementation",
+      "scope": "event",
       "type": "string",
-      "classification": "data_layer_variable",
-      "required": "optional",
-      "description": "Implementation variable used to map page template context to GA4.",
+      "classification": "custom_event_parameter",
+      "description": "The stable CMS or frontend template used to render the current page or virtual route.",
       "reporting_purpose": "Segments homepage behavior by page template for journey analysis.",
       "value_rules": "Use controlled lowercase ASCII snake_case values.",
       "example_value": "homepage",
-      "allowed_values": [
-        "homepage",
-        "listing_page",
-        "product_page",
-        "cart",
-        "checkout",
-        "content_page"
-      ],
       "source": "CMS page metadata",
-      "register_custom_definition": false,
+      "register_custom_definition": true,
       "cardinality_risk": "low",
       "pii_risk": "low",
       "consent_dependency": "",
       "official_verification": {
         "status": "not_applicable",
-        "source_url": "https://developers.google.com/tag-platform/tag-manager/datalayer",
-        "checked_date": "2026-06-29",
-        "scope_note": "Implementation variable page_data.template; not a GA4 reporting parameter by itself."
+        "scope_note": "Custom page_template event parameter; not an official GA4 parameter.",
+        "source_id": "developers_tag_platform_tag_manager_datalayer",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "proposed_taxonomy",
+        "entries": [
+          {
+            "raw_label": "homepage",
+            "normalized_value": "homepage",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          },
+          {
+            "raw_label": "listing_page",
+            "normalized_value": "listing_page",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          },
+          {
+            "raw_label": "product_page",
+            "normalized_value": "product_page",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          },
+          {
+            "raw_label": "cart",
+            "normalized_value": "cart",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          },
+          {
+            "raw_label": "checkout",
+            "normalized_value": "checkout",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          },
+          {
+            "raw_label": "content_page",
+            "normalized_value": "content_page",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          }
+        ],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
+    },
+    {
+      "parameter_name": "nav_language",
+      "display_name": "Navigation language",
+      "scope": "event",
+      "type": "string",
+      "classification": "custom_event_parameter",
+      "description": "The website navigation and content language selected when the event occurs.",
+      "reporting_purpose": "Segments behavior by the active website language across page and interaction events.",
+      "value_rules": "Use a lowercase ISO 639-1 language code observed in the website selector or locale route.",
+      "example_value": "en",
+      "source": "Website language selector or locale route",
+      "official_verification": {
+        "status": "not_applicable",
+        "scope_note": "Custom page-context parameter using a standard language-code rule.",
+        "source_id": "developers_tag_platform_tag_manager_datalayer",
+        "translation_status": "not_needed"
+      },
+      "register_custom_definition": true,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "",
+      "value_domain": {
+        "mode": "proposed_taxonomy",
+        "entries": [
+          {
+            "raw_label": "en",
+            "normalized_value": "en",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          }
+        ],
+        "source_refs": [],
+        "notes": "The generic fixture proposes one language value; a real plan must inspect the website selector and locale routes."
+      }
+    },
+    {
+      "parameter_name": "nav_environment",
+      "display_name": "Navigation environment",
+      "scope": "event",
+      "type": "string",
+      "classification": "custom_event_parameter",
+      "description": "The website environment in which the event is generated.",
+      "reporting_purpose": "Separates production traffic from staging or development data during analysis and implementation review.",
+      "value_rules": "Use the controlled deployment environment name supplied by the application configuration.",
+      "example_value": "production",
+      "source": "Application deployment configuration",
+      "official_verification": {
+        "status": "not_applicable",
+        "scope_note": "Custom page-context parameter for deployment environment governance.",
+        "source_id": "developers_tag_platform_tag_manager_datalayer",
+        "translation_status": "not_needed"
+      },
+      "register_custom_definition": true,
+      "cardinality_risk": "low",
+      "pii_risk": "low",
+      "consent_dependency": "",
+      "value_domain": {
+        "mode": "proposed_taxonomy",
+        "entries": [
+          {
+            "raw_label": "production",
+            "normalized_value": "production",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          },
+          {
+            "raw_label": "staging",
+            "normalized_value": "staging",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          },
+          {
+            "raw_label": "development",
+            "normalized_value": "development",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          }
+        ],
+        "source_refs": [],
+        "notes": "The generic fixture proposes common environment values; a real plan must confirm the deployment taxonomy."
+      }
     },
     {
       "parameter_name": "promotion_id",
@@ -1099,12 +1439,10 @@
       "scope": "event",
       "type": "string",
       "classification": "ga4_ecommerce_parameter",
-      "required": "conditional",
-      "description": "Official GA4 promotion identifier.",
+      "description": "The ID of the promotion associated with the event.",
       "reporting_purpose": "Joins promotion exposure and click performance using a stable merchandising identifier.",
       "value_rules": "Use a stable campaign or merchandising ID shared by impression and click.",
       "example_value": "home_hero_summer_2026",
-      "allowed_values": [],
       "source": "CMS or merchandising platform",
       "register_custom_definition": false,
       "cardinality_risk": "medium",
@@ -1112,12 +1450,19 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 ecommerce event parameter scope checked for promotion_id."
+        "scope_note": "Official GA4 ecommerce event parameter scope checked for promotion_id.",
+        "source_section": "Online sales > view_promotion > Parameters",
+        "source_locator": "promotion_id",
+        "canonical_wording": "The ID of the promotion associated with the event.",
+        "source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "governed_rule",
+        "entries": [],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "promotion_name",
@@ -1125,12 +1470,10 @@
       "scope": "event",
       "type": "string",
       "classification": "ga4_ecommerce_parameter",
-      "required": "conditional",
-      "description": "Official GA4 promotion name.",
+      "description": "The name of the promotion associated with the event.",
       "reporting_purpose": "Supports readable promotion performance reporting and merchandising review.",
       "value_rules": "Use normalized controlled values with accents removed.",
       "example_value": "summer_sale",
-      "allowed_values": [],
       "source": "CMS or merchandising platform",
       "register_custom_definition": false,
       "cardinality_risk": "medium",
@@ -1138,12 +1481,19 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 ecommerce event parameter scope checked for promotion_name."
+        "scope_note": "Official GA4 ecommerce event parameter scope checked for promotion_name.",
+        "source_section": "Online sales > view_promotion > Parameters",
+        "source_locator": "promotion_name",
+        "canonical_wording": "The name of the promotion associated with the event.",
+        "source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "governed_rule",
+        "entries": [],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "creative_name",
@@ -1151,12 +1501,10 @@
       "scope": "event",
       "type": "string",
       "classification": "ga4_ecommerce_parameter",
-      "required": "optional",
-      "description": "Official GA4 promotion creative name.",
+      "description": "The name of the promotional creative.",
       "reporting_purpose": "Compares promotion creative variants in exposure and click analysis.",
       "value_rules": "Use stable creative naming.",
       "example_value": "banner_blue",
-      "allowed_values": [],
       "source": "CMS or creative metadata",
       "register_custom_definition": false,
       "cardinality_risk": "medium",
@@ -1164,12 +1512,19 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 ecommerce event parameter scope checked for creative_name."
+        "scope_note": "Official GA4 ecommerce event parameter scope checked for creative_name.",
+        "source_section": "Online sales > view_promotion > Parameters",
+        "source_locator": "creative_name",
+        "canonical_wording": "The name of the promotional creative.",
+        "source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "governed_rule",
+        "entries": [],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "creative_slot",
@@ -1177,12 +1532,10 @@
       "scope": "event",
       "type": "string",
       "classification": "ga4_ecommerce_parameter",
-      "required": "optional",
-      "description": "Official GA4 promotion creative placement.",
+      "description": "The name of the promotional creative slot associated with the event.",
       "reporting_purpose": "Compares promotion placement performance across homepage areas.",
       "value_rules": "Use section and position.",
       "example_value": "homepage_hero_1",
-      "allowed_values": [],
       "source": "page layout metadata",
       "register_custom_definition": false,
       "cardinality_risk": "low",
@@ -1190,25 +1543,30 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 ecommerce event parameter scope checked for creative_slot."
+        "scope_note": "Official GA4 ecommerce event parameter scope checked for creative_slot.",
+        "source_section": "Online sales > view_promotion > Parameters",
+        "source_locator": "creative_slot",
+        "canonical_wording": "The name of the promotional creative slot associated with the event.",
+        "source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "governed_rule",
+        "entries": [],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "items",
       "display_name": "Items array",
       "scope": "event",
-      "type": "array<object>",
+      "type": "array",
       "classification": "ga4_ecommerce_parameter",
-      "required": "conditional",
-      "description": "Official GA4 ecommerce items array.",
+      "description": "The items for the event.",
       "reporting_purpose": "Carries the ecommerce item collection required for product and promotion analysis.",
       "value_rules": "Include at least one item object when ecommerce promotion or item context is available.",
       "example_value": "[{item_id:'sku_123',item_name:'summer_dress'}]",
-      "allowed_values": [],
       "source": "ecommerce data object",
       "register_custom_definition": false,
       "cardinality_risk": "medium",
@@ -1216,12 +1574,19 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 ecommerce event parameter scope checked for items."
+        "scope_note": "Official GA4 ecommerce event parameter scope checked for items.",
+        "source_section": "Online sales > view_promotion > Parameters",
+        "source_locator": "items",
+        "canonical_wording": "The items for the event.",
+        "source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "governed_rule",
+        "entries": [],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "items[].item_id",
@@ -1229,12 +1594,10 @@
       "scope": "item",
       "type": "string",
       "classification": "ga4_ecommerce_item_parameter",
-      "required": "conditional",
-      "description": "Official GA4 item identifier.",
+      "description": "The ID of the item. *One of item_id or item_name is required.",
       "reporting_purpose": "Identifies products or offers consistently across ecommerce and promotion events.",
       "value_rules": "One of items[].item_id or items[].item_name is required when items is sent.",
       "example_value": "sku_123",
-      "allowed_values": [],
       "source": "product catalog",
       "register_custom_definition": false,
       "cardinality_risk": "high",
@@ -1242,12 +1605,19 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/item-scoped-ecommerce",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 item-scoped ecommerce parameter scope checked for items[].item_id."
+        "scope_note": "Official GA4 item-scoped ecommerce parameter scope checked for items[].item_id.",
+        "source_section": "Online sales > view_promotion > Item parameters",
+        "source_locator": "items[].item_id",
+        "canonical_wording": "The ID of the item. *One of item_id or item_name is required.",
+        "source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "governed_rule",
+        "entries": [],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "items[].item_name",
@@ -1255,12 +1625,10 @@
       "scope": "item",
       "type": "string",
       "classification": "ga4_ecommerce_item_parameter",
-      "required": "conditional",
-      "description": "Official GA4 item name.",
+      "description": "The name of the item. *One of item_id or item_name is required.",
       "reporting_purpose": "Provides readable product or offer labels for ecommerce validation and reporting.",
       "value_rules": "One of items[].item_id or items[].item_name is required when items is sent.",
       "example_value": "summer_dress",
-      "allowed_values": [],
       "source": "product catalog",
       "register_custom_definition": false,
       "cardinality_risk": "high",
@@ -1268,12 +1636,19 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/item-scoped-ecommerce",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 item-scoped ecommerce parameter scope checked for items[].item_name."
+        "scope_note": "Official GA4 item-scoped ecommerce parameter scope checked for items[].item_name.",
+        "source_section": "Online sales > view_promotion > Item parameters",
+        "source_locator": "items[].item_name",
+        "canonical_wording": "The name of the item. *One of item_id or item_name is required.",
+        "source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "governed_rule",
+        "entries": [],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "search_term",
@@ -1281,12 +1656,10 @@
       "scope": "event",
       "type": "string",
       "classification": "ga4_recommended_parameter",
-      "required": "required",
-      "description": "Official GA4 search parameter.",
+      "description": "The term that was searched for.",
       "reporting_purpose": "Analyzes onsite search demand after PII scrubbing and supports search journey optimization.",
       "value_rules": "Scrub direct PII and sensitive terms before sending.",
       "example_value": "summer_dress",
-      "allowed_values": [],
       "source": "site search form",
       "register_custom_definition": false,
       "cardinality_risk": "high",
@@ -1294,12 +1667,19 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 event parameter scope checked for search_term."
+        "scope_note": "Official GA4 event parameter scope checked for search_term.",
+        "source_section": "For all properties > search > Parameters",
+        "source_locator": "search_term",
+        "canonical_wording": "The term that was searched for.",
+        "source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "governed_rule",
+        "entries": [],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "content_type",
@@ -1307,16 +1687,10 @@
       "scope": "event",
       "type": "string",
       "classification": "ga4_recommended_parameter",
-      "required": "optional",
-      "description": "Official GA4 parameter for select_content.",
+      "description": "The type of selected content.",
       "reporting_purpose": "Segments consolidated content selections by component or content family.",
       "value_rules": "Use controlled lowercase ASCII snake_case values.",
       "example_value": "category_navigation",
-      "allowed_values": [
-        "category_navigation",
-        "editorial_module",
-        "service_link"
-      ],
       "source": "component metadata",
       "register_custom_definition": true,
       "cardinality_risk": "low",
@@ -1324,12 +1698,41 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 event parameter scope checked for content_type."
+        "scope_note": "Official GA4 event parameter scope checked for content_type.",
+        "source_section": "For all properties > select_content > Parameters",
+        "source_locator": "content_type",
+        "canonical_wording": "The type of selected content.",
+        "source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "proposed_taxonomy",
+        "entries": [
+          {
+            "raw_label": "category_navigation",
+            "normalized_value": "category_navigation",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          },
+          {
+            "raw_label": "editorial_module",
+            "normalized_value": "editorial_module",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          },
+          {
+            "raw_label": "service_link",
+            "normalized_value": "service_link",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          }
+        ],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "content_id",
@@ -1337,12 +1740,10 @@
       "scope": "event",
       "type": "string",
       "classification": "ga4_recommended_parameter",
-      "required": "optional",
-      "description": "Official GA4 parameter for select_content.",
+      "description": "An identifier for the content that was selected. The value must include at least one non-numeric character.",
       "reporting_purpose": "Identifies selected content with a stable low-cardinality ID for module performance reporting.",
       "value_rules": "Use stable IDs or slugs.",
       "example_value": "nav_category",
-      "allowed_values": [],
       "source": "component metadata",
       "register_custom_definition": true,
       "cardinality_risk": "medium",
@@ -1350,38 +1751,47 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 event parameter scope checked for content_id."
+        "scope_note": "Official GA4 event parameter scope checked for content_id.",
+        "source_section": "For all properties > select_content > Parameters",
+        "source_locator": "content_id",
+        "canonical_wording": "An identifier for the content that was selected. The value must include at least one non-numeric character.",
+        "source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "governed_rule",
+        "entries": [],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "content_name",
       "display_name": "Content name",
       "scope": "event",
       "type": "string",
-      "classification": "ga4_recommended_parameter",
-      "required": "optional",
+      "classification": "custom_event_parameter",
       "description": "Readable selected content name.",
       "reporting_purpose": "Provides readable selected-content labels for analyst review while managing cardinality.",
       "value_rules": "Use normalized lowercase ASCII snake_case values when controlled.",
       "example_value": "product_category",
-      "allowed_values": [],
       "source": "component metadata",
       "register_custom_definition": true,
       "cardinality_risk": "medium",
       "pii_risk": "low",
       "consent_dependency": "analytics_storage",
       "official_verification": {
-        "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
-        "checked_date": "2026-06-29",
-        "scope_note": "Official GA4 event parameter scope checked for content_name."
+        "status": "not_applicable",
+        "scope_note": "Custom readable content label retained only for the stated reporting need.",
+        "source_id": "support_analytics_answer_12229021",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "governed_rule",
+        "entries": [],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "cta_location",
@@ -1389,18 +1799,10 @@
       "scope": "event",
       "type": "string",
       "classification": "custom_event_parameter",
-      "required": "optional",
       "description": "Location of a clicked CTA or module.",
       "reporting_purpose": "Compares CTA performance by page area or component location.",
       "value_rules": "Use controlled lowercase ASCII snake_case values.",
       "example_value": "header",
-      "allowed_values": [
-        "header",
-        "hero",
-        "body",
-        "footer",
-        "menu"
-      ],
       "source": "component metadata",
       "register_custom_definition": true,
       "cardinality_risk": "low",
@@ -1408,12 +1810,52 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "not_applicable",
-        "source_url": "https://support.google.com/analytics/answer/13316687",
-        "checked_date": "2026-06-29",
-        "scope_note": "Custom analytics parameter cta_location; governed by GA4 naming and registration rules."
+        "scope_note": "Custom analytics parameter cta_location; governed by GA4 naming and registration rules.",
+        "source_id": "support_analytics_answer_13316687",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "proposed_taxonomy",
+        "entries": [
+          {
+            "raw_label": "header",
+            "normalized_value": "header",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          },
+          {
+            "raw_label": "hero",
+            "normalized_value": "hero",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          },
+          {
+            "raw_label": "body",
+            "normalized_value": "body",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          },
+          {
+            "raw_label": "footer",
+            "normalized_value": "footer",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          },
+          {
+            "raw_label": "menu",
+            "normalized_value": "menu",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          }
+        ],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "link_url",
@@ -1421,12 +1863,10 @@
       "scope": "event",
       "type": "string",
       "classification": "custom_event_parameter",
-      "required": "optional",
       "description": "Destination URL for a selected link or module.",
       "reporting_purpose": "Validates navigation destination and supports outbound or internal path analysis after URL cleaning.",
       "value_rules": "Remove sensitive query parameters before sending.",
       "example_value": "https://example.com/category/example",
-      "allowed_values": [],
       "source": "clicked element href",
       "register_custom_definition": false,
       "cardinality_risk": "high",
@@ -1434,12 +1874,16 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "not_applicable",
-        "source_url": "https://support.google.com/analytics/answer/13316687",
-        "checked_date": "2026-06-29",
-        "scope_note": "Custom analytics parameter link_url; governed by GA4 naming and registration rules."
+        "scope_note": "Custom analytics parameter link_url; governed by GA4 naming and registration rules.",
+        "source_id": "support_analytics_answer_13316687",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "governed_rule",
+        "entries": [],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "cta_text",
@@ -1447,12 +1891,10 @@
       "scope": "event",
       "type": "string",
       "classification": "custom_event_parameter",
-      "required": "optional",
       "description": "Normalized visible CTA text.",
       "reporting_purpose": "Supports account-access intent analysis by comparing CTA wording without collecting personal data.",
       "value_rules": "Use lowercase ASCII snake_case controlled values and remove accents.",
       "example_value": "my_account",
-      "allowed_values": [],
       "source": "component metadata",
       "register_custom_definition": true,
       "cardinality_risk": "medium",
@@ -1460,12 +1902,16 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "not_applicable",
-        "source_url": "https://support.google.com/analytics/answer/13316687",
-        "checked_date": "2026-06-29",
-        "scope_note": "Custom analytics parameter cta_text; governed by GA4 naming and registration rules."
+        "scope_note": "Custom analytics parameter cta_text; governed by GA4 naming and registration rules.",
+        "source_id": "support_analytics_answer_13316687",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "governed_rule",
+        "entries": [],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "user_id",
@@ -1473,12 +1919,10 @@
       "scope": "implementation",
       "type": "string",
       "classification": "implementation_variable",
-      "required": "conditional",
       "description": "Opaque stable authenticated identifier mapped only to the GA4 User-ID configuration setting.",
       "reporting_purpose": "Supports cross-session and cross-device signed-in journey analysis through GA4 User-ID.",
       "value_rules": "Use a stable non-PII internal identifier. Omit before sign-in and set null after logout. Never use email or register this value as a custom dimension.",
       "example_value": "usr_7f3a91",
-      "allowed_values": [],
       "source": "authentication backend",
       "register_custom_definition": false,
       "cardinality_risk": "high",
@@ -1486,12 +1930,16 @@
       "consent_dependency": "analytics_storage and organization-approved User-ID policy",
       "official_verification": {
         "status": "verified",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/user-id",
-        "checked_date": "2026-07-11",
-        "scope_note": "Official GA4 User-ID configuration behavior and logout clearing rule verified."
+        "scope_note": "Official GA4 User-ID configuration behavior and logout clearing rule verified.",
+        "source_id": "developers_analytics_devguides_collection_ga4_user_id",
+        "translation_status": "not_needed"
       },
-      "availability": "requires_development",
-      "data_owner": "Authentication and analytics teams"
+      "value_domain": {
+        "mode": "governed_rule",
+        "entries": [],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "login_status",
@@ -1499,15 +1947,10 @@
       "scope": "user",
       "type": "string",
       "classification": "custom_user_property",
-      "required": "optional",
       "description": "Known anonymous login state.",
       "reporting_purpose": "Segments GA4 users and journeys by the current authenticated state.",
       "value_rules": "Use logged_in | logged_out and update immediately after login or logout.",
       "example_value": "logged_out",
-      "allowed_values": [
-        "logged_in",
-        "logged_out"
-      ],
       "source": "site authentication state",
       "register_custom_definition": true,
       "cardinality_risk": "low",
@@ -1515,12 +1958,31 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "not_applicable",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/protocol/ga4/user-properties",
-        "checked_date": "2026-07-11",
-        "scope_note": "Custom GA4 user property governed by official user-property behavior and registration rules."
+        "scope_note": "Custom GA4 user property governed by official user-property behavior and registration rules.",
+        "source_id": "developers_analytics_devguides_collection_protocol_ga4_user_properties",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "Web analyst and development team"
+      "value_domain": {
+        "mode": "proposed_taxonomy",
+        "entries": [
+          {
+            "raw_label": "logged_in",
+            "normalized_value": "logged_in",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          },
+          {
+            "raw_label": "logged_out",
+            "normalized_value": "logged_out",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          }
+        ],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "customer_status",
@@ -1528,16 +1990,10 @@
       "scope": "user",
       "type": "string",
       "classification": "custom_user_property",
-      "required": "optional",
       "description": "Low-cardinality customer lifecycle group available after authentication.",
       "reporting_purpose": "Segments authenticated journey and retention analysis by new or returning customer status.",
       "value_rules": "Use new | returning | unknown from an approved backend rule.",
       "example_value": "returning",
-      "allowed_values": [
-        "new",
-        "returning",
-        "unknown"
-      ],
       "source": "customer account backend",
       "register_custom_definition": true,
       "cardinality_risk": "low",
@@ -1545,12 +2001,38 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "not_applicable",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/protocol/ga4/user-properties",
-        "checked_date": "2026-07-11",
-        "scope_note": "Custom GA4 user property with project-defined controlled values."
+        "scope_note": "Custom GA4 user property with project-defined controlled values.",
+        "source_id": "developers_analytics_devguides_collection_protocol_ga4_user_properties",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "CRM and analytics teams"
+      "value_domain": {
+        "mode": "proposed_taxonomy",
+        "entries": [
+          {
+            "raw_label": "new",
+            "normalized_value": "new",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          },
+          {
+            "raw_label": "returning",
+            "normalized_value": "returning",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          },
+          {
+            "raw_label": "unknown",
+            "normalized_value": "unknown",
+            "language": "en",
+            "source_ref": "",
+            "mapping_method": "normalization_only"
+          }
+        ],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     },
     {
       "parameter_name": "account_type",
@@ -1558,12 +2040,10 @@
       "scope": "user",
       "type": "string",
       "classification": "custom_user_property",
-      "required": "optional",
       "description": "Optional low-cardinality account category when the business has stable account types.",
       "reporting_purpose": "Supports authenticated journey segmentation by a governed account category.",
       "value_rules": "Use a small English controlled taxonomy defined by the business; omit when no meaningful account categories exist.",
       "example_value": "standard",
-      "allowed_values": [],
       "source": "customer account backend",
       "register_custom_definition": true,
       "cardinality_risk": "low",
@@ -1571,12 +2051,16 @@
       "consent_dependency": "analytics_storage",
       "official_verification": {
         "status": "not_applicable",
-        "source_url": "https://developers.google.com/analytics/devguides/collection/protocol/ga4/user-properties",
-        "checked_date": "2026-07-11",
-        "scope_note": "Optional custom GA4 user property with project-defined controlled values."
+        "scope_note": "Optional custom GA4 user property with project-defined controlled values.",
+        "source_id": "developers_analytics_devguides_collection_protocol_ga4_user_properties",
+        "translation_status": "not_needed"
       },
-      "availability": "to_confirm",
-      "data_owner": "CRM and analytics teams"
+      "value_domain": {
+        "mode": "governed_rule",
+        "entries": [],
+        "source_refs": [],
+        "notes": "Migrated from the existing value rules; verify the value source and completeness before publication."
+      }
     }
   ],
   "not_tracked": [
@@ -1599,27 +2083,100 @@
       "name": "GA4 recommended events",
       "url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
       "source_type": "official",
-      "checked_for": "search, select_content, and recommended event semantics"
+      "checked_for": "Definition and parameters for search | Definition and parameters for select_content | Definition and parameters for select_promotion | Definition and parameters for view_promotion | Definition, type, and conditions for content_id | Definition, type, and conditions for content_type | Definition, type, and conditions for creative_name | Definition, type, and conditions for creative_slot | Definition, type, and conditions for items | Definition, type, and conditions for items[].item_id | Definition, type, and conditions for items[].item_name | Definition, type, and conditions for promotion_id | Definition, type, and conditions for promotion_name | Definition, type, and conditions for search_term | Trigger guidance for search | Trigger guidance for select_content | search, select_content, and recommended event semantics",
+      "source_id": "developers_analytics_devguides_collection_ga4_reference_events",
+      "checked_date": "2026-07-11",
+      "language": "en",
+      "content_signature": ""
     },
     {
       "name": "GA4 ecommerce measurement",
       "url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
       "source_type": "official",
-      "checked_for": "view_promotion, select_promotion, and items array format"
+      "checked_for": "Trigger guidance for select_promotion | Trigger guidance for view_promotion | view_promotion, select_promotion, and items array format",
+      "source_id": "developers_analytics_devguides_collection_ga4_ecommerce",
+      "checked_date": "2026-07-11",
+      "language": "en",
+      "content_signature": ""
     },
     {
       "name": "GA4 event naming rules",
       "url": "https://support.google.com/analytics/answer/13316687",
       "source_type": "official",
-      "checked_for": "custom event naming and reserved-name constraints"
+      "checked_for": "custom event naming and reserved-name constraints",
+      "source_id": "support_analytics_answer_13316687",
+      "checked_date": "2026-07-11",
+      "language": "en",
+      "content_signature": ""
     },
     {
       "name": "GTM data layer",
       "url": "https://developers.google.com/tag-platform/tag-manager/datalayer",
       "source_type": "official",
-      "checked_for": "dataLayer.push implementation pattern"
+      "checked_for": "dataLayer.push implementation pattern",
+      "source_id": "developers_tag_platform_tag_manager_datalayer",
+      "checked_date": "2026-07-11",
+      "language": "en",
+      "content_signature": ""
+    },
+    {
+      "source_id": "support_analytics_answer_9216061",
+      "name": "GA4 event reference: page_view",
+      "url": "https://support.google.com/analytics/answer/9216061?hl=en",
+      "source_type": "official",
+      "checked_for": "Definition and parameters for page_view | Trigger guidance for page_view",
+      "checked_date": "2026-07-11",
+      "language": "en",
+      "content_signature": ""
+    },
+    {
+      "source_id": "support_analytics_table_13594742",
+      "name": "GA4 parameter reference: page_location",
+      "url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_type": "official",
+      "checked_for": "Definition, type, and conditions for page_location | Definition, type, and conditions for page_referrer | Definition, type, and conditions for page_title",
+      "checked_date": "2026-07-11",
+      "language": "en",
+      "content_signature": ""
     }
   ],
+  "official_source_check": {
+    "schema_version": "1.0",
+    "status": "passed",
+    "mode": "live",
+    "checked_at": "2026-07-11T12:00:00Z",
+    "sources": [
+      {
+        "url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "url": "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce",
+        "content_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      {
+        "url": "https://support.google.com/analytics/answer/13316687",
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      {
+        "url": "https://developers.google.com/tag-platform/tag-manager/datalayer",
+        "content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      {
+        "url": "https://support.google.com/analytics/answer/9216061?hl=en",
+        "content_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      {
+        "url": "https://support.google.com/analytics/table/13594742?hl=en",
+        "content_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    ],
+    "catalog_signature_sha256": "3089577e70305368fd700a93a78c24702173eb1fdb30eadc78e644c0f52c489c",
+    "draft_plan_sha256": "f74e2e90ef02f04a47f6aa506bde524cd8f35bab95310c2ff91eef4dd8dfeb3a",
+    "resolved_plan_sha256": "f74e2e90ef02f04a47f6aa506bde524cd8f35bab95310c2ff91eef4dd8dfeb3a",
+    "errors": [],
+    "receipt_sha256": "e8f4f21b09a738470b7ff3b0044f8ffbac052edecc7ddc9bcde7c625d2c58d6c"
+  },
   "screenshot_capture": {
     "requirement": "required",
     "playwright_mcp_attempt": {
@@ -1714,5 +2271,14 @@
       "shared_reason": "",
       "notes": "Screenshot capture is blocked in this generic fixture. Capture the public account entry point with Playwright MCP before delivery."
     }
-  ]
+  ],
+  "language_policy": {
+    "site_language_scope": "unknown",
+    "site_languages": [],
+    "workbook_language": "en",
+    "controlled_value_language": "en",
+    "technical_name_language": "en",
+    "controlled_value_format": "lowercase_ascii_snake_case",
+    "decision_basis": "English retained provisionally because the source plan did not record a website language decision."
+  }
 }

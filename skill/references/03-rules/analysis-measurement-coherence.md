@@ -24,8 +24,10 @@ For each journey, check:
    scope and are not mixed with generic interaction-event variables.
 8. Not-tracked choices: noisy, duplicate, sensitive, unavailable, or
    non-actionable interactions are explicitly excluded.
-9. Screenshot evidence: every event has a Screenshot Register row with a
-   captured evidence, shared evidence, blocked reason, or not-needed reason.
+9. Screenshot evidence: when screenshots are requested, every event has a
+   Screenshot Register row with captured evidence, shared evidence, a blocked
+   reason, or a not-needed reason. When screenshots are excluded, the register
+   and its rows are absent.
 10. Future scale: future pages, markets, components, or funnel variants can
     reuse the event families and parameters without a full redesign.
 
@@ -40,7 +42,7 @@ Do not approve the plan when:
 - ecommerce events are missing official item, transaction, list, promotion, or
   checkout parameters required for the scenario;
 - parameter names change for the same business concept across events;
-- screenshots or concrete blocked reasons are missing from the Screenshot Register;
+- requested screenshots or concrete blocked reasons are missing from the Screenshot Register;
 - sensitive or user-provided data is hidden in generic parameters;
 - Universal Analytics fields are copied into the GA4 schema.
 

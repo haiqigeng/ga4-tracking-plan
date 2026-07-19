@@ -33,6 +33,16 @@ class FreshAgentEvaluationTests(unittest.TestCase):
     def test_manifest_is_generic_and_complete(self) -> None:
         self.assertEqual(validate_manifest(self.manifest), [])
 
+        malformed = copy.deepcopy(self.manifest)
+        malformed["cases"][1]["case_id"] = malformed["cases"][0]["case_id"]
+        malformed["cases"][1]["prompt"] = "Inspect https://client.example.net now."
+        malformed["cases"][1]["required_outcomes"][0]["criterion_id"] = malformed["cases"][1]["prohibited_outcomes"][0]["criterion_id"]
+        errors = validate_manifest(malformed)
+        self.assertTrue(any("Duplicate case_id" in error for error in errors))
+        self.assertTrue(any("non-generic domain" in error for error in errors))
+        self.assertTrue(any("duplicate criterion_id" in error for error in errors))
+        self.assertTrue(any("does not match" in error for error in errors))
+
     def test_complete_passing_results_are_accepted(self) -> None:
         self.assertEqual(score_results(self.manifest, self.complete_results()), [])
 

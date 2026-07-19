@@ -6,8 +6,8 @@ Use this reference whenever a plan includes GA4 ecommerce events or an ecommerce
 
 - Check current official GA4 ecommerce and recommended-event docs before finalizing event names, parameter names, and parameter scope.
 - Use event-level `currency` whenever `value` is sent.
-- Set every ecommerce parameter that the implementation reliably has, even when the parameter is optional.
-- Use `items` for product/item context. Each item needs one of `items[].item_id` or `items[].item_name`.
+- Treat every ecommerce parameter that the implementation reliably has as a candidate, following Google's recommendation, but retain an optional parameter in the client plan only when it supports a stated analysis, reporting, activation, or implementation need. Record meaningful exclusions instead of filling the matrix with unused fields.
+- Use `items` when product/item detail is part of the event. When `items` is sent, each item needs one of `items[].item_id` or `items[].item_name`. Do not make `items` mandatory for an event such as `refund` when the current official event table marks it optional and the plan intentionally specifies a full-transaction refund.
 - `items[].quantity` is optional and GA4 defaults it to `1` when omitted, but tracking plans should still display the intended quantity so analysts and developers do not confuse omission with absence.
 - `items[].affiliation` and `items[].location_id` are item-scoped only.
 - Event-level and item-level `coupon` are independent. Use item-level `items[].coupon` for item-specific coupons or discounts.
@@ -16,6 +16,18 @@ Use this reference whenever a plan includes GA4 ecommerce events or an ecommerce
 - Use official `items[].item_variant` before creating a separate custom item field for variant, color, size, or other product-option analysis.
 
 ## Preferred Planning Convention
+
+Select parameters in this order:
+
+1. Include every unconditionally required official parameter.
+2. Include each conditionally required parameter when its condition applies, such as `currency` when `value` is sent.
+3. Include at least one item identity field, `items[].item_id` or `items[].item_name`, for every ecommerce item.
+4. Add optional official parameters only when the business questions, available data, and intended reporting justify them.
+5. Add a custom event or item parameter only when no native field answers the same need and the reporting purpose, value rule, scope, registration decision, cardinality, privacy, and owner are explicit.
+
+Do not use a canonical profile as an instruction to add every field. Profiles
+control stable row order for the parameters selected by the analyst; they do
+not expand the event specification.
 
 Prefer event-level list and promotion parameters when all items in the event share the same list or promotion:
 
@@ -45,23 +57,10 @@ Do not group ecommerce events together just because they are in the same journey
 
 If a block becomes too dense, split it rather than hiding parameters. Keep rows in a stable official-first order so analysts can scan the same parameter in the same position across compatible events.
 
-## Canonical Parameter Profiles
-
-Use `parameter_profile` for every GA4 ecommerce event in structured plans:
-
-- `promotion_profile`: `view_promotion`, `select_promotion`
-- `list_profile`: `view_item_list`, `select_item`
-- `item_detail_profile`: `view_item`
-- `cart_profile`: `add_to_cart`, `remove_from_cart`, `view_cart`
-- `checkout_profile`: `begin_checkout`, `add_shipping_info`, `add_payment_info`
-- `transaction_profile`: `purchase`
-- `refund_profile`: `refund`
-
-The profile records the canonical parameter order used by
-`scripts/ecommerce_matrix.py`. Do not reorder related ecommerce parameters per
-event unless the exception is explicit and useful for implementation.
-
 ## Official-First Row Order
+
+The renderer derives stable row order from the event name and official catalog;
+the structured plan does not store a second profile or payload snapshot.
 
 Use a stable order inside each family:
 

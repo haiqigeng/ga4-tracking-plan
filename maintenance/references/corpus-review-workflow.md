@@ -24,6 +24,6 @@ signals. Do not commit source workbooks or generated inventories.
 5. Promote a lesson only when it is generic, privacy-safe, official-first,
    human-readable, and useful to analysts or developers.
 
-Use `references/03-rules/review-corpus-learning-policy.md` for the decision
+Use `maintenance/references/review-corpus-learning-policy.md` for the decision
 policy. Extract business and workbook lessons only. Ignore non-GA4 event names,
 parameters, payloads, and platform-specific structures.

@@ -8,13 +8,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "skill" / "scripts"))
 
 from ecommerce_matrix import (  # noqa: E402
-    ECOMMERCE_GROUP_ORDER,
     compact_json,
     ecommerce_group,
     ecommerce_parameter_applicability,
     event_family,
     event_level_value,
-    event_order_key,
     is_ecommerce_event,
     item_values,
     join_values,
@@ -36,17 +34,23 @@ def event(
     ga4_parameters: dict | None = None,
     items: list[dict] | None = None,
     push: dict | None = None,
-    profile: str | None = None,
 ) -> dict:
+    event_push = push or {
+        "event": name,
+        "ecommerce": {
+            **(ga4_parameters or {}),
+            **({"items": items} if items is not None else {}),
+        },
+    }
     value = {
         "event_name": name,
         "classification": classification,
-        "parameters": parameters or [],
-        "ga4_payload": {"parameters": ga4_parameters or {}, "items": items or []},
-        "data_layer": {"event_key": name, "push": push or {}},
+        "parameter_bindings": [
+            {"parameter_name": parameter}
+            for parameter in (parameters or [])
+        ],
+        "data_layer": {"event_key": name, "push": event_push},
     }
-    if profile:
-        value["parameter_profile"] = {"profile_id": profile}
     return value
 
 
@@ -90,21 +94,19 @@ class EcommerceMatrixTests(unittest.TestCase):
         self.assertEqual(scope_rule("custom_event_parameter"), "")
 
     def test_ordering_uses_profiles_groups_and_appended_custom_parameters(self) -> None:
-        profiled = event(parameters=["custom_stock_status"], profile="item_detail_profile")
+        profiled = event(parameters=["custom_stock_status", "items[].item_id", "currency"])
         ordered = ordered_parameters_for_events([profiled])
         self.assertEqual(ordered[0], "currency")
         self.assertIn("items[].item_id", ordered)
         self.assertEqual(ordered[-1], "custom_stock_status")
 
-        cart_events = [event("add_to_cart"), event("view_cart", parameters=["entry_point"])]
+        cart_events = [event("add_to_cart", parameters=["items"]), event("view_cart", parameters=["entry_point"])]
         grouped = ordered_parameters_for_events(cart_events)
         self.assertIn("items", grouped)
         self.assertEqual(grouped[-1], "entry_point")
 
         interaction = event("header_click", classification="custom", parameters=["link_name", "link_url"])
         self.assertEqual(ordered_parameters_for_events([interaction]), ["link_name", "link_url"])
-        self.assertLess(event_order_key(event("view_item"))[0], len(ECOMMERCE_GROUP_ORDER))
-        self.assertEqual(event_order_key(interaction), (len(ECOMMERCE_GROUP_ORDER), "header_click"))
 
     def test_nested_event_and_item_values_use_payload_then_datalayer(self) -> None:
         self.assertEqual(nested_value({"a": {"b": 2}}, "a.b"), 2)
@@ -115,7 +117,11 @@ class EcommerceMatrixTests(unittest.TestCase):
 
         push_event = event(
             ga4_parameters={},
-            push={"ecommerce": {"value": 10, "items": [{"item_name": "Product"}]}, "event_data": {"entry_point": "header"}},
+            push={
+                "event": "view_item",
+                "ecommerce": {"value": 10, "items": [{"item_name": "Product"}]},
+                "event_data": {"entry_point": "header"},
+            },
         )
         self.assertEqual(event_level_value(push_event, "value"), 10)
         self.assertEqual(event_level_value(push_event, "entry_point"), "header")
@@ -127,13 +133,22 @@ class EcommerceMatrixTests(unittest.TestCase):
         self.assertEqual(ecommerce_parameter_applicability(interaction, "link_name"), "send")
         self.assertEqual(ecommerce_parameter_applicability(interaction, "currency"), "not_applicable")
 
-        item_detail = event(parameters=["custom_item_flag"], ga4_parameters={"item_list_id": "related"})
+        item_detail = event(
+            parameters=[
+                "custom_item_flag",
+                "currency",
+                "items[].item_brand",
+                "items[].item_list_id",
+                "items[].quantity",
+            ],
+            ga4_parameters={"item_list_id": "related"},
+        )
         self.assertEqual(ecommerce_parameter_applicability(item_detail, "items[].item_list_id"), "event_level_used")
         self.assertEqual(ecommerce_parameter_applicability(item_detail, "items[].quantity"), "send")
         self.assertEqual(ecommerce_parameter_applicability(item_detail, "items[].promotion_id"), "not_applicable")
         self.assertEqual(ecommerce_parameter_applicability(item_detail, "items[].item_brand"), "send")
         self.assertEqual(ecommerce_parameter_applicability(item_detail, "items[].custom_item_flag"), "not_applicable")
-        item_detail["parameters"].append("items[].custom_item_flag")
+        item_detail["parameter_bindings"].append({"parameter_name": "items[].custom_item_flag"})
         self.assertEqual(ecommerce_parameter_applicability(item_detail, "items[].custom_item_flag"), "send")
         self.assertEqual(ecommerce_parameter_applicability(item_detail, "currency"), "send")
         self.assertEqual(ecommerce_parameter_applicability(item_detail, "custom_item_flag"), "send")
@@ -141,7 +156,7 @@ class EcommerceMatrixTests(unittest.TestCase):
 
     def test_matrix_values_and_availability_cover_all_rendering_states(self) -> None:
         item_detail = event(
-            parameters=["custom_missing"],
+            parameters=["custom_missing", "currency", "items", "items[].item_id", "items[].item_list_id", "items[].quantity"],
             ga4_parameters={"currency": "EUR", "item_list_id": "related"},
             items=[{"item_id": "SKU_1", "price": 12.5}],
         )
@@ -156,7 +171,7 @@ class EcommerceMatrixTests(unittest.TestCase):
         self.assertEqual(parameter_matrix_value(item_detail, "payment_type"), "not_applicable")
         self.assertEqual(parameter_matrix_value(item_detail, "custom_missing"), "not_available")
 
-        empty = event()
+        empty = event(parameters=["items"])
         self.assertEqual(parameter_matrix_value(empty, "items"), "Required when ecommerce context is sent")
         interaction = event("header_click", classification="custom", parameters=["link_name"])
         self.assertEqual(parameter_matrix_value(interaction, "link_name"), "-")

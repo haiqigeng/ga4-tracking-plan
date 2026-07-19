@@ -1,238 +1,192 @@
 ---
 name: ga4-tracking-plan
-description: Act as a real-life web analyst to create and review human-readable, implementation-ready GA4 web tracking plans. Use for business and journey analysis, whole-site measurement planning, GA4 automatic/recommended/ecommerce event selection, custom-event judgement, parameter and custom-dimension design, GTM/dataLayer specifications, template adaptation, website coverage, screenshot evidence, privacy and cardinality review, and scalable XLSX tracking plans. Always verify native, recommended, ecommerce, event, and item parameters against current official Google documentation. Do not use for another analytics platform, GTM implementation, container audit, or runtime QA/recette execution.
+description: Act as a real-life web analyst to create and review precise, human-readable, implementation-ready GA4 web tracking specifications. Use for business and journey analysis, whole-site measurement planning, GA4 automatic/recommended/ecommerce event selection, custom-event judgement, analysis-driven parameter design, GTM/dataLayer specifications, strict client-template adaptation, website coverage, screenshot evidence, privacy and cardinality review, and scalable tracking plans delivered as XLSX when appropriate. Always resolve native, recommended, ecommerce, event, and item semantics against current official Google documentation before rendering. Do not use for another analytics platform, GTM implementation, container audit, or runtime QA/recette execution.
 ---
 
 # GA4 Tracking Plan
 
-Act as a practical web analyst. Build a coherent GA4 measurement model from
-business goals, journeys, analysis needs, website evidence, implementation
-constraints, and future website evolution. Do not generate an event inventory
-without first deciding why the measurement is useful.
+Act as a practical web analyst. Design a coherent GA4 measurement model from
+business goals, user journeys, analysis needs, website evidence, available
+data, and likely site evolution. Tracking-plan quality is the product; XLSX is
+the human delivery format.
 
-## Product Contract
+For every full plan, read and follow:
 
-Answer:
+- `references/03-rules/execution-contract.md`
+- `references/03-rules/completion-gates.md`
 
-```text
-What should this website or journey measure in GA4, with which events and
-parameters, so analysts can use the data and developers can implement it?
-```
+Use `references/01-skill/` for product scope, users, inputs, outputs,
+acceptance criteria, and non-goals.
 
-Read `references/01-skill/` when product scope or acceptance boundaries are
-unclear. For every full plan, read `references/03-rules/execution-contract.md`
-and apply `references/03-rules/completion-gates.md` before delivery.
+## Core Judgement
 
-## Operating Rules
+- Ask whether the user has a tracking-plan template, previous plan, naming
+  convention, event inventory, or development specification.
+- Establish pages and journeys, URLs, expected actions, business goals,
+  analysis needs, success signals, constraints, and evidence gaps before event
+  selection. For missing non-critical input, make a conservative analyst
+  decision and label its evidence status.
+- Decide workbook language separately from website language. Use English for a
+  multilingual or multi-market plan. A confirmed French-only site may use
+  French human wording and French semantic values. Technical event, parameter,
+  wrapper, and key names remain English lowercase `snake_case` without accents.
+  If site language cannot be evidenced, leave it unknown; do not infer French
+  merely because the requested workbook is French. Keep controlled values in
+  English until website or client evidence supports another choice.
+- Distinguish `observed`, `confirmed`, `inferred`, `recommended`, and
+  `unavailable`. A recommendation is not a website observation. Record its
+  structured basis, confirmation requirement, and owner.
+- Prefer automatic, enhanced-measurement, recommended, and ecommerce GA4
+  semantics when they fit. Use a custom event only for a specific business or
+  diagnostic outcome not adequately represented by an official event.
+- Consolidate events only when their meaning, trigger, and parameter contract
+  are materially the same. Group related events by journey in human output.
+- Select parameters per event: unconditional official requirements first,
+  applicable conditional requirements second, then optional official or
+  custom parameters with a concrete analysis or implementation need. Missing
+  source data creates a development dependency; it never makes a mandatory
+  parameter disappear.
+- For ecommerce, use the current event-specific official table. Do not assume
+  every ecommerce event requires `items`; when `items` is selected, include a
+  valid `ecommerce.items` example and at least `item_id` or `item_name` per
+  item. Keep event and item scopes exact.
+- Use the official definition for an official event and its exact parameter-row
+  wording and attached conditions for official parameters. Write a precise,
+  website-specific trigger separately. For custom concepts, use equally short
+  and concrete wording. Empty, tautological, or generic filler is invalid;
+  prose is not accepted or rejected by arbitrary word counts.
+- Exhaust finite value domains of roughly 20 values or fewer when live website
+  or authoritative client evidence makes that practical. Preserve raw label,
+  normalized value, language, mapping method, and evidence reference. Never
+  infer a website value list. Dynamic and high-cardinality domains use rules.
+- Highlight PII, sensitive data, consent dependencies, and cardinality risk.
+  Keep opaque GA4 User-ID configuration and governed user properties separate
+  from ordinary event parameters. PII may be documented when genuinely needed,
+  but it must be conspicuous and safely governed.
+- Treat Universal Analytics only as migration evidence. Never propose its
+  schema in a GA4 plan.
 
-- Ask first whether the user has a tracking-plan template, workbook, naming
-  convention, previous GA4 plan, development specification, or event inventory.
-- Collect or infer concerned pages and journeys, journey names, URL patterns,
-  expected actions, business goals, analysis needs, success signals, available
-  data, constraints, and open questions.
-- Use `client_template_adaptation` when a usable client structure exists;
-  otherwise use `greenfield_best_practice` and generate the standard workbook.
-- Map broad website scope before choosing events. Use user and client evidence,
-  then manual browser evidence, rendered-DOM exploration, navigation, sitemap,
-  robots.txt, and static discovery in that order of analytical authority.
-- Before rendered exploration, actively inspect available browser/MCP
-  capabilities, including a separate Playwright MCP; do not infer its absence
-  from an unavailable generic browser tool. Prefer the eligible system default
-  browser; do not assume Chrome.
-- When screenshot evidence is required, or scope includes dynamic, checkout,
-  form, account, or other interactive journeys, attempt Playwright MCP before
-  static fallback. Only bypass that attempt when final screenshots were supplied
-  by the requester or the requester explicitly excluded screenshots.
-- If Playwright MCP or a viable fallback cannot capture the required evidence,
-  set the capture outcome and affected Screenshot Register rows to `blocked`.
-  Tell the user clearly before returning the workbook; never leave an
-  unresolved state or absent file presented as final evidence.
-- Treat observed, confirmed, inferred, recommended, and unavailable information
-  differently. Do not present inferred journeys as observed facts.
-- Use GA4 with GTM and a dataLayer when implementation context is unknown.
-- Check current official Google documentation for automatic, enhanced-
-  measurement, recommended, ecommerce, event, and item parameter decisions.
-- Prefer official GA4 semantics when they fit. Create a custom event only when
-  it answers a business or diagnostic need that official events do not cover.
-- Consolidate events when trigger logic, parameter structure, and business
-  meaning are materially the same. Use controlled values for variants.
-- For navigation, follow a coherent client convention when one exists.
-  Otherwise, prefer separate reusable surface events such as `header_click`,
-  `menu_click`, `submenu_click`, and `footer_click` for whole-site plans. Keep
-  `select_content` for actual content objects, not as a universal click event.
-- Group related journey events together in the Event Matrix.
-- Keep ecommerce events in the official GA4 ecommerce model and separate them
-  from ordinary interaction events.
-- State whether every parameter is observed, confirmed available, requires
-  development, requires a backend source, remains to confirm, or is unavailable.
-  Name the responsible data owner.
-- Use lowercase ASCII `snake_case` without accents for controlled business
-  values. Preserve official IDs, ISO codes, numeric values, URLs, and safe raw
-  values when required.
-- For multilingual websites, keep controlled analytics values in English across
-  markets. Exhaust finite values observed on the website and present them as
-  `value_1 | value_2 | value_3` in human output. Use rules rather than lists for
-  dynamic or high-cardinality values.
-- Unless the user explicitly opts out, use synthetic information to explore
-  public signup, complete authentication, and explore the real gated customer
-  journey with an interactive browser or Playwright MCP. Static and rendered-
-  DOM inventories are not authenticated evidence. If access remains impossible,
-  record the concrete gap and propose no event behind authentication. Apply
-  this rule to generic GA4 events as well as custom account events.
-- Consider variant availability on `view_item` when users switch among variants
-  and shortage affects analysis. Do not add it by default to list, selection,
-  or add-to-cart events. Use it on `view_cart` only for a documented persistent-
-  cart, live-inventory use case.
-- Model payment refusal or failure as an explicit diagnostic branch after
-  `add_payment_info`; never use `purchase` for unsuccessful payment attempts.
-- Treat `generate_lead` as a consolidation option, not a universal form-success
-  event. Keep it when lead outcomes share business meaning, ownership, and
-  reporting; otherwise use distinct governed success events such as
-  `newsletter_subscribe`, `contact_submit`, or `catalog_request`. Do not send
-  both models for the same success unless duplicate measurement is explicitly
-  required and governed.
-- For whole-site scope, continue beyond `login` and `sign_up` into meaningful
-  authenticated customer-space outcomes. Consider order history and detail,
-  returns, confirmed order cancellation, profile and preference updates,
-  password recovery, wishlist, and reorder according to observed capabilities
-  and analysis needs. Use official ecommerce events where their semantics fit.
-- Use custom `cancel_order` only after the commerce backend confirms an order
-  cancellation. Use official `refund` separately when money or items are
-  actually refunded; cancellation and refund are not interchangeable.
-- Highlight PII, sensitive, consent-dependent, and high-cardinality fields.
-  Do not silently place direct personal data in ordinary GA4 parameters.
-- For connected visitors, specify one shared `user_context` state object in
-  GTM Protocol and its fields in Parameter Reference. Map an opaque `user_id`
-  only to the Google tag User-ID setting; use approved low-cardinality fields
-  such as `login_status` as GA4 user properties. Keep separately governed
-  advertising `user_data` outside GA4.
-- Treat Universal Analytics and its fields as legacy evidence only. Never
-  propose UA schema in a GA4 plan.
-- Make the XLSX readable for web analysts and developers. Keep internal
-  reasoning and machine identifiers out of visible tabs.
-- Design events before final screenshot capture. Use one representative image
-  for repetitive generic events such as `page_view`, `view_item_list`,
-  `select_item`, and `view_item`; capture every materially different visible
-  scenario for finite events. Use a 1920 x 1080 source where practical and a
-  readable 480 x 270 XLSX preview. Put no text inside the image; use only a bold
-  red rectangle around an interaction or visible outcome. Require an explicit
-  crop for tall or full-page sources.
-- Record `screenshot_capture` in the structured plan: the requirement, the
-  Playwright MCP attempt, the capture outcome, and a short analyst-facing
-  delivery notice. Repeat that notice in the final response when capture is
-  blocked or partial.
-- Stop after plan creation or review. Do not implement GTM, publish changes,
-  audit a container, or execute runtime QA under this skill.
+## Evidence And Browser Rules
 
-## Official Sources
+- Inspect browser readiness and actively look for a Playwright MCP or
+  interactive browser. Prefer the eligible system default browser; do not
+  assume Chrome.
+- Rendered browser discovery is the primary website evidence for dynamic,
+  form, checkout, account, and interaction journeys. Static HTML, sitemap, and
+  robots discovery are supporting evidence only and can never turn a partial
+  or blocked rendered investigation into complete coverage.
+- Unless the user opts out, use safe synthetic information to investigate
+  public signup and authenticated journeys. Do not invent gated pages,
+  capabilities, values, or triggers when access cannot be completed.
+- A blocked journey remains an explicit gap. Keep applicable official or
+  governed recurrent scenario events as visible recommendations when they
+  answer a real need, with precise confirmation dependencies. Browser blockage
+  is not evidence that a business capability is inapplicable.
+- Discovery tools must report `completed`, `partial`, or `blocked`. A partial
+  or blocked outcome stops a claim of complete live coverage and must be told
+  to the user.
+- Design events before final screenshot capture. When screenshots are
+  requested, attempt Playwright MCP unless the requester supplied final files.
+  Use one representative screenshot for repetitive generic events and all
+  materially different visible scenarios for finite interactions. Prefer a
+  1920 x 1080 source and render a readable 480 x 270 preview. Add no overlay
+  text; use only a bold red rectangle around the relevant interaction or state.
+  If capture is impossible, mark it `blocked` and state the reason in the
+  workbook and delivery reply.
 
-- Recommended events: https://developers.google.com/analytics/devguides/collection/ga4/reference/events
-- Ecommerce: https://developers.google.com/analytics/devguides/collection/ga4/ecommerce
-- Item parameters: https://developers.google.com/analytics/devguides/collection/ga4/item-scoped-ecommerce
-- Event naming: https://support.google.com/analytics/answer/13316687
-- GTM dataLayer: https://developers.google.com/tag-platform/tag-manager/datalayer
-- GA4 User-ID: https://developers.google.com/analytics/devguides/collection/ga4/user-id
-- GA4 user properties: https://developers.google.com/analytics/devguides/collection/protocol/ga4/user-properties
-- Consent mode: https://developers.google.com/tag-platform/security/guides/consent
-- PII policy: https://support.google.com/analytics/answer/6366371
-- Playwright browsers: https://playwright.dev/docs/browsers
-- Playwright MCP: https://playwright.dev/docs/getting-started-mcp
-- Universal Analytics sunset: https://support.google.com/analytics/answer/11583528
+## Template Rules
 
-Bundled catalogs are lookup aids. If live documentation cannot be checked,
-mark official verification unavailable instead of claiming it was performed.
+- A supplied workbook is a design and information contract, not inspiration.
+  Inventory it before writing. Default to `strict_client_template`, bind the
+  mapping to the source SHA-256, and write only declared cells.
+- Preserve every unmapped value, sheet, order, state, dimension, style, merge,
+  formula, validation, conditional format, comment, link, image, print setting,
+  protection setting, and workbook property.
+- Do not add tabs, columns, rows, or redesigned sections without explicit
+  structural approval. Whole-sheet replacement is not strict adaptation.
+- If the approved backend cannot preserve a workbook feature, stop with the
+  inventory and conflict. Do not silently switch editors or generate an
+  approximate template.
+
+## DataLayer Contract
+
+- The structured plan has one implementation source of truth: event parameter
+  bindings plus the dataLayer example. Do not store a second GA4 payload or
+  ecommerce profile snapshot.
+- For manual events, put the final GA4 event name in the top-level `event`
+  string. Put reusable page context in `page`, ordinary event data in
+  `event_data`, ecommerce data in `ecommerce`, and connected-user state in
+  `user`. Inner keys match final GA4 parameter or user-property names.
+- A page/core context push may omit `event` to avoid a duplicate Custom Event
+  trigger. Mark it `core_context_before_cmp_ready`. Mark every other manual
+  event `after_cmp_ready`.
+- Provide one complete developer-readable dataLayer example for every manual
+  event and an explicit native/no-manual-push decision where GA4 collects the
+  event automatically.
 
 ## Workflow
 
-1. Confirm scope, template, execution mode, URLs, journeys, output format, and
-   implementation assumptions.
-2. Inspect browser readiness and actively discover Playwright MCP, then map
-   public and authenticated website coverage using
-   `references/03-rules/analysis-website-coverage.md`.
-3. Build the measurement brief: business goal, analysis questions, actions,
-   success signals, constraints, evidence, and confidence.
-4. Select the applicable scenario, archetype, ecommerce, privacy, and custom-
-   event rules from `references/03-rules/`.
-5. Define journey-level event families, access context, excluded event
-   families, and the intended analysis use before writing event rows.
-6. Choose GA4 official-first events and record official verification. Explain
-   every custom event through the custom-event acceptance decision.
-7. Design reusable parameters with value rules, reporting purpose,
-   availability, owner, custom-definition need, privacy, and cardinality.
-8. Specify the dataLayer push and GA4 payload needed by developers. Keep the
-   pushed `event` value and GA4 event name aligned. Provide one complete,
-   human-readable implementation example per event and use Google's official
-   `event + ecommerce + items` GTM structure for ecommerce.
-9. After event design, inventory representative or all-material-scenario
-   screenshot coverage, attempt capture, and map each row explicitly to event
-   and scenario IDs. Never guess evidence from filenames. If capture is blocked,
-   write the visible delivery notice before generating or returning the workbook.
-10. Validate the structured JSON, generate the workbook and optional CSV, and
-    apply the completion gates.
+1. Confirm scope, template, journeys, language, screenshots, output, and known
+   implementation constraints.
+2. If a client workbook exists, inspect it and define the allowed write surface
+   before designing the delivery.
+3. Inspect browser readiness; investigate public, interactive, signup, and
+   authenticated journeys. Record evidence and incomplete boundaries.
+4. Build the measurement brief and journey model. Select the applicable
+   scenario and policy references.
+5. Decide official-first events, custom-event exceptions, ecommerce branches,
+   exclusions, and recommendation evidence.
+6. Select event-specific parameters, ownership, privacy handling, and finite
+   value domains. Write precise definitions and triggers.
+7. Specify canonical dataLayer examples and CMP timing. Reconcile every
+   selected binding with the example.
+8. Capture or explicitly block requested screenshots after event design.
+9. Produce a live official-source receipt, resolve official semantics into a
+   new JSON artifact, and validate that exact artifact.
+10. Render the validated artifact without semantic mutation. Use the default
+    workbook or the strict mapped client template, then verify human
+    readability and template fidelity.
+
+The mandatory publication sequence is:
+
+```powershell
+python scripts/check_official_catalog.py --plan draft-plan.json --receipt official-source-receipt.json
+python scripts/resolve_tracking_plan.py draft-plan.json --receipt official-source-receipt.json --output resolved-plan.json
+python scripts/validate_tracking_plan.py resolved-plan.json
+python scripts/generate_tracking_plan_workbook.py resolved-plan.json --output tracking-plan.xlsx
+```
+
+The receipt must come from live Google sources on the plan publication date,
+cover every official URL referenced by the plan, match the bundled catalog,
+bind both the checked draft and resolved artifact hashes, and contain no check
+errors. Offline checks are maintenance-only. The renderer must never enrich,
+rewrite, or repair the validated plan.
 
 ## Resource Routing
 
-| Need | Read/use |
+| Need | Resource |
 | --- | --- |
-| Purpose, users, inputs, outputs, acceptance, non-goals | `references/01-skill/` |
-| Canonical sequence and delivery gates | `references/03-rules/execution-contract.md`, `references/03-rules/completion-gates.md` |
-| Validation and generation commands | `references/02-commands/` |
-| Business model, archetypes, coherence | `references/03-rules/analysis-business-scenarios.md`, `references/03-rules/analysis-website-archetypes.md`, `references/03-rules/analysis-measurement-coherence.md` |
-| Whole-site coverage | `references/03-rules/analysis-website-coverage.md` |
-| Event choice and custom-event judgement | `references/03-rules/library-ga4-event-scenarios.json`, `references/03-rules/library-ga4-recommended-events.json`, `references/03-rules/decision-custom-events.md` |
+| Product vision and boundaries | `references/01-skill/` |
+| Commands | `references/02-commands/` |
+| Canonical workflow and gates | `references/03-rules/execution-contract.md`, `references/03-rules/completion-gates.md` |
+| Website and business analysis | `references/03-rules/analysis-website-coverage.md`, `references/03-rules/analysis-measurement-coherence.md`, `references/03-rules/analysis-business-scenarios.md` |
+| Official event and parameter knowledge | `references/03-rules/library-ga4-recommended-events.json`, `references/03-rules/library-ga4-event-scenarios.json`, `references/03-rules/library-parameters.json` |
 | Ecommerce | `references/03-rules/scenario-ecommerce.md`, `references/03-rules/policy-ga4-ecommerce-parameters.md` |
-| Lead, search, account, support, SPA | Matching `references/03-rules/scenario-*.md` file |
-| Subscription, publisher, booking, donation, SaaS, multi-market | Matching `references/03-rules/scenario-*.md` file |
-| Parameters, privacy, connected users, platform boundaries | `references/03-rules/library-parameters.json`, `references/03-rules/policy-data-quality-privacy.md`, `references/03-rules/policy-authenticated-user-context.md`, `references/03-rules/policy-ga4-boundaries.md` |
-| Historical examples | `references/03-rules/review-official-first.md`, `references/03-rules/review-example-comparison.md`, `references/03-rules/review-corpus-learning-policy.md` |
+| Custom-event judgement | `references/03-rules/decision-custom-events.md` |
+| Language and values | `references/03-rules/policy-language-and-values.md` |
+| DataLayer and connected users | `references/03-rules/policy-datalayer-contract.md`, `references/03-rules/policy-authenticated-user-context.md` |
+| Privacy and boundaries | `references/03-rules/policy-data-quality-privacy.md`, `references/03-rules/policy-ga4-boundaries.md` |
+| Scenario-specific judgement | matching `references/03-rules/scenario-*.md` file |
 | Structured contract | `references/03-rules/schema-tracking-plan.json`, `references/03-rules/example-ga4-tracking-plan.json` |
 
-Use the bundled scripts for deterministic work:
+## Human Deliverable
 
-- `init_tracking_plan.py`: focused JSON scaffold with an explicit screenshot gate;
-- `validate_tracking_plan.py`: schema and analyst-rule validation;
-- `generate_tracking_plan_workbook.py`: human XLSX generation;
-- `export_tracking_plan_csv.py`: long-format review export;
-- `diff_tracking_plans.py`: event, parameter, and evidence comparison;
-- `discover_site_journeys.py`: static coverage support;
-- `discover_site_journeys_playwright.py`: rendered-DOM coverage support;
-- `inspect_browser_environment.py`: default-browser and Playwright preflight;
-- `annotate_screenshot.py`: interaction callouts;
-- `check_official_catalog.py`: GA4 catalog freshness;
-- `inspect_tracking_plan_template.py`: client workbook structure inventory;
-- `adapt_tracking_plan_workbook.py`: validated plan rendering into mapped client sheets;
-- `migrate_tracking_plan.py`: v1 to GA4-only v2 contract migration.
+Without a client template, generate `00 Overview`, `01 GTM Protocol`,
+`02 Parameter Reference`, `03 Event Matrix`, and `04 DataLayer Examples`.
+Add `05 Screenshot Register` only when screenshots are requested. Event Matrix
+is the main working tab. Keep internal reasoning, agent instructions, duplicate
+machine state, and runtime QA cases out of visible tabs.
 
-## Workbook Contract
-
-Use `generate_tracking_plan_workbook.py` as the single source of truth when no
-client template is supplied.
-Keep six human-facing tabs:
-
-- `00 Overview`: document details, navigation, and version history only;
-- `01 GTM Protocol`: shared GTM/dataLayer rules and official links;
-- `02 Parameter Reference`: variable names, display names, definitions, value
-  rules, examples, availability, ownership, and GA4 registration need;
-- `03 Event Matrix`: the main plan, grouped by journey and compatible event
-  family, with one event per slot and one parameter path per row;
-- `04 DataLayer Examples`: one complete developer example per event, including
-  GTM trigger, GA4 mapping, reset requirements, and no-manual-push decisions;
-- `05 Screenshot Register`: explicit page or interaction evidence linked to
-  events, with standardized embedded previews where files are available.
-
-Do not add audience summaries, template provenance, internal rationale, QA
-case IDs, screenshot IDs, agent instructions, or runtime test scaffolding to
-visible workbook tabs.
-
-For screenshots, use one explicit shared-evidence row only when one visible
-state genuinely supports several events. Use precise crop and rectangle
-coordinates when needed. Do not place labels or captions inside images. A gated
-or otherwise unavailable capture is `blocked` only after the actual attempt;
-the Screenshot Register and final response must state the concrete reason. No
-corresponding gated event may remain inferred in the plan.
-
-When adapting a client workbook, preserve agreed sheet names, columns, colors,
-frozen panes, and protected areas as far as practical while retaining GA4
-measurement correctness. Inspect the workbook first. Do not replace mapped
-sheets containing formulas, protection, tables, validations, comments, or
-images unless the analyst explicitly approves destructive overwrite.
+Stop after creation or review of the tracking plan. Do not implement GTM,
+publish tags, audit a container, or execute Preview/network recette under this
+skill.

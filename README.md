@@ -4,13 +4,15 @@
 
 [![Validate skill](https://github.com/haiqigeng/ga4-tracking-plan/actions/workflows/validate-skill.yml/badge.svg)](https://github.com/haiqigeng/ga4-tracking-plan/actions/workflows/validate-skill.yml)
 
-A reusable web-analyst skill for creating and reviewing human-readable GA4
-tracking plans.
+A reusable web-analyst skill for creating and reviewing accurate, useful, and
+implementation-ready GA4 tracking plans. Tracking-plan quality is the product;
+XLSX is one human delivery format.
 
 It starts from the website, business goals, journeys, expected actions, and
-analysis needs. It then selects appropriate GA4 events, defines useful
-parameters, states what data is available, and produces an XLSX plan that a web
-analyst or developer can use.
+analysis needs. It then selects appropriate GA4 events, keeps only justified
+parameters without dropping mandatory fields, grounds definitions in the exact
+Google documentation sections, and produces a plan that analysts and developers
+can act on.
 
 ## Who It Is For
 
@@ -29,37 +31,64 @@ analyst or developer can use.
 - Ecommerce events mixed with generic click tracking.
 - Whole-site plans that stop at login and omit useful customer-space services.
 - Parameters with unclear values, source, ownership, or reporting purpose.
+- Multilingual plans with translated event schemas, inconsistent market values,
+  or no explicit workbook-language decision.
+- Finite value lists inferred from labels instead of observed in the website or
+  confirmed by an authoritative client source.
+- Mandatory parameters removed in the name of simplification, or every optional
+  parameter copied without an analysis need.
+- Generic event triggers and parameter summaries that do not tell a developer
+  what the value means or when the event fires.
 - Tracking plans that invent data the website does not currently expose.
 - Journey events scattered across a workbook.
 - Unreadable templates filled with internal or agent-oriented information.
 - Screenshots guessed from filenames or reused without a clear reason.
 - Screenshot evidence silently omitted even though the plan says it was captured.
+- Client workbooks whose layout, formulas, styles, validations, or human working
+  conventions are silently replaced during adaptation.
 
 ## Procedure
 
 1. Confirm the website scope, pages, journeys, template, and naming convention.
-2. Understand the business goal, expected actions, analysis needs, and success
+2. Decide the website-language scope, workbook language, and controlled-value
+   language. Multilingual plans use English; French-only plans may use French
+   human wording and French semantic values while technical names stay English.
+3. When a client workbook exists, inventory its sheets, blocks, rows, styles,
+   formulas, validations, images, protection, and print settings before planning
+   any write.
+4. Understand the business goal, expected actions, analysis needs, and success
    signals.
-3. Actively discover an available Playwright MCP, inspect browser readiness,
+5. Actively discover an available Playwright MCP, inspect browser readiness,
    then complete public signup and authenticated customer-space journeys with
-   synthetic information. If the gated journey cannot be entered, retain a
-   coverage gap and no gated events.
-4. Select GA4 automatic, enhanced-measurement, recommended, and ecommerce
+   synthetic information. If the gated journey cannot be entered, record the
+   gap and keep only applicable official or recurrent sector outcomes as
+   clearly labelled recommendations; never claim site-specific behavior as observed.
+6. Resolve official event meanings, implementation sections, parameter rows,
+   requiredness, types, examples, and attached conditions from current Google
+   documentation.
+7. Select GA4 automatic, enhanced-measurement, recommended, and ecommerce
    events before considering custom events. Decide whether form outcomes share
    `generate_lead` or need separate success events.
-5. Exhaust finite English controlled values where practical, then define
-   parameter rules, examples, availability, data owners,
-   privacy risks, and GA4 registration needs.
-6. Specify one complete developer-readable dataLayer and GA4 mapping example
-   per event, using Google's official GTM ecommerce structure.
-7. Define connected-user state once in GTM Protocol when relevant, with GA4
+8. Include mandatory and applicable conditional parameters first. Add optional
+   or custom parameters only for a stated analysis or implementation need.
+   Requiredness, conditions, availability, and ownership are decided per event.
+9. Use the live website or authoritative client evidence to exhaust practical
+   finite values. Each finite value keeps its original label, normalized value,
+   language, mapping method, and evidence source. Dynamic values use precise rules.
+10. Specify one complete developer-readable dataLayer and GA4 mapping example
+   per event, using the project's `page`, `event_data`, `ecommerce`, and `user`
+   wrappers. Native page/core context omits a Custom Event trigger and may
+   precede CMP readiness; every other manual
+   event follows CMP readiness.
+11. Define connected-user state once in GTM Protocol when relevant, with GA4
    User-ID and user-property mappings kept separate from event payloads.
-8. After event design, attempt screenshot capture with Playwright MCP: one
+12. After event design, attempt screenshot capture with Playwright MCP: one
    representative image for repetitive generic events and all materially
    different scenarios for finite events.
-9. If capture is blocked or partial, show the reason in Screenshot Register and
+13. If capture is blocked or partial, show the reason in Screenshot Register and
    tell the reviewer before returning the workbook.
-10. Generate and validate the XLSX tracking plan.
+14. Validate semantic quality and, for a client template, prove that only
+    approved cells changed before returning the workbook.
 
 For ecommerce customer spaces, the skill considers meaningful order, return,
 cancellation, profile, preference, and reorder outcomes. It keeps confirmed
@@ -76,23 +105,26 @@ The skill can use:
 - screenshots, navigation, sitemap, or browser evidence;
 - known GTM, dataLayer, CMS, ecommerce, SPA, or consent context.
 
-When information is missing, the skill makes conservative assumptions, marks
-them as inferred, and states what must be confirmed.
+When information is missing, the skill preserves it as unknown or as a clearly
+labelled recommendation with a confirmation owner. It does not invent website
+languages, finite values, gated capabilities, or observed journey coverage.
 
 ## Outputs
 
-The main output is an XLSX workbook with six tabs:
+Without a client template, the main output is an XLSX workbook with five core tabs:
 
 - `00 Overview`: document details, navigation, and version history;
 - `01 GTM Protocol`: shared GTM/dataLayer rules and official links;
-- `02 Parameter Reference`: definitions, values, availability, owners, and GA4
-  registration needs;
+- `02 Parameter Reference`: definitions, values, event-specific availability,
+  owners, and GA4 registration needs;
 - `03 Event Matrix`: the main tracking plan grouped by journey;
 - `04 DataLayer Examples`: complete per-event GTM implementation examples;
-- `05 Screenshot Register`: explicit page and interaction evidence, with a
-  visible capture notice when screenshots are incomplete or unavailable.
+- `05 Screenshot Register` when screenshots are requested: explicit page and
+  interaction evidence, with a visible notice when capture is incomplete.
 
-The skill can also produce validated JSON and a long-format CSV. Machine fields
+With a client template, its information scope, sheet order, layout, styles,
+formulas, validations, merges, images, and print setup remain the contract. The
+skill can also produce validated JSON and a long-format CSV. Machine fields
 remain outside the human Event Matrix.
 
 ## Non-Goals
@@ -117,6 +149,8 @@ This skill does not:
   the GA4 contract.
 - `skill/scripts/`: installed runtime tools.
 - `scripts/`: repository wrappers and release maintenance.
+- `maintenance/`: migrations, corpus review, catalog upkeep, and fresh-agent
+  evaluation assets that are not installed with the runtime skill.
 - `tests/`: unit and integration regression tests.
 
 The three reference branches follow the same convention used by the companion
@@ -159,42 +193,54 @@ Edge through `msedge`, and reports when another browser build is needed.
 Create a focused initial JSON draft:
 
 ```powershell
-python scripts/init_tracking_plan.py https://www.example.com/ --journey-name "Initial journey" --output plan.json
+python scripts/init_tracking_plan.py https://www.example.com/ --journey-name "Initial journey" --site-language fr --workbook-language fr --output plan.json
 ```
 
-The default draft keeps the Playwright MCP screenshot gate unresolved. Use
+The default draft keeps live browser discovery unresolved, independently of
+the screenshot choice. Repeat
+`--site-language` for multilingual sites; multilingual output is normalized to
+English. Use
 `--screenshots not_requested` only when the requester explicitly excludes
 screenshots.
 
-Validate a plan:
+Create a live official-source receipt, resolve official wording into a new
+artifact, then validate that exact artifact:
 
 ```powershell
-python scripts/validate_tracking_plan.py plan.json
+python scripts/check_official_catalog.py --plan draft-plan.json --receipt official-source-receipt.json
+python scripts/resolve_tracking_plan.py draft-plan.json --receipt official-source-receipt.json --output resolved-plan.json
+python scripts/validate_tracking_plan.py resolved-plan.json
 ```
 
-Generate the XLSX:
+Generate the XLSX from the validated resolved plan:
 
 ```powershell
-python scripts/generate_tracking_plan_workbook.py plan.json --output plan.xlsx
+python scripts/generate_tracking_plan_workbook.py resolved-plan.json --output plan.xlsx
 ```
+
+The receipt must come from live Google sources on the publication date, cover
+every official URL used by the plan, match the bundled catalog, and bind both
+the checked draft and resolved plan hashes. The renderer never enriches or
+repairs the plan after validation.
 
 Inspect and use a client workbook template:
 
 ```powershell
 python scripts/inspect_tracking_plan_template.py client-template.xlsx --output template-inventory.json
-python scripts/adapt_tracking_plan_workbook.py plan.json client-template.xlsx --mapping sheet-mapping.json --output plan.xlsx
+python scripts/adapt_tracking_plan_workbook.py resolved-plan.json client-template.xlsx --mapping strict-cell-mapping.json --output plan.xlsx --fidelity-report template-fidelity.json
 ```
 
-Adaptation stops before replacing a mapped sheet that contains formulas,
-protection, tables, data validations, comments, or images. Prefer mapping to a
-new sheet or using an approved cleaned copy. The explicit
-`--allow-destructive-template-overwrite` option is reserved for documented
-analyst approval.
+Strict adaptation writes only explicitly mapped cells and then compares the
+saved workbook with the exact SHA-bound source template. The fidelity report
+records template, mapping, and output hashes; any unexpected change blocks delivery.
+Templates containing features the editing backend cannot guarantee to preserve
+are blocked instead of being called strictly adapted. Whole-sheet replacement
+and legacy string mappings are unsupported.
 
 Use explicit screenshots stored beside the plan:
 
 ```powershell
-python scripts/generate_tracking_plan_workbook.py plan.json --output plan.xlsx --screenshot-dir screenshots
+python scripts/generate_tracking_plan_workbook.py resolved-plan.json --output plan.xlsx --screenshot-dir screenshots
 ```
 
 Use 1920 x 1080 viewport sources where practical. XLSX previews are 480 x 270
@@ -217,15 +263,17 @@ python scripts/diff_tracking_plans.py plan-v1.json plan-v2.json
 Migrate an older contract:
 
 ```powershell
-python scripts/migrate_tracking_plan.py old-plan.json --output plan-v2.json
+python scripts/migrate_tracking_plan.py old-plan.json --output plan-v3.json
 ```
 
-Check official catalog metadata or live drift:
+Check official catalog metadata without authorizing a delivery:
 
 ```powershell
 python scripts/check_official_catalog.py --offline
-python scripts/check_official_catalog.py
 ```
+
+Offline mode is maintenance-only. A deliverable uses the receipt-bound live
+command shown above; initial scaffolds remain blocked until that step succeeds.
 
 Check whether the installed skill matches the repository:
 
@@ -239,28 +287,20 @@ Before release:
 
 ```powershell
 ruff check .
-python -m compileall -q scripts skill/scripts tests
+python -m compileall -q scripts skill/scripts maintenance/scripts tests
 python -m unittest discover -s tests
-python -m coverage run --source=skill/scripts -m unittest discover -s tests
-python -m coverage report --include="skill/scripts/validate_tracking_plan.py" --fail-under=90
-python -m coverage report --include="skill/scripts/ecommerce_matrix.py" --fail-under=95
-python -m coverage report --include="skill/scripts/adapt_tracking_plan_workbook.py" --fail-under=90
-python -m coverage report --include="skill/scripts/inspect_tracking_plan_template.py" --fail-under=90
-python -m coverage report --include="skill/scripts/init_tracking_plan.py" --fail-under=90
-python -m coverage report --include="skill/scripts/tracking_plan_workbook_layout.py" --fail-under=85
-python -m coverage report --include="skill/scripts/validate_tracking_plan.py,skill/scripts/tracking_plan_validation_*.py,skill/scripts/ecommerce_matrix.py,skill/scripts/official_ga4_catalog.py,skill/scripts/generate_tracking_plan_workbook.py,skill/scripts/tracking_plan_workbook_layout.py,skill/scripts/adapt_tracking_plan_workbook.py,skill/scripts/inspect_tracking_plan_template.py,skill/scripts/init_tracking_plan.py" --fail-under=88
-python -m coverage report --include="skill/scripts/browser_environment.py,skill/scripts/discover_site_journeys_playwright.py" --fail-under=70
-python scripts/validate_fresh_agent_evals.py
-python scripts/check_official_catalog.py --offline
 python scripts/validate_package.py
 git diff --check
 ```
 
-The GitHub workflows run the package on Windows and Ubuntu. The reusable
-fresh-agent suite covers ecommerce, lead-model judgement, protected client
-templates, screenshot failure, and multilingual navigation. A scheduled
-workflow checks whether the official GA4 recommended-event page has drifted
-from the bundled catalog.
+The GitHub workflows run the package on Windows and Ubuntu. CI validates the
+fresh-agent case manifest but does not claim that an agent was executed. Real
+fresh-agent results are a separate manual release gate. The cases cover
+ecommerce, lead-model judgement, strict client templates, screenshot failure,
+multilingual navigation, French localization, blocked authenticated discovery,
+official wording, and parameter selection. A scheduled workflow checks event
+and parameter semantics, not only names, against the official GA4 recommended,
+ecommerce, automatic, and enhanced-measurement pages.
 
 ## Privacy And Safety
 
@@ -271,8 +311,9 @@ values only.
 
 ## Versioning
 
-The GA4-only v2 contract is a breaking change from earlier multi-platform
-drafts. Schema `2.4.0` permits only final screenshot evidence states and uses
-the generated workbook as the default template source. Future minor releases
-add compatible analyst or scenario improvements; patch releases fix
-documentation, validation, or rendering defects.
+The GA4-only v3 contract is a breaking change from v2. Schema `3.0.0` adds
+event-specific parameter requiredness and availability, reusable multi-journey
+events, evidence-bearing finite values, a normalized official-source registry,
+conditional screenshot sheets, and artifact-bound client-template fidelity.
+Future minor releases add compatible analyst or scenario improvements; patch
+releases fix documentation, validation, or rendering defects.

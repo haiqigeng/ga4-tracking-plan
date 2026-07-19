@@ -234,6 +234,16 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def discovery_outcome(pages: list[dict], errors: list[SourceError]) -> tuple[str, int, str]:
+    usable = sum(not page.get("fetch_error") for page in pages)
+    root_failed = bool(pages and pages[0].get("fetch_error"))
+    if usable == 0:
+        return "blocked", usable, "Static discovery produced no usable page evidence."
+    if errors or root_failed:
+        return "partial", usable, "Static discovery is partial; inspect source_errors before using any evidence."
+    return "completed", usable, "Static discovery completed as supporting evidence only."
+
+
 def main() -> int:
     args = parse_args()
     root_url = canonical_url(args.url if "://" in args.url else f"https://{args.url}")
@@ -258,10 +268,15 @@ def main() -> int:
             errors.append(SourceError("page", url, str(page["fetch_error"])))
         if len(pages) >= args.limit:
             break
+    outcome, usable_page_count, delivery_notice = discovery_outcome(pages, errors)
     output = {
         "root_url": root_url,
         "generated_by": "discover_site_journeys.py",
         "crawl_mode": "static_html",
+        "outcome": outcome,
+        "attempted_page_count": len(pages),
+        "usable_page_count": usable_page_count,
+        "delivery_notice": delivery_notice,
         "sources_checked": [
             {"source_type": "robots_txt", "source_ref": robots_url, "used_for": "sitemap discovery"},
             *[
@@ -274,14 +289,14 @@ def main() -> int:
         "pages_sampled": pages,
         "journeys_discovered": summarize_journeys(pages),
         "notes": [
-            "This helper is a first-pass discovery aid, not a full Playwright crawl.",
+            "Static discovery is supporting evidence and never satisfies the live-rendered exploration gate.",
             "Use browser or Playwright exploration for dynamic menus, checkout, account, forms, filters, and SPA routes.",
         ],
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
     print(args.output)
-    return 0
+    return 0 if outcome == "completed" else 1
 
 
 if __name__ == "__main__":

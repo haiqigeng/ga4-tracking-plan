@@ -26,7 +26,7 @@ jobs:
       - name: Validate package
         run: |
           ruff check .
-          python -m compileall -q scripts skill/scripts tests
+          python -m compileall -q scripts skill/scripts maintenance/scripts tests
           python -m coverage run --source=skill/scripts -m unittest discover -s tests
           python -m coverage report --include="skill/scripts/validate_tracking_plan.py" --fail-under=90
           python -m coverage report --include="skill/scripts/ecommerce_matrix.py" --fail-under=95
@@ -34,8 +34,10 @@ jobs:
           python -m coverage report --include="skill/scripts/inspect_tracking_plan_template.py" --fail-under=90
           python -m coverage report --include="skill/scripts/init_tracking_plan.py" --fail-under=90
           python -m coverage report --include="skill/scripts/tracking_plan_workbook_layout.py" --fail-under=85
+          python -m coverage report --include="skill/scripts/tracking_plan_validation_quality.py,skill/scripts/official_ga4_catalog.py" --fail-under=90
+          python -m coverage report --include="skill/scripts/official_source_receipt.py,skill/scripts/resolve_tracking_plan.py" --fail-under=85
           python -m coverage report --include="skill/scripts/validate_tracking_plan.py,skill/scripts/tracking_plan_validation_*.py,skill/scripts/ecommerce_matrix.py,skill/scripts/official_ga4_catalog.py,skill/scripts/generate_tracking_plan_workbook.py,skill/scripts/tracking_plan_workbook_layout.py,skill/scripts/adapt_tracking_plan_workbook.py,skill/scripts/inspect_tracking_plan_template.py,skill/scripts/init_tracking_plan.py" --fail-under=88
           python -m coverage report --include="skill/scripts/browser_environment.py,skill/scripts/discover_site_journeys_playwright.py" --fail-under=70
-          python scripts/validate_fresh_agent_evals.py
+          python scripts/validate_eval_manifest.py
           python scripts/check_official_catalog.py --offline
           python scripts/validate_package.py

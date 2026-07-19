@@ -3,51 +3,89 @@
 Use this workflow for the analyst-facing XLSX deliverable.
 
 1. Create or migrate the GA4-only structured plan.
-2. When a client template exists, inspect its sheets, headers, formulas,
-   formatting, and protected structure before deciding the mapping.
-3. Validate the JSON.
-4. Confirm journey grouping, event consolidation, parameter availability, and
-   ecommerce isolation.
-5. Confirm every event has a complete dataLayer example or an explicit
-   no-manual-push decision and that GTM paths map to final GA4 parameters.
-6. After the event model is final, assign screenshot coverage: one
+2. Decide the workbook and controlled-value languages from the client template,
+   website language scope, selector, locale routes, and market structure.
+3. When a client template exists, inspect its complete workbook surface before
+   deciding the mapping: sheets, states, dimensions, merges, styles, formulas,
+   tables, filters, validations, conditional formatting, comments, links,
+   images, print setup, protection, named ranges, and unsupported OOXML parts.
+4. Resolve every official event definition and parameter row from current
+   Google documentation, including attached conditions and source locators.
+   Produce a live source receipt for the exact draft and resolve a new JSON
+   artifact.
+5. Validate the resolved artifact. Rendering must not enrich or repair it.
+6. Confirm journey grouping, event consolidation, parameter availability, and
+   ecommerce isolation. Start with mandatory and applicable conditional
+   parameters; include optional parameters only for explicit analysis needs.
+7. Use browser or client evidence to exhaust practical finite values and record
+   their provenance. Use precise rules for dynamic domains.
+8. Confirm every event has a complete dataLayer example or an explicit
+   no-manual-push decision and that GTM paths map to final GA4 parameters. Do
+   not keep a duplicate GA4 payload or ecommerce profile in the plan.
+9. Confirm page/core context uses `core_context_before_cmp_ready`, every other
+   manual event uses `after_cmp_ready`, and page/user context is complete.
+10. After the event model is final, assign screenshot coverage: one
    representative scenario for repetitive generic events, or every materially
    different visible scenario for finite events.
-7. When screenshots are required, actively discover and attempt Playwright MCP
+11. When screenshots are required, actively discover and attempt Playwright MCP
    before using a fallback browser. Only bypass that attempt when final image files
    were supplied by the requester or screenshots were explicitly excluded.
-8. Capture 1920 x 1080 viewport evidence where practical. Use no labels or
+   This screenshot choice never waives required live browser journey discovery.
+12. Capture 1920 x 1080 viewport evidence where practical. Use no labels or
    captions inside images; add only a bold red rectangle around an interaction
    area, confirmation, or error state. Page views normally need no rectangle.
-9. Record the `screenshot_capture` outcome. For blocked or partial capture,
+13. Record the `screenshot_capture` outcome. For blocked or partial capture,
    write a concise notice that will appear at the top of Screenshot Register and
    repeat it in the delivery response. Use `blocked`, never an unresolved final
    status, when required evidence cannot be captured.
-10. Put screenshot files in a `screenshots` folder beside the JSON, or pass a
+14. Put screenshot files in a `screenshots` folder beside the JSON, or pass a
    folder explicitly.
-11. Generate the default or mapped client workbook. The generator rejects a
-    row marked captured when its image file is missing.
-12. Review every 480 x 270 preview at normal spreadsheet zoom.
+15. Generate the default workbook from the validated resolved JSON, or apply an
+    artifact-bound strict client-template cell write map. The generator rejects
+    a row marked captured when its image file is missing.
+16. For strict templates, compare the saved result with the source and allow
+    only the mapped cell-value changes. Deliver the fidelity report with source,
+    mapping, and output hashes. Any other difference blocks delivery.
+17. Review every 480 x 270 preview at normal spreadsheet zoom.
 
 ```powershell
-python scripts/generate_tracking_plan_workbook.py plan.json --output plan.xlsx
-python scripts/generate_tracking_plan_workbook.py plan.json --output plan.xlsx --screenshot-dir screenshots
+python scripts/check_official_catalog.py --plan draft-plan.json --receipt official-source-receipt.json
+python scripts/resolve_tracking_plan.py draft-plan.json --receipt official-source-receipt.json --output resolved-plan.json
+python scripts/validate_tracking_plan.py resolved-plan.json
+python scripts/generate_tracking_plan_workbook.py resolved-plan.json --output plan.xlsx
+python scripts/generate_tracking_plan_workbook.py resolved-plan.json --output plan.xlsx --screenshot-dir screenshots
 ```
 
 Inspect and adapt a client template:
 
 ```powershell
 python scripts/inspect_tracking_plan_template.py client-template.xlsx --output template-inventory.json
-python scripts/adapt_tracking_plan_workbook.py plan.json client-template.xlsx --mapping sheet-mapping.json --output plan.xlsx
+python scripts/adapt_tracking_plan_workbook.py resolved-plan.json client-template.xlsx --mapping sheet-mapping.json --output plan.xlsx
 ```
 
-The optional mapping is a JSON object whose keys are canonical sheet names and
-whose values are client sheet names. Unmapped client-owned sheets are retained.
-Mapped sheets containing formulas, protection, tables, data validations,
-comments, or images are blocked from replacement by default. Prefer a new
-mapped sheet or an approved cleaned copy. Use
-`--allow-destructive-template-overwrite` only after explicit analyst approval,
-then review the adapted workbook for structure and content loss.
+For final client delivery, use a strict mapping with explicit writes:
+
+```json
+{
+  "mode": "strict_client_template",
+  "mapping_id": "client_tracking_plan_v1",
+  "template_sha256": "<sha256 from template inventory>",
+  "cell_writes": [
+    {"sheet": "Overview", "cell": "B4", "value_path": "$.document.version"},
+    {"sheet": "Events", "cell": "V10", "value_path": "$.events[0].event_name"}
+  ]
+}
+```
+
+Strict mode does not create or replace sheets and preserves all formatting and
+workbook features outside the write map. Use literal `value` only when the
+content is intentionally derived during template mapping. A write that would
+replace a formula requires explicit cell-level approval.
+
+Whole-sheet replacement and legacy string-to-string mappings are unsupported.
+When the client explicitly approves new structure, use
+`approved_structural_extension` with a declared source-sheet clone, target
+sheet, approval reason, and mapped writes; the extension fidelity report must pass.
 
 Use `scripts/annotate_screenshot.py` when an interaction target needs a red
 rectangle. The utility does not add text. Store crop and annotation coordinates
@@ -70,8 +108,13 @@ parameter value.
 
 - Keep the Overview limited to document details, navigation, and version history.
 - Keep official links and implementation rules in GTM Protocol.
+- Localize fixed human labels to French when `workbook_language` is `fr`, while
+  keeping sheet names and technical event/parameter identifiers stable.
 - Use human labels, value rules, availability, and owners in Parameter Reference.
+- Use official definitions and attached conditions for official parameters;
+  use equally concrete business definitions for custom parameters.
 - Keep Event Matrix as the main working tab and group related journeys.
+- Keep event summaries separate from precise website-specific triggers.
 - Keep complete per-event implementation examples in DataLayer Examples rather
   than expanding Event Matrix cells into long code blocks.
 - Keep screenshot rows concise and link them explicitly to events.

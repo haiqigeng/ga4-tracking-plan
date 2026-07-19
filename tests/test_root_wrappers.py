@@ -16,7 +16,6 @@ WRAPPERS = [
     "init_tracking_plan.py",
     "inspect_tracking_plan_template.py",
     "inspect_browser_environment.py",
-    "migrate_tracking_plan.py",
     "validate_tracking_plan.py",
 ]
 
@@ -28,6 +27,10 @@ class RootWrapperTests(unittest.TestCase):
             with self.subTest(wrapper=wrapper):
                 self.assertIn("from _run_skill_script import run", text)
                 self.assertIn("run(__file__)", text)
+
+    def test_migration_wrapper_targets_repository_maintenance_tool(self) -> None:
+        text = (ROOT / "scripts" / "migrate_tracking_plan.py").read_text(encoding="utf-8")
+        self.assertIn('"maintenance" / "scripts" / "migrate_tracking_plan.py"', text)
 
 
 if __name__ == "__main__":

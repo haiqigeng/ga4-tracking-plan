@@ -2,179 +2,316 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any
 
-from generate_tracking_plan_workbook import build_workbook
-from inspect_tracking_plan_template import destructive_overwrite_hazards
-from openpyxl import load_workbook
-from openpyxl.formatting.formatting import ConditionalFormattingList
+from inspect_tracking_plan_template import (
+    compare_workbook_extension_fidelity,
+    compare_workbook_fidelity,
+    file_sha256,
+    load_client_workbook,
+    unsupported_strict_package_parts,
+)
+from openpyxl.cell.cell import MergedCell
 from validate_tracking_plan import render_text, validate_plan_data
+
+STRICT_TEMPLATE_MODE = "strict_client_template"
+EXTENSION_TEMPLATE_MODE = "approved_structural_extension"
+TEMPLATE_MODES = {STRICT_TEMPLATE_MODE, EXTENSION_TEMPLATE_MODE}
+MAPPING_KEYS = {
+    "mode",
+    "mapping_id",
+    "template_sha256",
+    "cell_writes",
+    "sheet_clones",
+    "notes",
+}
+WRITE_KEYS = {
+    "sheet",
+    "cell",
+    "value",
+    "value_path",
+    "transform",
+    "allow_formula_overwrite",
+    "purpose",
+}
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Render a GA4 tracking plan into mapped client workbook sheets.")
+    parser = argparse.ArgumentParser(
+        description="Apply an explicit cell-level GA4 tracking-plan mapping to a client workbook."
+    )
     parser.add_argument("plan", type=Path, help="Validated tracking-plan JSON.")
     parser.add_argument("template", type=Path, help="Client XLSX template.")
     parser.add_argument("--output", "-o", type=Path, required=True, help="Adapted XLSX output.")
-    parser.add_argument("--mapping", type=Path, help="Optional JSON object mapping canonical sheet names to client sheet names.")
-    parser.add_argument("--screenshot-dir", type=Path, help="Optional screenshot folder.")
     parser.add_argument(
-        "--allow-destructive-template-overwrite",
-        action="store_true",
-        help="Explicitly allow replacement of mapped sheets that contain formulas, protection, tables, validations, comments, or images.",
+        "--mapping",
+        type=Path,
+        required=True,
+        help="Structured strict or explicitly approved-extension mapping JSON.",
+    )
+    parser.add_argument(
+        "--fidelity-report",
+        type=Path,
+        help="JSON fidelity report. Defaults beside the output workbook.",
     )
     return parser.parse_args()
 
 
-def load_mapping(path: Path | None) -> dict[str, str]:
-    if not path:
-        return {}
+def _validate_strict_write(write: Any, index: int) -> None:
+    if not isinstance(write, dict):
+        raise ValueError(f"cell_writes[{index}] must be an object.")
+    unknown = set(write) - WRITE_KEYS
+    if unknown:
+        raise ValueError(f"cell_writes[{index}] has unsupported keys: {', '.join(sorted(unknown))}.")
+    sheet = str(write.get("sheet", "")).strip()
+    coordinate = str(write.get("cell", ""))
+    if not sheet or not re.fullmatch(r"[A-Z]{1,3}[1-9][0-9]*", coordinate):
+        raise ValueError(f"cell_writes[{index}] needs a sheet and an uppercase A1 cell reference.")
+    sources = [key for key in ("value", "value_path") if key in write]
+    if len(sources) != 1:
+        raise ValueError(f"cell_writes[{index}] needs exactly one of value or value_path.")
+
+
+def _validate_sheet_clone(clone: Any, index: int) -> None:
+    if not isinstance(clone, dict):
+        raise ValueError(f"sheet_clones[{index}] must be an object.")
+    required = {"source_sheet", "target_sheet", "approved_reason"}
+    if set(clone) != required:
+        raise ValueError(
+            f"sheet_clones[{index}] must contain exactly: {', '.join(sorted(required))}."
+        )
+    source = str(clone.get("source_sheet", "")).strip()
+    target = str(clone.get("target_sheet", "")).strip()
+    reason = str(clone.get("approved_reason", "")).strip()
+    if not source or not target or source == target:
+        raise ValueError(f"sheet_clones[{index}] needs distinct source_sheet and target_sheet values.")
+    if not reason:
+        raise ValueError(f"sheet_clones[{index}].approved_reason cannot be empty.")
+
+
+def validate_mapping(mapping: dict[str, Any]) -> dict[str, Any]:
+    unknown = set(mapping) - MAPPING_KEYS
+    if unknown:
+        raise ValueError(f"Template mapping has unsupported keys: {', '.join(sorted(unknown))}.")
+    mode = mapping.get("mode")
+    if mode not in TEMPLATE_MODES:
+        raise ValueError(
+            "Template mappings must use mode='strict_client_template' or "
+            "mode='approved_structural_extension'."
+        )
+    template_hash = str(mapping.get("template_sha256", ""))
+    if not re.fullmatch(r"[a-f0-9]{64}", template_hash):
+        raise ValueError("Template mappings need the lowercase SHA-256 from the template inventory.")
+    writes = mapping.get("cell_writes")
+    if not isinstance(writes, list) or not writes:
+        raise ValueError("Client-template mappings need a non-empty cell_writes list.")
+    targets: set[tuple[str, str]] = set()
+    for index, write in enumerate(writes):
+        _validate_strict_write(write, index)
+        target = (str(write["sheet"]), str(write["cell"]))
+        if target in targets:
+            raise ValueError(f"Duplicate cell-write target: {target[0]}!{target[1]}.")
+        targets.add(target)
+
+    clones = mapping.get("sheet_clones", [])
+    if mode == STRICT_TEMPLATE_MODE and clones:
+        raise ValueError("Strict client-template mappings cannot add or clone sheets.")
+    if mode == EXTENSION_TEMPLATE_MODE and (not isinstance(clones, list) or not clones):
+        raise ValueError("Approved structural extension mappings need at least one sheet_clones entry.")
+    clone_targets: set[str] = set()
+    for index, clone in enumerate(clones):
+        _validate_sheet_clone(clone, index)
+        target = str(clone["target_sheet"])
+        if target in clone_targets:
+            raise ValueError(f"Duplicate approved clone target: {target}.")
+        clone_targets.add(target)
+    return mapping
+
+
+def load_mapping(path: Path | None) -> dict[str, Any]:
+    if path is None:
+        raise ValueError("Client-template adaptation requires an explicit mapping JSON.")
     value = json.loads(path.read_text(encoding="utf-8-sig"))
-    if not isinstance(value, dict) or not all(isinstance(key, str) and isinstance(item, str) for key, item in value.items()):
-        raise ValueError("Template mapping must be a JSON object of canonical sheet name to client sheet name.")
+    if not isinstance(value, dict):
+        raise ValueError("Template mapping must be a JSON object.")
+    return validate_mapping(value)
+
+
+def is_strict_mapping(mapping: dict[str, Any]) -> bool:
+    return mapping.get("mode") == STRICT_TEMPLATE_MODE
+
+
+def _value_at_path(value: Any, path: str) -> Any:
+    if path == "$":
+        return value
+    if not path.startswith("$."):
+        raise ValueError(f"Unsupported value_path '{path}'.")
+    current = value
+    for part in path[2:].split("."):
+        match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)(?:\[([0-9]+)\])?", part)
+        if not match:
+            raise ValueError(f"Unsupported value_path segment '{part}' in '{path}'.")
+        key, index = match.groups()
+        if not isinstance(current, dict) or key not in current:
+            raise ValueError(f"value_path '{path}' does not resolve at '{key}'.")
+        current = current[key]
+        if index is not None:
+            if not isinstance(current, list) or int(index) >= len(current):
+                raise ValueError(f"value_path '{path}' does not resolve index {index}.")
+            current = current[int(index)]
+    return current
+
+
+def _cell_value(value: Any, transform: str | None) -> Any:
+    if transform == "join_pipe":
+        if not isinstance(value, list):
+            raise ValueError("join_pipe transform requires a list value.")
+        return " | ".join(str(item) for item in value)
+    if transform == "json":
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    if transform not in {None, "string"}:
+        raise ValueError(f"Unknown mapping transform '{transform}'.")
+    if isinstance(value, list):
+        return " | ".join(str(item) for item in value)
+    if isinstance(value, dict):
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    if transform == "string" and value is not None:
+        return str(value)
     return value
 
 
-def capture_client_surface(target) -> dict:
-    return {
-        "style_coordinates": {
-            cell.coordinate
-            for row in target.iter_rows()
-            for cell in row
-            if cell.has_style
-        },
-        "widths": {key: copy.copy(value) for key, value in target.column_dimensions.items()},
-        "heights": {key: copy.copy(value) for key, value in target.row_dimensions.items()},
-        "freeze_panes": target.freeze_panes,
-        "tab_color": copy.copy(target.sheet_properties.tabColor),
-    }
+def allowed_cells(mapping: dict[str, Any]) -> dict[str, set[str]]:
+    result: dict[str, set[str]] = {}
+    for write in mapping["cell_writes"]:
+        result.setdefault(str(write["sheet"]), set()).add(str(write["cell"]))
+    return result
 
 
-def reset_sheet(target) -> None:
-    target._images = []
-    for table_name in list(target.tables.keys()):
-        del target.tables[table_name]
-    target.data_validations.dataValidation = []
-    target.conditional_formatting = ConditionalFormattingList()
-    target.protection.sheet = False
-    for merged in list(target.merged_cells.ranges):
-        target.unmerge_cells(str(merged))
-    for row in target.iter_rows():
-        for cell in row:
-            cell.value = None
-            cell.hyperlink = None
-            cell.comment = None
+def _clone_approved_sheets(client: Any, mapping: dict[str, Any]) -> None:
+    for index, clone in enumerate(mapping.get("sheet_clones", [])):
+        source_name = str(clone["source_sheet"])
+        target_name = str(clone["target_sheet"])
+        if source_name not in client.sheetnames:
+            raise ValueError(f"sheet_clones[{index}] targets missing source sheet '{source_name}'.")
+        if target_name in client.sheetnames:
+            raise ValueError(f"sheet_clones[{index}] target sheet '{target_name}' already exists.")
+        source = client[source_name]
+        target = client.copy_worksheet(source)
+        target.title = target_name
+        for image in source._images:
+            target.add_image(copy.copy(image), copy.copy(image.anchor))
 
 
-def copy_cells(source, target, preserve_existing_style: bool, style_coordinates: set[str]) -> None:
-    for row in source.iter_rows():
-        for source_cell in row:
-            target_cell = target[source_cell.coordinate]
-            target_cell.value = source_cell.value
-            target_cell.hyperlink = copy.copy(source_cell.hyperlink)
-            target_cell.comment = copy.copy(source_cell.comment)
-            keep_style = preserve_existing_style and source_cell.coordinate in style_coordinates
-            if not keep_style:
-                target_cell.font = copy.copy(source_cell.font)
-                target_cell.fill = copy.copy(source_cell.fill)
-                target_cell.border = copy.copy(source_cell.border)
-                target_cell.number_format = source_cell.number_format
-                target_cell.alignment = copy.copy(source_cell.alignment)
-                target_cell.protection = copy.copy(source_cell.protection)
-    for merged in source.merged_cells.ranges:
-        target.merge_cells(str(merged))
+def _apply_cell_writes(client: Any, plan: dict[str, Any], mapping: dict[str, Any]) -> None:
+    for index, write in enumerate(mapping["cell_writes"]):
+        sheet_name = str(write["sheet"])
+        coordinate = str(write["cell"])
+        if sheet_name not in client.sheetnames:
+            raise ValueError(f"cell_writes[{index}] targets missing sheet '{sheet_name}'.")
+        target = client[sheet_name][coordinate]
+        if isinstance(target, MergedCell):
+            raise ValueError(f"cell_writes[{index}] targets non-anchor merged cell {sheet_name}!{coordinate}.")
+        if isinstance(target.value, str) and target.value.startswith("=") and not write.get("allow_formula_overwrite"):
+            raise ValueError(
+                f"cell_writes[{index}] would replace formula {sheet_name}!{coordinate}. "
+                "Approve that exact write with allow_formula_overwrite=true or choose a content cell."
+            )
+        source_value = write.get("value") if "value" in write else _value_at_path(plan, str(write["value_path"]))
+        target.value = _cell_value(source_value, write.get("transform"))
 
 
-def copy_dimensions(source, target, preserve_existing_style: bool, surface: dict) -> None:
-    if preserve_existing_style:
-        target.freeze_panes = surface["freeze_panes"] or source.freeze_panes
-        target.sheet_properties.tabColor = surface["tab_color"] or copy.copy(source.sheet_properties.tabColor)
-        if not surface["widths"]:
-            for key, value in source.column_dimensions.items():
-                target.column_dimensions[key] = copy.copy(value)
-        if not surface["heights"]:
-            for key, value in source.row_dimensions.items():
-                target.row_dimensions[key] = copy.copy(value)
-    else:
-        target.freeze_panes = source.freeze_panes
-        target.sheet_properties.tabColor = copy.copy(source.sheet_properties.tabColor)
-        for key, value in source.column_dimensions.items():
-            target.column_dimensions[key] = copy.copy(value)
-        for key, value in source.row_dimensions.items():
-            target.row_dimensions[key] = copy.copy(value)
-
-
-def copy_sheet_features(source, target) -> None:
-    target.auto_filter.ref = source.auto_filter.ref
-    target.sheet_view.showGridLines = source.sheet_view.showGridLines
-    target.data_validations = copy.deepcopy(source.data_validations)
-    for conditional_format, rules in source.conditional_formatting._cf_rules.items():
-        for rule in rules:
-            target.conditional_formatting.add(str(conditional_format.sqref), copy.deepcopy(rule))
-    for image in source._images:
-        target.add_image(copy.copy(image), image.anchor)
-
-
-def copy_sheet(source, target, preserve_existing_style: bool) -> None:
-    surface = capture_client_surface(target)
-    reset_sheet(target)
-    copy_cells(source, target, preserve_existing_style, surface["style_coordinates"])
-    copy_dimensions(source, target, preserve_existing_style, surface)
-    copy_sheet_features(source, target)
-
-
-def adapt_workbook(
-    plan: dict,
-    template: Path,
-    mapping: dict[str, str],
-    screenshot_dir: Path | None = None,
-    *,
-    allow_destructive_template_overwrite: bool = False,
-):
-    client = load_workbook(template, read_only=False, data_only=False)
-    with TemporaryDirectory(prefix="tracking_plan_template_previews_") as raw:
-        generated = build_workbook(plan, screenshot_dir=screenshot_dir, preview_dir=Path(raw))
-        for source in generated.worksheets:
-            target_name = mapping.get(source.title, source.title)
-            if target_name in client.sheetnames:
-                target = client[target_name]
-                hazards = destructive_overwrite_hazards(target)
-                if hazards and not allow_destructive_template_overwrite:
-                    joined = ", ".join(hazards)
-                    raise ValueError(
-                        f"Mapped client sheet '{target_name}' contains {joined}. Default adaptation will not replace "
-                        "these human-owned or executable workbook features. Map the canonical sheet to a new target "
-                        "sheet, remove the hazards in an approved copy, or rerun with "
-                        "--allow-destructive-template-overwrite after explicit analyst approval."
-                    )
-                copy_sheet(source, target, preserve_existing_style=True)
-            else:
-                target = client.create_sheet(target_name)
-                copy_sheet(source, target, preserve_existing_style=False)
+def adapt_workbook(plan: dict[str, Any], template: Path, mapping: dict[str, Any]):
+    validate_mapping(mapping)
+    actual_hash = file_sha256(template)
+    if actual_hash != mapping["template_sha256"]:
+        raise ValueError(
+            "The mapping was prepared for a different template file: "
+            f"expected {mapping['template_sha256']}, received {actual_hash}."
+        )
+    unsupported = unsupported_strict_package_parts(template)
+    if unsupported:
+        raise ValueError(
+            "Client-template adaptation is blocked because the approved openpyxl backend cannot preserve: "
+            f"{', '.join(unsupported)}. Return the template inventory and request a simplified workbook "
+            "without those features. No automatic fallback backend is defined."
+        )
+    client = load_client_workbook(template)
+    if mapping["mode"] == EXTENSION_TEMPLATE_MODE:
+        _clone_approved_sheets(client, mapping)
+    _apply_cell_writes(client, plan, mapping)
     return client
+
+
+def mapping_sha256(mapping: dict[str, Any]) -> str:
+    payload = json.dumps(mapping, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def build_fidelity_report(
+    template: Path,
+    output: Path,
+    mapping: dict[str, Any],
+    mapping_path: Path,
+) -> dict[str, Any]:
+    cells = allowed_cells(mapping)
+    if is_strict_mapping(mapping):
+        report = compare_workbook_fidelity(template, output, cells)
+    else:
+        report = compare_workbook_extension_fidelity(
+            template,
+            output,
+            cells,
+            mapping["sheet_clones"],
+        )
+    report.update(
+        {
+            "mapping_mode": mapping["mode"],
+            "mapping_id": str(mapping.get("mapping_id", "")),
+            "mapping_file": mapping_path.name,
+            "mapping_sha256": mapping_sha256(mapping),
+        }
+    )
+    return report
 
 
 def main() -> int:
     args = parse_args()
     plan = json.loads(args.plan.read_text(encoding="utf-8-sig"))
+    mapping = load_mapping(args.mapping)
     issues = validate_plan_data(plan)
     if issues:
         print(render_text(issues), file=sys.stderr)
     if any(issue.severity == "error" for issue in issues):
         return 1
-    workbook = adapt_workbook(
-        plan,
-        args.template,
-        load_mapping(args.mapping),
-        args.screenshot_dir,
-        allow_destructive_template_overwrite=args.allow_destructive_template_overwrite,
-    )
+
+    workbook = adapt_workbook(plan, args.template, mapping)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    workbook.save(args.output)
+    fidelity_path = args.fidelity_report or args.output.with_name(
+        f"{args.output.stem}.fidelity.json"
+    )
+    with TemporaryDirectory(prefix="tracking_plan_adapted_", dir=args.output.parent) as raw:
+        candidate = Path(raw) / args.output.name
+        workbook.save(candidate)
+        report = build_fidelity_report(args.template, candidate, mapping, args.mapping)
+        fidelity_path.parent.mkdir(parents=True, exist_ok=True)
+        fidelity_path.write_text(
+            json.dumps(report, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        if report["status"] != "passed":
+            print("Client-template fidelity validation failed:", file=sys.stderr)
+            for difference in report["unexpected_differences"]:
+                print(f"- {difference}", file=sys.stderr)
+            return 1
+        candidate.replace(args.output)
     print(args.output)
+    print(fidelity_path)
     return 0
 
 

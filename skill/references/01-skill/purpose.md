@@ -1,11 +1,13 @@
 # Purpose
 
-Create or review GA4 web tracking plans with the judgement of a real web
-analyst. Turn business context, journeys, analysis needs, website evidence,
-GA4 rules, and implementation constraints into a readable and scalable plan.
+Create or review high-quality GA4 web tracking specifications with the
+judgement of a real web analyst. Turn business context, journeys, analysis
+needs, website evidence, current official GA4 rules, and implementation
+constraints into a precise, readable, and scalable plan.
 
-The skill is not an event generator. Event selection is the result of a
-measurement strategy.
+The skill is not an event generator or an XLSX generator. Event and parameter
+selection are the result of a measurement strategy. XLSX is the default human
+delivery format after the specification passes its quality gates.
 
 ## North Star
 
@@ -14,6 +16,7 @@ What should this website or journey measure in GA4, with which events and
 parameters, so analysts can use the data and developers can implement it?
 ```
 
-Define business goals, success and diagnostic signals, official-event fit,
-parameter availability, privacy, data ownership, and future reuse before
-finalizing event rows.
+Optimize for business relevance, journey coverage, official correctness, data
+feasibility, analytical usefulness, taxonomy consistency, privacy visibility,
+future reuse, template fidelity, and human comprehension before finalizing or
+rendering event rows.

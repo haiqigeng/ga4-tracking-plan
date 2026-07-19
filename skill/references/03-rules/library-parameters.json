@@ -3,10 +3,262 @@
   "policy": [
     "Use official GA4 parameters and item parameters when the event is official or ecommerce.",
     "Use custom parameters only when they answer a concrete analysis, segmentation, implementation, or optimization need.",
-    "Use English lowercase ASCII snake_case for controlled values across multilingual websites and remove accents.",
-    "Exhaust finite website values when practical and display them with space-pipe-space separators in human output.",
+    "Use lowercase ASCII snake_case in the selected controlled-value language; multilingual websites use English and all values remove accents.",
+    "Exhaust finite website values from browser or client evidence when practical and display them with space-pipe-space separators in human output.",
     "Do not use Universal Analytics fields such as eventCategory, eventAction, eventLabel, nonInteraction, dimension1, or metric1.",
     "Do not send PII, contact-derived identifiers, free text, account IDs, addresses, or sensitive user input to GA4. Governed non-GA4 implementation variables must identify destination, consent, transformation, and ownership."
+  ],
+  "official_parameter_definitions": [
+    {
+      "parameter_name": "page_location",
+      "scope": "event",
+      "type": "string",
+      "required": "optional",
+      "example": "https://www.example.com/products",
+      "description": "The complete URL of the webpage that someone visited on your website.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "Page / Screen > page_location"
+    },
+    {
+      "parameter_name": "page_referrer",
+      "scope": "event",
+      "type": "string",
+      "required": "optional",
+      "example": "https://www.example.com/",
+      "description": "The referring URL, which is the user's previous URL and can be your website's domain or other domains.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "Page / Screen > page_referrer"
+    },
+    {
+      "parameter_name": "page_title",
+      "scope": "event",
+      "type": "string",
+      "required": "optional",
+      "example": "Home",
+      "description": "The HTML page title that you set on your website. The page_title parameter can override the title HTML tag.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "Page / Screen > page_title"
+    },
+    {
+      "parameter_name": "engagement_time_msec",
+      "scope": "event",
+      "type": "number",
+      "required": "optional",
+      "example": "1000",
+      "description": "The amount of time a user spends with your web page in focus or app screen in the foreground.",
+      "source_url": "https://support.google.com/analytics/answer/9234069?hl=en",
+      "source_section": "Automatically collected events > engagement parameters"
+    },
+    {
+      "parameter_name": "search_term",
+      "scope": "event",
+      "type": "string",
+      "required": "required",
+      "example": "t-shirts",
+      "description": "The strings or keywords used in a search.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "General > search_term"
+    },
+    {
+      "parameter_name": "link_classes",
+      "scope": "event",
+      "type": "string",
+      "required": "optional",
+      "example": "primary-link",
+      "description": "The HTML class attribute for an outbound link or file download.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "Link > link_classes"
+    },
+    {
+      "parameter_name": "link_domain",
+      "scope": "event",
+      "type": "string",
+      "required": "optional",
+      "example": "example.com",
+      "description": "The destination domain of an outbound link or file download.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "Link > link_domain"
+    },
+    {
+      "parameter_name": "link_id",
+      "scope": "event",
+      "type": "string",
+      "required": "optional",
+      "example": "primary-cta",
+      "description": "The ID for an outbound link or file download.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "Link > link_id"
+    },
+    {
+      "parameter_name": "link_text",
+      "scope": "event",
+      "type": "string",
+      "required": "optional",
+      "example": "Download guide",
+      "description": "The text of the link clicked by the user.",
+      "source_url": "https://support.google.com/analytics/answer/9216061?hl=en",
+      "source_section": "Events measurement and parameters > file_download"
+    },
+    {
+      "parameter_name": "link_url",
+      "scope": "event",
+      "type": "string",
+      "required": "optional",
+      "example": "https://www.example.com/file.pdf",
+      "description": "The full URL for an outbound link or file download.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "Link > link_url"
+    },
+    {
+      "parameter_name": "outbound",
+      "scope": "event",
+      "type": "boolean",
+      "required": "optional",
+      "example": "true",
+      "description": "Indicates whether a click was on an outbound link.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "Link > outbound"
+    },
+    {
+      "parameter_name": "file_extension",
+      "scope": "event",
+      "type": "string",
+      "required": "optional",
+      "example": "pdf",
+      "description": "The extension of a file download.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "General > file_extension"
+    },
+    {
+      "parameter_name": "file_name",
+      "scope": "event",
+      "type": "string",
+      "required": "optional",
+      "example": "guide.pdf",
+      "description": "The page path of a file download.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "General > file_name"
+    },
+    {
+      "parameter_name": "form_id",
+      "scope": "event",
+      "type": "string",
+      "required": "optional",
+      "example": "contact-form",
+      "description": "The HTML id attribute of the form DOM element.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "General > form_id"
+    },
+    {
+      "parameter_name": "form_name",
+      "scope": "event",
+      "type": "string",
+      "required": "optional",
+      "example": "contact",
+      "description": "The HTML name attribute of the form element.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "General > form_name"
+    },
+    {
+      "parameter_name": "form_destination",
+      "scope": "event",
+      "type": "string",
+      "required": "optional",
+      "example": "https://www.example.com/contact/submit",
+      "description": "The URL to which the form is being submitted.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "General > form_destination"
+    },
+    {
+      "parameter_name": "form_submit_text",
+      "scope": "event",
+      "type": "string",
+      "required": "optional",
+      "example": "Send",
+      "description": "The text of the submit button, if present.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "General > form_submit_text"
+    },
+    {
+      "parameter_name": "percent_scrolled",
+      "scope": "event",
+      "type": "number",
+      "required": "optional",
+      "example": "90",
+      "description": "The percentage down the page that the user scrolled.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "General > percent_scrolled"
+    },
+    {
+      "parameter_name": "video_current_time",
+      "scope": "event",
+      "type": "number",
+      "required": "optional",
+      "example": "30",
+      "description": "The current time in a video of the viewer.",
+      "source_url": "https://support.google.com/analytics/answer/9216061?hl=en",
+      "source_section": "Events measurement and parameters > video engagement"
+    },
+    {
+      "parameter_name": "video_duration",
+      "scope": "event",
+      "type": "number",
+      "required": "optional",
+      "example": "120",
+      "description": "The duration of a video.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "Video > video_duration"
+    },
+    {
+      "parameter_name": "video_percent",
+      "scope": "event",
+      "type": "number",
+      "required": "optional",
+      "example": "50",
+      "description": "The percentage of a video that a user watched.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "Video > video_percent"
+    },
+    {
+      "parameter_name": "video_provider",
+      "scope": "event",
+      "type": "string",
+      "required": "optional",
+      "example": "youtube",
+      "description": "The source of an embedded video.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "Video > video_provider"
+    },
+    {
+      "parameter_name": "video_title",
+      "scope": "event",
+      "type": "string",
+      "required": "optional",
+      "example": "Product demonstration",
+      "description": "The title of the embedded video.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "Video > video_title"
+    },
+    {
+      "parameter_name": "video_url",
+      "scope": "event",
+      "type": "string",
+      "required": "optional",
+      "example": "https://www.youtube.com/watch?v=example",
+      "description": "The URL of an embedded video.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "Video > video_url"
+    },
+    {
+      "parameter_name": "visible",
+      "scope": "event",
+      "type": "boolean",
+      "required": "optional",
+      "example": "true",
+      "description": "Set to true if an embedded video is visible to the user.",
+      "source_url": "https://support.google.com/analytics/table/13594742?hl=en",
+      "source_section": "General > visible"
+    }
   ],
   "families": [
     {
@@ -50,12 +302,21 @@
           "registration_default": "custom_dimension_when_used_for_reporting"
         },
         {
-          "parameter_name": "language",
-          "display_name": "Language",
+          "parameter_name": "nav_language",
+          "display_name": "Navigation language",
           "scope": "event",
           "type": "string",
           "classification": "custom_event_parameter",
-          "value_rules": "ISO language code when available, for example fr | en | de.",
+          "value_rules": "Lowercase ISO 639-1 code observed from the website language selector or locale route, for example fr | en | de.",
+          "registration_default": "custom_dimension_when_used_for_reporting"
+        },
+        {
+          "parameter_name": "nav_environment",
+          "display_name": "Navigation environment",
+          "scope": "event",
+          "type": "string",
+          "classification": "custom_event_parameter",
+          "value_rules": "Controlled deployment environment supplied by the application configuration, for example production | staging | development.",
           "registration_default": "custom_dimension_when_used_for_reporting"
         },
         {

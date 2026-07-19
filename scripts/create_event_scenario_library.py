@@ -1,4 +1,5 @@
 import json
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -10,7 +11,15 @@ OFFICIAL_JSON = SKILL_REFS / "library-ga4-recommended-events.json"
 LIBRARY_JSON = SKILL_REFS / "library-ga4-event-scenarios.json"
 sys.path.insert(0, str(ROOT / "skill" / "scripts"))
 
-from official_ga4_catalog import parse_catalog_html  # noqa: E402
+from official_ga4_catalog import (  # noqa: E402
+    AUTOMATIC_EVENTS_URL,
+    ECOMMERCE_IMPLEMENTATION_URL,
+    ENHANCED_MEASUREMENT_URL,
+    STANDARD_EVENT_OFFICIAL_SEMANTICS,
+    clean_html,
+    normalize_text,
+    parse_catalog_html,
+)
 
 SOURCES = [
     {
@@ -97,114 +106,140 @@ SOURCES = [
 def fetch_recommended_events():
     url = "https://developers.google.com/analytics/devguides/collection/ga4/reference/events"
     text = urlopen(Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=30).read().decode("utf-8", "ignore")
-    return parse_catalog_html(text)
+    recommended, official_updated = parse_catalog_html(text)
+    if not recommended or not official_updated:
+        raise ValueError("Could not parse the live GA4 recommended-event catalog and its update date.")
+    ecommerce_text = urlopen(
+        Request(ECOMMERCE_IMPLEMENTATION_URL, headers={"User-Agent": "Mozilla/5.0"}),
+        timeout=30,
+    ).read().decode("utf-8", "ignore")
+    ecommerce_match = re.search(r"Last updated\s+(\d{4}-\d{2}-\d{2})\s+UTC", ecommerce_text)
+    if not ecommerce_match:
+        raise ValueError("Could not parse the live GA4 ecommerce source update date.")
+    standard_pages = {
+        source_url: normalize_text(
+            clean_html(
+                urlopen(
+                    Request(source_url, headers={"User-Agent": "Mozilla/5.0"}),
+                    timeout=30,
+                )
+                .read()
+                .decode("utf-8", "ignore")
+            )
+        )
+        for source_url in (AUTOMATIC_EVENTS_URL, ENHANCED_MEASUREMENT_URL)
+    }
+    for event_name, semantics in STANDARD_EVENT_OFFICIAL_SEMANTICS.items():
+        source_text = standard_pages[str(semantics["source_url"])]
+        trigger_text = normalize_text(semantics["official_trigger"])
+        trigger_position = source_text.find(trigger_text)
+        if trigger_position < 0:
+            raise ValueError(f"Could not verify the live GA4 trigger wording for {event_name}.")
+        evidence_window = source_text[trigger_position : trigger_position + 3000]
+        missing_parameters = [
+            parameter
+            for parameter in semantics["parameters"]
+            if normalize_text(parameter) not in evidence_window
+        ]
+        if missing_parameters:
+            raise ValueError(
+                f"Could not verify the live GA4 parameter list for {event_name}: {', '.join(missing_parameters)}."
+            )
+    return recommended, official_updated, ecommerce_match.group(1), date.today().isoformat()
 
 
-STANDARD_EVENTS = [
+STANDARD_EVENT_CONTEXTS = [
     {
         "event": "page_view",
         "group": "automatic / enhanced measurement",
         "scenario": "page view, SPA route change",
-        "trigger": "Page load or browser history state change.",
-        "parameters": "page_location, page_referrer, page_title, engagement_time_msec",
         "implementation": "Usually automatic. Manually control only when SPA/infinite-scroll behavior requires it.",
     },
     {
         "event": "first_visit",
         "group": "automatic",
         "scenario": "new user acquisition",
-        "trigger": "First visit from a user/client.",
-        "parameters": "client_id, ga_session_id, ga_session_number, page_location, page_referrer, page_title",
         "implementation": "Automatic; do not implement manually.",
     },
     {
         "event": "session_start",
         "group": "automatic",
         "scenario": "session analysis",
-        "trigger": "User starts or resumes a session.",
-        "parameters": "client_id, ga_session_id, ga_session_number, page_location, page_referrer, page_title",
         "implementation": "Automatic; do not implement manually.",
     },
     {
         "event": "user_engagement",
         "group": "automatic",
         "scenario": "engagement time",
-        "trigger": "Webpage is in focus for at least one second.",
-        "parameters": "engagement_time_msec",
         "implementation": "Automatic; do not implement manually.",
     },
     {
         "event": "scroll",
         "group": "enhanced measurement",
         "scenario": "content engagement",
-        "trigger": "First time a user reaches 90% vertical depth.",
-        "parameters": "engagement_time_msec",
-        "implementation": "Enhanced measurement. Custom scroll_depth event only if 25/50/75 thresholds are needed.",
+        "implementation": "Enhanced measurement. Use a custom scroll-depth event only when additional thresholds answer an analysis need.",
     },
     {
         "event": "click",
         "group": "enhanced measurement",
         "scenario": "outbound link click",
-        "trigger": "User clicks a link leading away from the current domain.",
-        "parameters": "link_classes, link_domain, link_id, link_url, outbound",
-        "implementation": "Enhanced measurement. Avoid duplicating with custom outbound_click unless needed.",
+        "implementation": "Enhanced measurement. Avoid duplicating it with a custom outbound-click event.",
     },
     {
         "event": "view_search_results",
         "group": "enhanced measurement",
         "scenario": "search results page",
-        "trigger": "Search results page is shown based on configured query parameter.",
-        "parameters": "search_term, q_<additional key>",
-        "implementation": "Enhanced measurement. Use recommended search for explicit submitted-search tracking.",
+        "implementation": "Enhanced measurement. Optional configured query keys are emitted as q_<key>; use recommended search when explicit submitted-search measurement is also needed.",
     },
     {
         "event": "video_start",
         "group": "enhanced measurement",
         "scenario": "YouTube embedded video",
-        "trigger": "Supported YouTube video starts.",
-        "parameters": "video_current_time, video_duration, video_percent, video_provider, video_title, video_url, visible",
-        "implementation": "Enhanced measurement when YouTube JS API support exists.",
+        "implementation": "Enhanced measurement for embedded YouTube videos with JavaScript API support.",
     },
     {
         "event": "video_progress",
         "group": "enhanced measurement",
         "scenario": "YouTube embedded video",
-        "trigger": "Supported video passes 10%, 25%, 50%, or 75%.",
-        "parameters": "video_current_time, video_duration, video_percent, video_provider, video_title, video_url, visible",
-        "implementation": "Enhanced measurement when YouTube JS API support exists.",
+        "implementation": "Enhanced measurement for embedded YouTube videos with JavaScript API support.",
     },
     {
         "event": "video_complete",
         "group": "enhanced measurement",
         "scenario": "YouTube embedded video",
-        "trigger": "Supported video completes.",
-        "parameters": "video_current_time, video_duration, video_percent, video_provider, video_title, video_url, visible",
-        "implementation": "Enhanced measurement when YouTube JS API support exists.",
+        "implementation": "Enhanced measurement for embedded YouTube videos with JavaScript API support.",
     },
     {
         "event": "file_download",
         "group": "enhanced measurement",
         "scenario": "downloadable file click",
-        "trigger": "User clicks a common downloadable file extension.",
-        "parameters": "file_extension, file_name, link_classes, link_id, link_text, link_url",
-        "implementation": "Enhanced measurement. Custom file events only for gated downloads or special classifications.",
+        "implementation": "Enhanced measurement. Use a custom file event only for a materially different gated or classified outcome.",
     },
     {
         "event": "form_start",
         "group": "enhanced measurement",
         "scenario": "form engagement",
-        "trigger": "First time a user interacts with a form in a session.",
-        "parameters": "form_id, form_name, form_destination",
-        "implementation": "Enhanced measurement. Custom form_step events when multi-step funnel detail is required.",
+        "implementation": "Enhanced measurement. Use custom form-step events only when the form funnel requires them.",
     },
     {
         "event": "form_submit",
         "group": "enhanced measurement",
         "scenario": "form submission",
-        "trigger": "User submits a form.",
-        "parameters": "form_id, form_name, form_destination, form_submit_text",
-        "implementation": "Enhanced measurement. Use generate_lead for validated lead success.",
+        "implementation": "Enhanced measurement records submission, not confirmed lead success; use generate_lead only after a valid lead outcome.",
     },
+]
+
+STANDARD_EVENTS = [
+    {
+        **context,
+        "description": STANDARD_EVENT_OFFICIAL_SEMANTICS[context["event"]]["definition"],
+        "trigger": STANDARD_EVENT_OFFICIAL_SEMANTICS[context["event"]]["trigger"],
+        "official_trigger": STANDARD_EVENT_OFFICIAL_SEMANTICS[context["event"]]["official_trigger"],
+        "parameters": ", ".join(STANDARD_EVENT_OFFICIAL_SEMANTICS[context["event"]]["parameters"]),
+        "source_url": STANDARD_EVENT_OFFICIAL_SEMANTICS[context["event"]]["source_url"],
+        "source_section": STANDARD_EVENT_OFFICIAL_SEMANTICS[context["event"]]["source_section"],
+    }
+    for context in STANDARD_EVENT_CONTEXTS
 ]
 
 
@@ -442,7 +477,7 @@ SCENARIOS = [
         "website_examples": "media site, blog, documentation, editorial brand",
         "official_events": "page_view, scroll, select_content, share, file_download, video_start, video_progress, video_complete",
         "typical_custom_events": "newsletter_signup_intent, accordion_open, modal_open",
-        "primary_parameters": "page_data.template, content_type, content_id, content_name, link_url, video_title",
+        "primary_parameters": "page_template, content_type, content_id, content_name, link_url, video_title",
         "notes": "Prefer enhanced measurement for scroll/video/download when it is sufficient; use select_content for content card/article selections.",
     },
     {
@@ -544,10 +579,10 @@ DATALAYER_PATTERNS = [
         "gtm_mapping": "Custom Event trigger = custom_event_name. GA4 Event tag event name = {{Event}} or fixed event name. Map event_data.* as event parameters.",
     },
     {
-        "name": "Manual page_view with page_data",
+        "name": "Manual page_view with page",
         "use_for": "SPA route changes or explicit pageview control.",
-        "format": "dataLayer.push({'page_data': null});\ndataLayer.push({\n  'event': 'page_view',\n  'page_data': {\n    'location': 'https://example.com/page',\n    'title': 'Page title',\n    'template': 'homepage',\n    'language': 'fr'\n  }\n});",
-        "gtm_mapping": "Trigger on page_view. Map page_data.location/title/template/language into GA4 parameters when needed.",
+        "format": "dataLayer.push({'page': null});\ndataLayer.push({\n  'event': 'page_view',\n  'page': {\n    'page_location': 'https://example.com/page',\n    'page_title': 'Page title',\n    'page_referrer': 'https://example.com/',\n    'page_template': 'homepage',\n    'nav_language': 'fr',\n    'nav_environment': 'production'\n  },\n  'user': {\n    'login_status': 'logged_out'\n  }\n});",
+        "gtm_mapping": "Trigger on page_view. Map page.page_location/page_title/page_referrer/page_template/nav_language/nav_environment to identically named GA4 parameters when needed. Map approved user fields separately.",
     },
     {
         "name": "Recommended search event",
@@ -590,12 +625,7 @@ DATALAYER_PATTERNS = [
 
 def build_library():
     SKILL_REFS.mkdir(parents=True, exist_ok=True)
-    try:
-        recommended, official_updated = fetch_recommended_events()
-    except Exception:
-        recommended = json.loads(OFFICIAL_JSON.read_text(encoding="utf-8")) if OFFICIAL_JSON.exists() else []
-        existing = json.loads(LIBRARY_JSON.read_text(encoding="utf-8")) if LIBRARY_JSON.exists() else {}
-        official_updated = existing.get("catalog_metadata", {}).get("official_source_last_updated", "")
+    recommended, official_updated, ecommerce_updated, automatic_enhanced_checked = fetch_recommended_events()
     OFFICIAL_JSON.write_text(json.dumps(recommended, indent=2, ensure_ascii=False), encoding="utf-8")
     library = {
         "version": official_updated or date.today().isoformat(),
@@ -604,8 +634,10 @@ def build_library():
             "generated_date": date.today().isoformat(),
             "generator_version": "1.0.0",
             "official_source_last_updated": official_updated,
+            "ecommerce_source_last_updated": ecommerce_updated,
+            "automatic_enhanced_checked_date": automatic_enhanced_checked,
         },
-        "scope": "GA4 web tracking-plan scenario library for human analysts and AI-agent-assisted tracking plan generation.",
+        "scope": "GA4 web tracking-plan scenario library for human analysis and implementation planning.",
         "source_priority": "Official Google documentation first. Trusted practitioner sources only for custom-event patterns and implementation judgement.",
         "value_convention": "For controlled analytics values, use lowercase ASCII snake_case, remove accents/diacritics, and list finite options with pipes. Preserve official IDs, ISO codes, numeric values, URLs, and raw native/user-entered fields only when required and privacy-safe.",
         "sources": SOURCES,

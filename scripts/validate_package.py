@@ -7,6 +7,8 @@ import subprocess
 import sys
 import tempfile
 import zipfile
+from itertools import chain
+from operator import attrgetter
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -17,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skill"
 RULES = SKILL / "references" / "03-rules"
 COMMANDS = SKILL / "references" / "02-commands"
+MAINTENANCE = ROOT / "maintenance"
 SCHEMA = RULES / "schema-tracking-plan.json"
 FIXTURE = RULES / "example-ga4-tracking-plan.json"
 
@@ -33,6 +36,8 @@ REQUIRED_FILES = {
     RULES / "completion-gates.md",
     RULES / "policy-ga4-boundaries.md",
     RULES / "policy-authenticated-user-context.md",
+    RULES / "policy-datalayer-contract.md",
+    RULES / "policy-language-and-values.md",
     RULES / "library-ga4-event-scenarios.json",
     RULES / "library-ga4-recommended-events.json",
     RULES / "library-parameters.json",
@@ -40,9 +45,9 @@ REQUIRED_FILES = {
     FIXTURE,
     COMMANDS / "validation-commands.md",
     COMMANDS / "workbook-generation.md",
-    COMMANDS / "official-catalog-maintenance.md",
-    COMMANDS / "fresh-agent-evaluation.md",
-    COMMANDS / "fresh-agent-evaluation-cases.json",
+    MAINTENANCE / "references" / "official-catalog-maintenance.md",
+    MAINTENANCE / "references" / "fresh-agent-evaluation.md",
+    MAINTENANCE / "evaluations" / "fresh-agent-evaluation-cases.json",
     SKILL / "scripts" / "validate_tracking_plan.py",
     SKILL / "scripts" / "init_tracking_plan.py",
     SKILL / "scripts" / "generate_tracking_plan_workbook.py",
@@ -50,20 +55,27 @@ REQUIRED_FILES = {
     SKILL / "scripts" / "browser_environment.py",
     SKILL / "scripts" / "inspect_browser_environment.py",
     SKILL / "scripts" / "tracking_plan_validation_common.py",
+    SKILL / "scripts" / "tracking_plan_validation_datalayer.py",
     SKILL / "scripts" / "tracking_plan_validation_delivery.py",
     SKILL / "scripts" / "tracking_plan_validation_event_rules.py",
+    SKILL / "scripts" / "tracking_plan_validation_governance.py",
+    SKILL / "scripts" / "tracking_plan_validation_quality.py",
     SKILL / "scripts" / "tracking_plan_validation_screenshot_capture.py",
     SKILL / "scripts" / "tracking_plan_workbook_layout.py",
     SKILL / "scripts" / "official_ga4_catalog.py",
+    SKILL / "scripts" / "official_source_receipt.py",
+    SKILL / "scripts" / "resolve_tracking_plan.py",
     SKILL / "scripts" / "inspect_tracking_plan_template.py",
     SKILL / "scripts" / "adapt_tracking_plan_workbook.py",
     SKILL / "scripts" / "check_official_catalog.py",
-    SKILL / "scripts" / "migrate_tracking_plan.py",
+    MAINTENANCE / "scripts" / "migrate_tracking_plan.py",
     ROOT / "scripts" / "inspect_tracking_plan_template.py",
     ROOT / "scripts" / "adapt_tracking_plan_workbook.py",
     ROOT / "scripts" / "inspect_browser_environment.py",
     ROOT / "scripts" / "init_tracking_plan.py",
+    ROOT / "scripts" / "resolve_tracking_plan.py",
     ROOT / "scripts" / "validate_fresh_agent_evals.py",
+    ROOT / "scripts" / "validate_eval_manifest.py",
 }
 
 EXPECTED_TABS = ["00 Overview", "01 GTM Protocol", "02 Parameter Reference", "03 Event Matrix", "04 DataLayer Examples", "05 Screenshot Register"]
@@ -151,8 +163,8 @@ def check_schema_and_fixture() -> None:
     errors = sorted(Draft202012Validator(schema).iter_errors(fixture), key=lambda item: list(item.path))
     if errors:
         fail("Generic GA4 fixture does not match schema:\n" + "\n".join(error.message for error in errors))
-    if fixture.get("schema_version") != "2.4.0":
-        fail("Generic fixture must use schema_version 2.4.0")
+    if fixture.get("schema_version") != "3.0.0":
+        fail("Generic fixture must use schema_version 3.0.0")
     final_screenshot_statuses = schema["$defs"]["screenshotEvidence"]["properties"]["status"]["enum"]
     if final_screenshot_statuses != ["captured", "shared_evidence", "not_needed", "blocked"]:
         fail(f"Screenshot evidence enum contains non-final states: {final_screenshot_statuses}")
@@ -226,14 +238,8 @@ def check_validator() -> None:
         expect_code(
             fixture,
             temp_dir,
-            "EVENT_ANALYSIS_USE_WEAK",
-            lambda plan: plan["events"][0].update({"analysis_use": "reporting"}),
-        )
-        expect_code(
-            fixture,
-            temp_dir,
-            "PARAMETER_DATA_OWNER_MISSING",
-            lambda plan: plan["parameters"][0].update({"availability": "to_confirm", "data_owner": "TBD"}),
+            "EVENT_PARAMETER_OWNER_MISSING",
+            lambda plan: plan["events"][0]["parameter_bindings"][0].update({"availability": "to_confirm", "data_owner": "TBD"}),
         )
 
 
@@ -243,37 +249,43 @@ def check_workbook(path: Path) -> None:
         fail(f"Unexpected workbook tabs: {wb.sheetnames}")
 
     overview = wb["00 Overview"]
-    overview_text = " ".join(str(cell.value) for row in overview.iter_rows() for cell in row if cell.value is not None).lower()
-    for forbidden in ("main users", "reviewed by", "template used", "qa cases", "automation cue"):
-        if forbidden in overview_text:
-            fail(f"Overview contains non-essential field: {forbidden}")
+    overview_text = " ".join(
+        map(str, filter(None, map(attrgetter("value"), chain.from_iterable(overview.iter_rows()))))
+    ).lower()
+    forbidden = next(filter(overview_text.__contains__, ("main users", "reviewed by", "template used", "qa cases", "automation cue")), None)
+    if forbidden:
+        fail(f"Overview contains non-essential field: {forbidden}")
 
-    parameter_headers = [cell.value for cell in wb["02 Parameter Reference"][3]]
-    for expected in ("Variable name", "Display name", "Value rules", "Availability", "Data owner", "Register in GA4"):
-        if expected not in parameter_headers:
-            fail(f"Parameter Reference is missing {expected}")
+    parameter_headers = set(map(attrgetter("value"), wb["02 Parameter Reference"][3]))
+    missing_headers = {
+        "Variable name", "Display name", "Value rules", "Availability by event", "Data owner(s)", "Register in GA4"
+    } - parameter_headers
+    if missing_headers:
+        fail(f"Parameter Reference is missing {', '.join(sorted(missing_headers))}")
 
     matrix = wb["03 Event Matrix"]
-    if matrix.freeze_panes != "C6" or not str(matrix.auto_filter.ref).startswith("A5:F"):
+    if matrix.freeze_panes != "C6" or not str(matrix.auto_filter.ref).startswith("A5:J"):
         fail("Event Matrix must keep its parameter columns frozen and all event slots filterable")
-    matrix_text = " ".join(str(cell.value) for row in matrix.iter_rows() for cell in row if cell.value is not None)
-    for forbidden in ("event_id", "qa_id", "screenshot_id", "primary_platform"):
-        if forbidden in matrix_text:
-            fail(f"Event Matrix exposes internal field {forbidden}")
+    matrix_text = " ".join(map(str, filter(None, map(attrgetter("value"), chain.from_iterable(matrix.iter_rows())))))
+    forbidden = next(filter(matrix_text.__contains__, ("event_id", "qa_id", "screenshot_id", "primary_platform")), None)
+    if forbidden:
+        fail(f"Event Matrix exposes internal field {forbidden}")
 
-    datalayer_headers = [cell.value for cell in wb["04 DataLayer Examples"][3]]
+    datalayer_headers = list(map(attrgetter("value"), wb["04 DataLayer Examples"][3]))
     expected_datalayer_headers = ["Journey", "Event", "Evidence", "Trigger", "dataLayer.push example", "GTM and GA4 mapping", "Implementation notes"]
     if datalayer_headers[:7] != expected_datalayer_headers:
         fail(f"Unexpected DataLayer Examples headers: {datalayer_headers}")
     if wb["04 DataLayer Examples"].freeze_panes != "A4" or not str(wb["04 DataLayer Examples"].auto_filter.ref).startswith("A3:G"):
         fail("DataLayer Examples must keep headers frozen and all seven columns filterable")
 
-    datalayer_text = " ".join(str(cell.value) for row in wb["04 DataLayer Examples"].iter_rows() for cell in row if cell.value is not None)
-    for event in load_json(FIXTURE)["events"]:
-        if event["event_name"] not in datalayer_text:
-            fail(f"DataLayer Examples is missing event {event['event_name']}")
+    datalayer_event_names = set(
+        filter(None, map(attrgetter("value"), wb["04 DataLayer Examples"]["B"][3:]))
+    )
+    missing_events = {event["event_name"] for event in load_json(FIXTURE)["events"]} - datalayer_event_names
+    if missing_events:
+        fail(f"DataLayer Examples is missing events: {', '.join(sorted(missing_events))}")
 
-    screenshot_headers = [cell.value for cell in wb["05 Screenshot Register"][3]]
+    screenshot_headers = list(map(attrgetter("value"), wb["05 Screenshot Register"][3]))
     expected_headers = ["Journey", "Event(s)", "Screenshot preview", "Page / component", "URL / route", "Capture objective", "Status", "Notes"]
     if screenshot_headers[:8] != expected_headers:
         fail(f"Unexpected Screenshot Register headers: {screenshot_headers}")
@@ -320,12 +332,14 @@ def check_plan_initializer() -> None:
             "Plan initializer",
         )
         issues = validator_issues(load_json(output), Path(raw))
-        if issues:
-            fail(f"Initialized no-screenshot plan has validator issues: {issues}")
+        issue_codes = {issue["code"] for issue in issues}
+        expected = {"PLAYWRIGHT_EXPLORATION_ATTEMPT_MISSING", "OFFICIAL_SOURCE_RECEIPT_INVALID"}
+        if issue_codes != expected:
+            fail(f"Initialized plan should remain blocked on live browser discovery and official-source review: {issues}")
 
 
-def check_fresh_agent_evaluations() -> None:
-    run([sys.executable, "-B", "scripts/validate_fresh_agent_evals.py"], "Fresh-agent evaluation manifest")
+def check_evaluation_manifest() -> None:
+    run([sys.executable, "-B", "scripts/validate_eval_manifest.py"], "Evaluation manifest structure")
 
 
 def check_migration() -> None:
@@ -342,8 +356,8 @@ def check_migration() -> None:
         source.write_text(json.dumps(legacy), encoding="utf-8")
         run([sys.executable, "-B", "scripts/migrate_tracking_plan.py", str(source), "--output", str(output)], "Contract migration")
         migrated = load_json(output)
-        if migrated.get("schema_version") != "2.4.0" or "analytics_platforms" in migrated or "qa_cases" in migrated:
-            fail("Contract migration did not produce a clean v2.4 plan")
+        if migrated.get("schema_version") != "3.0.0" or "analytics_platforms" in migrated or "qa_cases" in migrated:
+            fail("Contract migration did not produce a clean v3 plan")
         attempt = migrated.get("screenshot_capture", {}).get("playwright_mcp_attempt", {}).get("status")
         if attempt != "not_recorded":
             fail("Contract migration must mark an unrecorded Playwright MCP attempt explicitly")
@@ -360,7 +374,6 @@ def check_release_package() -> None:
         required_commands = {
             "scripts/_run_skill_script.py",
             "scripts/check_installed_skill_sync.py",
-            "scripts/validate_fresh_agent_evals.py",
             "scripts/validate_tracking_plan.py",
         }
         if not required_commands <= set(names):
@@ -447,7 +460,7 @@ CHECKS = [
     check_generated_outputs,
     check_catalog,
     check_plan_initializer,
-    check_fresh_agent_evaluations,
+    check_evaluation_manifest,
     check_migration,
     check_release_package,
     check_privacy_and_cleanliness,

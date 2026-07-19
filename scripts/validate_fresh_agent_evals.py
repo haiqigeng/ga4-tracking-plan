@@ -3,19 +3,84 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from collections import Counter
 from pathlib import Path
 
+from jsonschema import Draft202012Validator
+
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_MANIFEST = ROOT / "skill" / "references" / "02-commands" / "fresh-agent-evaluation-cases.json"
+DEFAULT_MANIFEST = ROOT / "maintenance" / "evaluations" / "fresh-agent-evaluation-cases.json"
 REQUIRED_CATEGORIES = {"whole_site_ecommerce", "lead_generation", "client_template", "screenshot_evidence"}
 SEVERITIES = {"blocking", "quality"}
 REAL_DOMAIN_RE = re.compile(r"https?://([^/\s]+)", re.I)
+MANIFEST_SCHEMA = {
+    "type": "object",
+    "required": ["version", "cases"],
+    "properties": {
+        "version": {"const": "1.0"},
+        "pass_rule": {
+            "type": "object",
+            "properties": {
+                "quality_criteria_minimum_ratio": {"type": "number", "minimum": 0, "maximum": 1},
+            },
+        },
+        "cases": {
+            "type": "array",
+            "minItems": 4,
+            "allOf": [
+                {
+                    "contains": {
+                        "type": "object",
+                        "required": ["category"],
+                        "properties": {"category": {"const": category}},
+                    }
+                }
+                for category in sorted(REQUIRED_CATEGORIES)
+            ],
+            "items": {
+                "type": "object",
+                "required": ["case_id", "category", "title", "prompt", "required_outcomes", "prohibited_outcomes"],
+                "properties": {
+                    "case_id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+                    "category": {"type": "string", "minLength": 1},
+                    "title": {"type": "string", "minLength": 1},
+                    "prompt": {"type": "string", "pattern": r"^\S+(?:\s+\S+){19,}"},
+                    "required_outcomes": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                            "type": "object",
+                            "required": ["criterion_id", "severity", "description"],
+                            "properties": {
+                                "criterion_id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+                                "severity": {"enum": sorted(SEVERITIES)},
+                                "description": {"type": "string", "pattern": r"^\S+(?:\s+\S+){4,}"},
+                            },
+                        },
+                    },
+                    "prohibited_outcomes": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                            "type": "object",
+                            "required": ["criterion_id", "description"],
+                            "properties": {
+                                "criterion_id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+                                "description": {"type": "string", "pattern": r"^\S+(?:\s+\S+){4,}"},
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+}
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate or score the GA4 skill fresh-agent acceptance suite.")
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST, help="Evaluation case manifest.")
-    parser.add_argument("--results", type=Path, help="Completed evaluation results to score.")
+    parser.add_argument("--results", type=Path, required=True, help="Completed results from actual fresh-agent sessions.")
     return parser.parse_args()
 
 
@@ -27,61 +92,31 @@ def load_json(path: Path) -> dict:
 
 
 def validate_manifest(manifest: dict) -> list[str]:
-    errors: list[str] = []
+    errors = [f"{error.json_path}: {error.message}" for error in Draft202012Validator(MANIFEST_SCHEMA).iter_errors(manifest)]
     cases = manifest.get("cases")
-    if manifest.get("version") != "1.0":
-        errors.append("Manifest version must be 1.0.")
-    if not isinstance(cases, list) or len(cases) < 4:
-        return [*errors, "Manifest must contain at least four fresh-agent cases."]
-    case_ids: set[str] = set()
-    categories: set[str] = set()
-    for index, case in enumerate(cases):
-        base = f"cases[{index}]"
-        if not isinstance(case, dict):
-            errors.append(f"{base} must be an object.")
-            continue
-        case_id = str(case.get("case_id", ""))
-        if not re.fullmatch(r"[a-z0-9_]+", case_id):
-            errors.append(f"{base}.case_id must use lowercase ASCII snake_case.")
-        elif case_id in case_ids:
-            errors.append(f"Duplicate case_id: {case_id}.")
-        case_ids.add(case_id)
-        categories.add(str(case.get("category", "")))
+    if not isinstance(cases, list):
+        return errors
+    valid_cases = [case for case in cases if isinstance(case, dict)]
+    case_ids = Counter(str(case.get("case_id", "")) for case in valid_cases)
+    errors.extend(f"Duplicate case_id: {case_id}." for case_id, count in case_ids.items() if case_id and count > 1)
+    for index, case in enumerate(valid_cases):
         prompt = str(case.get("prompt", ""))
-        if len(prompt.split()) < 20:
-            errors.append(f"{base}.prompt is too short to be reproducible.")
         for domain in REAL_DOMAIN_RE.findall(prompt):
             domain = domain.rstrip(".,;:)")
             if domain.lower() != "example.com" and not domain.lower().endswith(".example.com"):
-                errors.append(f"{base}.prompt contains a non-generic domain: {domain}.")
-        required = case.get("required_outcomes")
-        prohibited = case.get("prohibited_outcomes")
-        if not isinstance(required, list) or not required:
-            errors.append(f"{base}.required_outcomes must be a non-empty list.")
-            required = []
-        if not isinstance(prohibited, list) or not prohibited:
-            errors.append(f"{base}.prohibited_outcomes must be a non-empty list.")
-            prohibited = []
-        criterion_ids: set[str] = set()
-        for criterion in required:
-            criterion_id = str(criterion.get("criterion_id", "")) if isinstance(criterion, dict) else ""
-            if not criterion_id or criterion_id in criterion_ids:
-                errors.append(f"{base} has a missing or duplicate required criterion_id.")
-            criterion_ids.add(criterion_id)
-            if not isinstance(criterion, dict) or criterion.get("severity") not in SEVERITIES:
-                errors.append(f"{base}.{criterion_id or 'required'} must use severity blocking or quality.")
-            if not isinstance(criterion, dict) or len(str(criterion.get("description", "")).split()) < 5:
-                errors.append(f"{base}.{criterion_id or 'required'} needs a clear description.")
-        for criterion in prohibited:
-            criterion_id = str(criterion.get("criterion_id", "")) if isinstance(criterion, dict) else ""
-            if not criterion_id or criterion_id in criterion_ids:
-                errors.append(f"{base} has a missing or duplicate prohibited criterion_id.")
-            criterion_ids.add(criterion_id)
-            if not isinstance(criterion, dict) or len(str(criterion.get("description", "")).split()) < 5:
-                errors.append(f"{base}.{criterion_id or 'prohibited'} needs a clear description.")
-    missing = sorted(REQUIRED_CATEGORIES - categories)
-    if missing:
-        errors.append(f"Manifest is missing required categories: {', '.join(missing)}.")
+                errors.append(f"cases[{index}].prompt contains a non-generic domain: {domain}.")
+        match case:
+            case {"required_outcomes": list() as required, "prohibited_outcomes": list() as prohibited}:
+                criterion_ids = Counter(
+                    str(criterion.get("criterion_id", ""))
+                    for criterion in [*required, *prohibited]
+                    if isinstance(criterion, dict)
+                )
+                errors.extend(
+                    f"cases[{index}] has a duplicate criterion_id: {criterion_id}."
+                    for criterion_id, count in criterion_ids.items()
+                    if criterion_id and count > 1
+                )
     return errors
 
 
@@ -130,15 +165,13 @@ def main() -> int:
     args = parse_args()
     manifest = load_json(args.manifest)
     errors = validate_manifest(manifest)
-    if not errors and args.results:
+    if not errors:
         errors.extend(score_results(manifest, load_json(args.results)))
     if errors:
         for error in errors:
             print(f"ERROR {error}")
         return 1
-    print(f"Fresh-agent evaluation manifest passed ({len(manifest['cases'])} cases).")
-    if args.results:
-        print("Fresh-agent evaluation results passed.")
+    print(f"Fresh-agent evaluation results passed ({len(manifest['cases'])} cases).")
     return 0
 
 

@@ -35,6 +35,16 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def discovery_outcome(pages: list[dict], errors: list[SourceError]) -> tuple[str, int, str]:
+    usable = sum(not page.get("fetch_error") for page in pages)
+    root_failed = bool(pages and pages[0].get("fetch_error"))
+    if usable == 0:
+        return "blocked", usable, "Rendered discovery produced no usable page evidence."
+    if errors or root_failed:
+        return "partial", usable, "Rendered discovery is partial; inspect source_errors before claiming website coverage."
+    return "completed", usable, "Rendered discovery completed for the sampled public pages."
+
+
 def require_playwright():
     try:
         from playwright.sync_api import sync_playwright
@@ -138,10 +148,15 @@ def main() -> int:
         context.close()
         browser.close()
 
+    outcome, usable_page_count, delivery_notice = discovery_outcome(pages, errors)
     output = {
         "root_url": root_url,
         "generated_by": "discover_site_journeys_playwright.py",
         "crawl_mode": "playwright_rendered_dom",
+        "outcome": outcome,
+        "attempted_page_count": len(pages),
+        "usable_page_count": usable_page_count,
+        "delivery_notice": delivery_notice,
         "browser": {
             "requested": args.browser,
             "selected_channel": browser_channel,
@@ -161,13 +176,13 @@ def main() -> int:
         "notes": [
             "This helper samples rendered DOM pages. It does not submit forms, log in, place orders, or mutate live state.",
             "This crawler is not authenticated exploration. Use an interactive browser or Playwright MCP with synthetic information for gated journeys.",
-            "Never infer events behind authentication from this rendered-DOM inventory. If interactive access fails, record a coverage gap and propose no gated events.",
+            "Never claim site-specific gated capabilities from this rendered-DOM inventory. If interactive access fails, record the coverage gap; applicable official or recurrent sector outcomes may remain visibly recommended with to-confirm website data and precise success conditions.",
         ],
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
     print(args.output)
-    return 0
+    return 0 if outcome == "completed" else 1
 
 
 if __name__ == "__main__":

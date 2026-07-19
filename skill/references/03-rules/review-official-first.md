@@ -12,14 +12,18 @@ intent into GA4.
 5. Accept a custom event only when official semantics do not fit.
 6. Verify event and item parameters, scope, availability, ownership, privacy,
    cardinality, and custom-definition need.
-7. Remove Universal Analytics fields and generic wrapper events.
-8. Keep only human-useful workbook content.
+7. Produce a live source receipt, resolve a new plan artifact, and validate
+   that exact artifact before rendering.
+8. Remove Universal Analytics fields, generic wrapper events, and duplicate
+   GA4 payload or ecommerce-profile snapshots.
+9. Keep only human-useful workbook content.
 
 ## Evidence Quality
 
 An event is not justified merely because a button exists. Use website evidence,
 client documentation, business requirements, or a clearly labelled analyst
-inference. State confidence and what must be confirmed.
+recommendation. Recommendations record a structured basis, confirmation need,
+and owner; do not rely on vague prose or arbitrary word counts.
 
 ## Human Output
 

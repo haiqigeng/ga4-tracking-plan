@@ -57,7 +57,7 @@ def _check_notice(capture: dict[str, Any], base: str, issues: list[Issue]) -> No
             f"{base}.delivery_notice",
             "The delivery notice must explicitly state the screenshot-capture outcome for the analyst.",
         )
-    if outcome in {"blocked", "partially_captured"} and len(notice.split()) < 6:
+    if outcome in {"blocked", "partially_captured"} and not notice:
         add_issue(
             issues,
             "error",
@@ -142,13 +142,13 @@ def _check_not_requested_capture(capture: dict[str, Any], rows: list[dict[str, A
             base,
             "When screenshots are not requested, the Playwright MCP attempt must be not_required and the capture outcome must be not_requested.",
         )
-    if any(str(row.get("status", "")) != "not_needed" for row in rows):
+    if rows:
         add_issue(
             issues,
             "error",
             "SCREENSHOT_EVIDENCE_NOT_REQUESTED",
             "$.screenshot_evidence",
-            "A no-screenshot plan must mark every Screenshot Register row not_needed rather than leaving captured or blocked evidence.",
+            "A no-screenshot plan must omit Screenshot Register evidence rows entirely.",
         )
 
 
@@ -186,7 +186,7 @@ def check_screenshot_row(
         add_issue(issues, "error", "SCREENSHOT_FILE_MISSING", f"{base}.file_name", f"Screenshot status '{status}' requires an explicit evidence file name.")
     if status == "shared_evidence" and len(related) < 2:
         add_issue(issues, "error", "SCREENSHOT_SHARED_WITH_ONE_EVENT", f"{base}.event_ids", "shared_evidence must reference at least two events.")
-    if status == "shared_evidence" and len(str(row.get("shared_reason", "")).split()) < 4:
+    if status == "shared_evidence" and not str(row.get("shared_reason", "")).strip():
         add_issue(issues, "error", "SCREENSHOT_SHARED_REASON_WEAK", f"{base}.shared_reason", "Shared screenshot evidence needs a clear reason describing the common page state or interaction.")
     if file_name:
         file_usage[file_name.lower()].append(row)
@@ -225,8 +225,8 @@ def check_all_scenario_screenshots(index: int, scenarios: list[str], rows: list[
 
 
 def check_not_needed_screenshot(index: int, scenarios: list[str], rows: list[dict[str, Any]], issues: list[Issue]) -> None:
-    if scenarios or len(rows) != 1 or rows[0].get("status") != "not_needed":
-        add_issue(issues, "error", "SCREENSHOT_NOT_NEEDED_INVALID", f"$.events[{index}].screenshot_coverage", "Not-needed coverage must have no scenarios and one explicit not_needed evidence row.")
+    if scenarios or rows:
+        add_issue(issues, "error", "SCREENSHOT_NOT_NEEDED_INVALID", f"$.events[{index}].screenshot_coverage", "Not-needed coverage must have no scenarios and no evidence rows.")
 
 
 def check_event_screenshot_mode(
@@ -294,8 +294,9 @@ def check_screenshot_evidence(plan: dict[str, Any], issues: list[Issue]) -> None
     for index, row in enumerate(rows):
         check_screenshot_row(row, index, event_ids, covered, file_usage, issues)
 
+    screenshots_not_requested = screenshot_capture_requirement(plan) == "not_requested"
     for event_id in sorted(event_ids):
-        if covered[event_id] == 0:
+        if covered[event_id] == 0 and not screenshots_not_requested:
             add_issue(issues, "error", "SCREENSHOT_EVENT_MISSING", "$.screenshot_evidence", f"Event '{event_id}' needs a screenshot-evidence row or an explicit not-needed decision.")
 
     for file_name, reused_rows in file_usage.items():
@@ -308,4 +309,4 @@ def check_screenshot_evidence(plan: dict[str, Any], issues: list[Issue]) -> None
                 "$.screenshot_evidence",
                 f"Screenshot '{file_name}' is reused across events without one explicit shared_evidence row.",
             )
-    check_screenshot_coverage(events, rows, screenshot_capture_requirement(plan) == "not_requested", issues)
+    check_screenshot_coverage(events, rows, screenshots_not_requested, issues)

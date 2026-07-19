@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from official_ga4_catalog import event_parameter_order, load_catalog
+from tracking_plan_contract import event_ga4_payload, event_parameter_names
 
 ECOMMERCE_GROUP_BY_EVENT = {
     "view_promotion": "Ecommerce promotions",
@@ -21,16 +22,6 @@ ECOMMERCE_GROUP_BY_EVENT = {
     "purchase": "Ecommerce transactions",
     "refund": "Ecommerce transactions",
 }
-
-ECOMMERCE_GROUP_ORDER = [
-    "Ecommerce promotions",
-    "Ecommerce product lists",
-    "Ecommerce product detail",
-    "Ecommerce cart",
-    "Ecommerce checkout",
-    "Ecommerce transactions",
-    "Ecommerce other",
-]
 
 COMMON_ITEM_PARAMETERS = [
     "items[].item_id",
@@ -256,31 +247,27 @@ def scope_rule(parameter: str) -> str:
 
 
 def ordered_parameters_for_events(events: list[dict[str, Any]]) -> list[str]:
+    selected: list[str] = []
+    for event in events:
+        for parameter in event_parameter_names(event):
+            if parameter not in selected:
+                selected.append(parameter)
+
     if events and all(is_ecommerce_event(event) for event in events):
-        profile = None
-        if len(events) == 1:
-            event_profile = events[0].get("parameter_profile", {})
-            if isinstance(event_profile, dict):
-                profile = event_profile.get("profile_id")
+        profile = ECOMMERCE_PROFILE_BY_EVENT.get(str(events[0].get("event_name", ""))) if len(events) == 1 else None
         if profile in ECOMMERCE_PARAMETERS_BY_PROFILE:
-            ordered = list(ECOMMERCE_PARAMETERS_BY_PROFILE[profile])
+            canonical = list(ECOMMERCE_PARAMETERS_BY_PROFILE[profile])
         else:
             group = ecommerce_group(str(events[0].get("event_name", "")))
-            ordered = list(ECOMMERCE_PARAMETERS_BY_GROUP.get(group, ECOMMERCE_PARAMETERS_BY_GROUP["Ecommerce other"]))
+            canonical = list(ECOMMERCE_PARAMETERS_BY_GROUP.get(group, ECOMMERCE_PARAMETERS_BY_GROUP["Ecommerce other"]))
+        ordered = [parameter for parameter in canonical if parameter in selected]
     else:
         ordered = []
 
-    for event in events:
-        for parameter in event.get("parameters", []):
-            if parameter not in ordered:
-                ordered.append(parameter)
+    for parameter in selected:
+        if parameter not in ordered:
+            ordered.append(parameter)
     return ordered
-
-
-def event_order_key(event: dict[str, Any]) -> tuple[int, str]:
-    family = event_family(event)
-    family_rank = ECOMMERCE_GROUP_ORDER.index(family) if family in ECOMMERCE_GROUP_ORDER else len(ECOMMERCE_GROUP_ORDER)
-    return family_rank, str(event.get("event_name", ""))
 
 
 def nested_value(data: Any, path: str) -> Any:
@@ -294,7 +281,7 @@ def nested_value(data: Any, path: str) -> Any:
 
 
 def event_level_value(event: dict[str, Any], parameter: str) -> Any:
-    payload = event.get("ga4_payload", {})
+    payload = event_ga4_payload(event)
     params = payload.get("parameters", {}) if isinstance(payload.get("parameters"), dict) else {}
     if parameter in params:
         return params[parameter]
@@ -304,7 +291,7 @@ def event_level_value(event: dict[str, Any], parameter: str) -> Any:
 
 def item_values(event: dict[str, Any], parameter: str) -> list[Any]:
     key = parameter.split(".", 1)[1]
-    payload_items = event.get("ga4_payload", {}).get("items", [])
+    payload_items = event_ga4_payload(event).get("items", [])
     values = [item.get(key) for item in payload_items if isinstance(item, dict) and item.get(key) not in (None, "")]
     if values:
         return values
@@ -316,25 +303,22 @@ def item_values(event: dict[str, Any], parameter: str) -> list[Any]:
 
 
 def ecommerce_parameter_applicability(event: dict[str, Any], parameter: str) -> str:
-    event_name = str(event.get("event_name", ""))
     if not is_ecommerce_event(event):
-        return "send" if parameter in event.get("parameters", []) else "not_applicable"
+        return "send" if parameter in event_parameter_names(event) else "not_applicable"
     if parameter.startswith("items[]."):
+        if parameter not in event_parameter_names(event):
+            return "not_applicable"
         if parameter in ITEM_FALLBACK_TO_EVENT_LEVEL:
             counterpart = ITEM_FALLBACK_TO_EVENT_LEVEL[parameter]
             if event_level_value(event, counterpart) not in (None, ""):
                 return "event_level_used"
         if parameter == "items[].quantity":
             return "send"
-        if parameter in PROMOTION_ITEM_PARAMETERS and event_name not in {"view_promotion", "select_promotion"}:
+        if parameter in PROMOTION_ITEM_PARAMETERS and event.get("event_name") not in {"view_promotion", "select_promotion"}:
             return "not_applicable"
-        if parameter in COMMON_ITEM_PARAMETERS or parameter in PROMOTION_ITEM_PARAMETERS:
-            return "send"
-        return "send" if parameter in event.get("parameters", []) else "not_applicable"
-
-    if parameter in EVENT_PARAMETERS_BY_EVENT.get(event_name, set()):
         return "send"
-    if parameter in event.get("parameters", []):
+
+    if parameter in event_parameter_names(event):
         return "send"
     return "not_applicable"
 
@@ -344,10 +328,15 @@ def parameter_matrix_value(event: dict[str, Any], parameter: str) -> str:
         return str(event.get("data_layer", {}).get("event_key") or event.get("event_name") or "")
 
     if parameter == "items":
-        items = event.get("ga4_payload", {}).get("items", [])
+        if is_ecommerce_event(event) and parameter not in event_parameter_names(event):
+            return "not_applicable"
+        items = event_ga4_payload(event).get("items", [])
         return compact_json(items) if items else "Required when ecommerce context is sent"
 
     if parameter.startswith("items[]."):
+        applicability = ecommerce_parameter_applicability(event, parameter)
+        if applicability == "not_applicable":
+            return "not_applicable"
         values = item_values(event, parameter)
         if values:
             return join_values(values)
@@ -358,16 +347,16 @@ def parameter_matrix_value(event: dict[str, Any], parameter: str) -> str:
                 return f"event-level {counterpart}: {compact_json(fallback)}"
         if parameter == "items[].quantity" and is_ecommerce_event(event):
             return "1"
-        applicability = ecommerce_parameter_applicability(event, parameter)
-        return "not_applicable" if applicability == "not_applicable" else "not_available"
+        return "not_available"
 
+    if is_ecommerce_event(event) and ecommerce_parameter_applicability(event, parameter) == "not_applicable":
+        return "not_applicable"
     value = event_level_value(event, parameter)
     if value not in (None, ""):
         return compact_json(value)
 
     if is_ecommerce_event(event):
-        applicability = ecommerce_parameter_applicability(event, parameter)
-        return "not_applicable" if applicability == "not_applicable" else "not_available"
+        return "not_available"
     return "-"
 
 

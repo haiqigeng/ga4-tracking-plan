@@ -23,13 +23,20 @@ privacy, workbook readability, or deterministic validation.
 
 ```powershell
 ruff check .
-python -m compileall -q scripts skill/scripts tests
+python -m compileall -q scripts skill/scripts maintenance/scripts tests
 python -m unittest discover -s tests
 python -m coverage run --source=skill/scripts -m unittest discover -s tests
-python scripts/validate_fresh_agent_evals.py
+python scripts/validate_eval_manifest.py
 python scripts/check_official_catalog.py --offline
 python scripts/validate_package.py
 ```
 
 Release assets must be created with `scripts/create_release_package.py` and
 must contain only generic reusable files.
+
+`validate_eval_manifest.py` checks only evaluation-case structure. A real
+fresh-agent release gate requires clean sessions and a completed result file:
+
+```powershell
+python scripts/validate_fresh_agent_evals.py --results path\to\fresh-agent-results.json
+```

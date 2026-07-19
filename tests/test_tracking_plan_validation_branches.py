@@ -48,15 +48,14 @@ class TrackingPlanValidationBranchTests(unittest.TestCase):
         context["execution_mode"] = "client_template_adaptation"
         context["input_artifact_inventory"] = []
         context["template_policy"].update(
-            {"mode": "default_skill_template", "template_diff_required": True, "preservation_requirements": []}
+            {"mode": "default_skill_template", "template_diff_required": False, "preservation_requirements": []}
         )
-        context.pop("template_diff_summary", None)
         codes = self.codes(plan)
         self.assertTrue(
             {
                 "CLIENT_TEMPLATE_POLICY_MISSING",
                 "CLIENT_TEMPLATE_ARTIFACT_MISSING",
-                "TEMPLATE_DIFF_SUMMARY_MISSING",
+                "TEMPLATE_ARTIFACT_DIFF_NOT_REQUIRED",
             }
             <= codes
         )
@@ -71,7 +70,7 @@ class TrackingPlanValidationBranchTests(unittest.TestCase):
 
     def test_measurement_alignment_and_strategy_fail_closed(self) -> None:
         plan = copy.deepcopy(self.fixture)
-        plan["events"][0]["journey_id"] = "unknown_journey"
+        plan["events"][0]["journey_ids"] = ["unknown_journey"]
         plan["measurement_brief"].append(copy.deepcopy(plan["measurement_brief"][0]))
         plan["measurement_brief"][-1].update({"journey_id": "empty_journey", "success_signals": []})
         plan["measurement_strategy"]["page_roles"][0]["journey_id"] = "strategy_unknown"
@@ -84,7 +83,6 @@ class TrackingPlanValidationBranchTests(unittest.TestCase):
                 "EVENT_JOURNEY_UNKNOWN",
                 "JOURNEY_HAS_NO_EVENTS",
                 "STRATEGY_JOURNEY_UNKNOWN",
-                "STRATEGY_EVENT_FAMILY_REASON_WEAK",
                 "EVENT_FAMILY_UNKNOWN",
                 "CUSTOM_EVENT_ACCEPTANCE_MISSING",
             }
@@ -164,7 +162,7 @@ class TrackingPlanValidationBranchTests(unittest.TestCase):
         }
         check_screenshot_row(row, 0, {"KNOWN"}, Counter(), defaultdict(list), issues)
         self.assertTrue(
-            {"SCREENSHOT_EVENT_UNKNOWN", "SCREENSHOT_FILE_MISSING", "SCREENSHOT_SHARED_WITH_ONE_EVENT", "SCREENSHOT_SHARED_REASON_WEAK"}
+            {"SCREENSHOT_EVENT_UNKNOWN", "SCREENSHOT_FILE_MISSING", "SCREENSHOT_SHARED_WITH_ONE_EVENT"}
             <= {issue.code for issue in issues}
         )
 
@@ -231,9 +229,9 @@ class TrackingPlanValidationBranchTests(unittest.TestCase):
                 "scope": "event",
                 "official_verification": {
                     "status": "not_applicable",
-                    "source_url": "https://developers.google.com/analytics/devguides/collection/ga4/item-scoped-ecommerce",
-                    "checked_date": "2026-06-29",
+                    "source_id": "not_applicable",
                     "scope_note": "Custom item parameter is not official.",
+                    "translation_status": "not_needed",
                 },
             }
         )

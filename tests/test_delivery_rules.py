@@ -22,6 +22,21 @@ class DeliveryRuleTests(unittest.TestCase):
     def codes(self, plan: dict) -> set[str]:
         return {issue.code for issue in validate_plan_data(plan)}
 
+    @staticmethod
+    def add_binding(event: dict, parameter_name: str) -> None:
+        event["parameter_bindings"].append(
+            {
+                "parameter_name": parameter_name,
+                "requirement": "optional",
+                "condition": "",
+                "inclusion_reason": "Supports the scoped attribution or diagnostic analysis for this event.",
+                "availability": "to_confirm",
+                "data_owner": "Web development team",
+                "official_source_id": str(event.get("official_verification", {}).get("source_id", "")),
+                "official_source_locator": parameter_name,
+            }
+        )
+
     def test_manual_event_needs_developer_example(self) -> None:
         plan = copy.deepcopy(self.fixture)
         del plan["events"][3]["data_layer"]
@@ -33,10 +48,48 @@ class DeliveryRuleTests(unittest.TestCase):
         push.update(push.pop("ecommerce"))
         self.assertIn("GTM_ECOMMERCE_WRAPPER_MISSING", self.codes(plan))
 
-    def test_controlled_values_use_english_ascii(self) -> None:
+    def test_non_ecommerce_parameters_use_event_data_wrapper(self) -> None:
         plan = copy.deepcopy(self.fixture)
-        plan["parameters"][3]["allowed_values"] = ["prêt_a_porter"]
-        self.assertIn("CONTROLLED_VALUE_NOT_ENGLISH_ASCII", self.codes(plan))
+        event = next(item for item in plan["events"] if item["event_name"] == "search")
+        push = event["data_layer"]["push"]
+        push["search_term"] = push["event_data"].pop("search_term")
+        self.assertIn("DATALAYER_ROOT_FIELD_UNWRAPPED", self.codes(plan))
+
+    def test_wrapper_key_matches_final_ga4_parameter(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        event = next(item for item in plan["events"] if item["event_name"] == "search")
+        push = event["data_layer"]["push"]
+        push["event_data"]["query"] = push["event_data"].pop("search_term")
+        self.assertIn("DATALAYER_PARAMETER_MAPPING_MISSING", self.codes(plan))
+
+    def test_page_context_uses_page_wrapper(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        event = next(item for item in plan["events"] if item["event_name"] == "page_view")
+        push = event["data_layer"]["push"]
+        push["page_data"] = push.pop("page")
+        self.assertIn("DATALAYER_ROOT_FIELD_UNWRAPPED", self.codes(plan))
+
+        native_plan = copy.deepcopy(self.fixture)
+        native_event = next(item for item in native_plan["events"] if item["event_name"] == "page_view")
+        native_event["data_layer"]["push"]["event"] = "page_view"
+        self.assertIn("NATIVE_EVENT_MANUAL_PUSH", self.codes(native_plan))
+
+        manual_plan = copy.deepcopy(self.fixture)
+        manual_event = next(item for item in manual_plan["events"] if item["event_name"] == "page_view")
+        manual_event["collection_strategy"]["collection_source"] = "manual_gtm"
+        manual_event["data_layer"]["push"]["event"] = "page_view"
+        self.assertNotIn("NATIVE_EVENT_MANUAL_PUSH", self.codes(manual_plan))
+        self.assertNotIn("DATALAYER_TRIGGER_MISMATCH", self.codes(manual_plan))
+
+    def test_connected_user_state_uses_user_wrapper(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        plan["user_context"]["data_layer_object"] = "user_context"
+        self.assertIn("USER_CONTEXT_OBJECT_INVALID", self.codes(plan))
+
+    def test_controlled_values_use_selected_language_ascii_snake_case(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        plan["parameters"][3]["value_domain"]["entries"][0]["normalized_value"] = "prêt_a_porter"
+        self.assertIn("CONTROLLED_VALUE_FORMAT_INVALID", self.codes(plan))
 
     def test_whole_site_navigation_needs_surface_model(self) -> None:
         plan = copy.deepcopy(self.fixture)
@@ -59,7 +112,7 @@ class DeliveryRuleTests(unittest.TestCase):
 
     def test_variant_availability_is_not_default_list_data(self) -> None:
         plan = copy.deepcopy(self.fixture)
-        plan["events"][1]["parameters"].append("items[].availability_status")
+        self.add_binding(plan["events"][1], "items[].availability_status")
         self.assertIn("AVAILABILITY_STATUS_SCOPE_INVALID", self.codes(plan))
 
     def test_checkout_needs_payment_failure_branch(self) -> None:
@@ -67,6 +120,23 @@ class DeliveryRuleTests(unittest.TestCase):
         plan["events"][0]["event_name"] = "add_payment_info"
         plan["events"][1]["event_name"] = "purchase"
         self.assertIn("PAYMENT_FAILURE_BRANCH_MISSING", self.codes(plan))
+
+    def test_ecommerce_list_values_cannot_be_sent_at_both_scopes(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        event = next(item for item in plan["events"] if item["event_name"] == "view_promotion")
+        self.add_binding(event, "items[].promotion_id")
+        event["data_layer"]["push"]["ecommerce"]["items"][0]["promotion_id"] = "%promotion_id%"
+        self.assertIn("ECOMMERCE_DUPLICATE_SCOPE_PRECEDENCE", self.codes(plan))
+
+    def test_downstream_list_attribution_is_not_approved_by_prose_heuristics(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        event = next(item for item in plan["events"] if item["event_name"] == "view_promotion")
+        event["event_name"] = "add_to_cart"
+        event["data_layer"]["event_key"] = "add_to_cart"
+        event["data_layer"]["push"]["event"] = "add_to_cart"
+        self.add_binding(event, "items[].item_list_id")
+        event["data_layer"]["push"]["ecommerce"]["items"][0]["item_list_id"] = "homepage_recommendations"
+        self.assertNotIn("ECOMMERCE_DOWNSTREAM_LIST_ATTRIBUTION_UNJUSTIFIED", self.codes(plan))
 
     def test_multiple_lead_outcomes_need_a_deliberate_event_model(self) -> None:
         plan = copy.deepcopy(self.fixture)
@@ -78,7 +148,6 @@ class DeliveryRuleTests(unittest.TestCase):
         event["page_or_component"] = "Newsletter, catalogue, and contact forms"
         event["data_layer"]["event_key"] = "generate_lead"
         event["data_layer"]["push"]["event"] = "generate_lead"
-        event["ga4_payload"]["event_name"] = "generate_lead"
         plan["events"].append(event)
         self.assertIn("LEAD_MODEL_NOT_APPLICABLE_CONFLICT", self.codes(plan))
 
@@ -100,7 +169,7 @@ class DeliveryRuleTests(unittest.TestCase):
         plan["website_coverage_map"]["authenticated_journey"]["discovery_status"] = "authenticated_observed"
         self.assertIn("AUTHENTICATED_OUTCOMES_MISSING", self.codes(plan))
 
-    def test_blocked_customer_space_does_not_require_invented_events(self) -> None:
+    def test_blocked_customer_space_still_requires_recommended_outcome_coverage(self) -> None:
         plan = copy.deepcopy(self.fixture)
         plan["website_coverage_map"]["site_scope"] = "whole_site"
         plan["measurement_brief"][0]["scope"] = "Authenticated customer space, account orders and returns"
@@ -111,7 +180,67 @@ class DeliveryRuleTests(unittest.TestCase):
             "evidence": ["Signup required a real customer identifier"],
             "gap_reason": "The flow required a real customer identifier that was unavailable.",
         }
-        self.assertNotIn("AUTHENTICATED_OUTCOMES_MISSING", self.codes(plan))
+        self.assertIn("AUTHENTICATED_OUTCOMES_MISSING", self.codes(plan))
+
+    def test_blocked_authentication_allows_official_recommendation(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        plan["website_coverage_map"]["authenticated_journey"] = {
+            "applicable": True,
+            "discovery_status": "attempted_blocked",
+            "attempted_actions": ["Attempted synthetic login"],
+            "evidence": ["Authentication could not be completed"],
+            "gap_reason": "The account required a real customer identifier that was unavailable.",
+        }
+        event = next(item for item in plan["events"] if item["event_name"] == "search")
+        event["access_context"] = "authenticated_area"
+        event["trigger"] = "Fire once after the authenticated search results are successfully confirmed by the application."
+        event["data_dependencies"].append("Application confirmation that authenticated search results loaded successfully")
+        event["evidence_basis"] = {
+            "status": "recommended",
+            "source_refs": ["Official GA4 recommended search event", "Governed customer-space scenario"],
+            "confidence": "medium",
+        }
+        codes = self.codes(plan)
+        self.assertNotIn("UNVERIFIED_AUTHENTICATED_EVENT", codes)
+        self.assertNotIn("AUTHENTICATED_EVENT_EVIDENCE_WEAK", codes)
+
+    def test_blocked_authentication_allows_accepted_custom_recommendation(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        plan["website_coverage_map"]["authenticated_journey"] = {
+            "applicable": True,
+            "discovery_status": "attempted_blocked",
+            "attempted_actions": ["Attempted synthetic login"],
+            "evidence": ["Authentication could not be completed"],
+            "gap_reason": "The account required a real customer identifier that was unavailable.",
+        }
+        event = next(item for item in plan["events"] if item["event_name"] == "account_access_intent")
+        event["event_name"] = "view_order_history"
+        event["access_context"] = "authenticated_area"
+        event["trigger"] = "Fire once after the backend confirms that the authenticated order-history view loaded successfully."
+        event["data_layer"]["event_key"] = "view_order_history"
+        event["data_layer"]["push"]["event"] = "view_order_history"
+        event["evidence_basis"] = {
+            "status": "recommended",
+            "source_refs": ["Governed retail customer-space scenario"],
+            "confidence": "low",
+        }
+        plan["measurement_strategy"]["custom_event_acceptance"][0]["event_name"] = "view_order_history"
+        codes = self.codes(plan)
+        self.assertNotIn("UNVERIFIED_AUTHENTICATED_EVENT", codes)
+        self.assertNotIn("AUTHENTICATED_EVENT_EVIDENCE_WEAK", codes)
+
+    def test_unobserved_recommendation_cannot_claim_high_confidence(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        plan["website_coverage_map"]["authenticated_journey"]["discovery_status"] = "attempted_blocked"
+        event = next(item for item in plan["events"] if item["event_name"] == "search")
+        event["access_context"] = "authenticated_area"
+        event["trigger"] = "Fire after the backend confirms successful search results."
+        event["evidence_basis"] = {
+            "status": "recommended",
+            "source_refs": ["Official GA4 recommended search event"],
+            "confidence": "high",
+        }
+        self.assertIn("UNOBSERVED_RECOMMENDATION_CONFIDENCE_HIGH", self.codes(plan))
 
     def test_generic_event_behind_login_cannot_be_inferred(self) -> None:
         plan = copy.deepcopy(self.fixture)
@@ -161,14 +290,14 @@ class DeliveryRuleTests(unittest.TestCase):
 
     def test_user_id_must_not_be_an_event_parameter(self) -> None:
         plan = copy.deepcopy(self.fixture)
-        plan["events"][3]["parameters"].append("user_id")
-        plan["events"][3]["ga4_payload"]["parameters"]["user_id"] = "customer_123"
+        self.add_binding(plan["events"][3], "user_id")
+        plan["events"][3]["data_layer"]["push"]["event_data"]["user_id"] = "customer_123"
         self.assertIn("USER_ID_EVENT_PARAMETER_INVALID", self.codes(plan))
 
-    def test_user_property_reuses_parameter_reference_values(self) -> None:
+    def test_user_property_does_not_duplicate_parameter_reference_values(self) -> None:
         plan = copy.deepcopy(self.fixture)
         plan["user_context"]["user_properties"][0]["allowed_values"] = ["signed_in", "signed_out"]
-        self.assertIn("USER_PROPERTY_VALUES_MISMATCH", self.codes(plan))
+        self.assertIn("SCHEMA_VALIDATION", self.codes(plan))
 
     def test_governed_advertising_user_data_remains_outside_ga4(self) -> None:
         plan = copy.deepcopy(self.fixture)
@@ -194,10 +323,26 @@ class DeliveryRuleTests(unittest.TestCase):
         }
         self.assertIn("AD_USER_DATA_GOVERNANCE_WEAK", self.codes(plan))
 
-    def test_order_cancellation_is_not_covered_by_refund_alone(self) -> None:
+    def test_scope_prose_does_not_infer_an_order_cancellation_event(self) -> None:
         plan = copy.deepcopy(self.fixture)
         plan["measurement_brief"][0]["scope"] = "Post-purchase order cancellation"
-        self.assertIn("ORDER_CANCELLATION_EVENT_MISSING", self.codes(plan))
+        self.assertNotIn("ORDER_CANCELLATION_EVENT_MISSING", self.codes(plan))
+
+    def test_whole_site_retail_needs_explicit_funnel_and_service_decisions(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        plan["website_coverage_map"]["site_scope"] = "whole_site"
+        self.assertIn("WHOLE_SITE_ECOMMERCE_EVENT_DECISION_MISSING", self.codes(plan))
+
+    def test_blocked_browser_access_is_not_an_ecommerce_exclusion_reason(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        plan["website_coverage_map"]["site_scope"] = "whole_site"
+        plan["not_tracked"].append(
+            {
+                "interaction": "purchase",
+                "reason": "The purchase confirmation was not observed because checkout access was blocked by login.",
+            }
+        )
+        self.assertIn("ECOMMERCE_EVENT_EXCLUSION_UNCONFIRMED", self.codes(plan))
 
 
 if __name__ == "__main__":

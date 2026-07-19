@@ -57,6 +57,8 @@ Before proposing events for broad scope, capture:
   scope;
 - whether Playwright or deeper browser exploration was required, optional, not
   needed, or blocked.
+- the actual Playwright MCP attempt, selected eligible browser, journey-
+  discovery outcome, value-discovery outcome, and evidence references.
 
 Use `website_coverage_map` in the structured plan. Keep this information
 concise. Do not add a dense visible workbook tab unless the user asks for it;
@@ -84,8 +86,11 @@ python scripts/discover_site_journeys_playwright.py https://www.example.com/ --b
 ```
 
 The rendered helper samples links, forms, and buttons after page load. It does
-not submit forms, log in, place orders, or mutate live state. It is not evidence
-of a gated journey and must never be used to infer events behind authentication.
+not submit forms, log in, place orders, or mutate live state. Use an interactive
+Playwright MCP or browser session for those journeys. Static helper output is
+not evidence of a gated journey and must never be used to label a gated
+capability or event as observed, or to invent its site-specific pages, values,
+or trigger details.
 
 The preflight detects the system default browser and eligible Playwright
 channels. Prefer the eligible default, including Microsoft Edge through
@@ -103,10 +108,25 @@ rendered gated evidence as synthetic account exploration. A static crawler or
 the presence of account links is not enough.
 
 When the real authenticated flow cannot be completed, document the concrete
-coverage gap and required follow-up. Do not propose any event from the gated
-area, including generic `page_view`, `view_item_list`, `view_item`, or
-ecommerce events. Client-confirmed capabilities may be included as confirmed,
-never as analyst inference.
+evidence gap and required follow-up. Do not invent site-specific pages,
+interactions, values, capabilities, or trigger details beyond the boundary.
+This does not make a whole-site measurement specification complete: retain
+applicable official GA4 events and recurrent, governed sector or journey events
+as `recommended` rows when they answer a named business question. Mark their
+site data `to_confirm`, keep confidence low or medium, and write the canonical
+success or backend-confirmed trigger precisely. Client-confirmed capabilities
+remain `confirmed`; recommendations must never be presented as observations.
+
+Keep discovery evidence and specification coverage separate:
+
+- `authenticated_journey.discovery_status = attempted_blocked` records the
+  failed live access attempt;
+- the matching journey coverage can remain `assumed` and `included` when the
+  plan contains governed recommendation rows;
+- a coverage gap records which site-specific details still need confirmation;
+- `blocked`, CAPTCHA, missing credentials, or an unreachable confirmation page
+  is never by itself a valid reason to omit an applicable checkout, purchase,
+  refund, return, cancellation, login, signup, or customer-service branch.
 
 For an unconfirmed gated journey, execute this sequence before event design:
 
@@ -117,8 +137,11 @@ For an unconfirmed gated journey, execute this sequence before event design:
 4. Explore the visible customer navigation and each safely reachable service.
 5. Record attempted actions, representative gated URLs or states, and
    screenshot evidence without personal information.
-6. Mark only observed outcomes as events. If any step blocks access, stop at
-   the boundary, document the gap, and add no event from beyond it.
+6. Mark only observed outcomes as `observed`. If any step blocks access, stop
+   the browser at the boundary and document the gap. Then complete the
+   specification from current official GA4 semantics and governed scenario
+   rules, using `recommended` only for applicable unobserved outcomes and never
+   fabricating website values or capabilities.
 
 ## Playwright Decision
 
@@ -136,11 +159,24 @@ Use Playwright or equivalent browser exploration when:
 - the plan will be used as a real delivery and missing journeys would create
   implementation risk.
 
-Playwright is optional only when screenshots were explicitly excluded or final
-screenshots were supplied by the requester. Otherwise, a required screenshot,
-dynamic journey, or unconfirmed gated journey requires a Playwright MCP attempt
-before an interactive-browser fallback. State the attempt and its outcome in
-`screenshot_capture`; do not present a preflight as a completed attempt.
+For a whole-site plan, live rendered exploration is required even when the
+requester excludes screenshots. A sitemap or static crawl can support URL
+coverage but cannot prove dynamic journeys, interactions, or finite values.
+Record the actual outcome in `website_coverage_map.browser_exploration`.
+
+During the same exploration, inspect finite parameter domains. Exercise filters,
+sorts, menus, language selectors, shipping and payment choices, and other safely
+reachable option sets. Store only values actually observed, and link each
+exhaustive list to its browser evidence through the parameter `value_domain`
+and each observed entry's `source_ref`.
+
+The screenshot-capture attempt is optional only when screenshots were
+explicitly excluded or final screenshots were supplied by the requester. That
+does not waive live journey discovery. A dynamic journey or unconfirmed gated
+journey still requires a Playwright MCP attempt before an interactive-browser
+fallback, and a whole-site plan still records its browser-exploration outcome.
+State capture attempts in `screenshot_capture`; do not present a preflight as a
+completed attempt.
 
 ## Screenshot Capture Gate
 
@@ -163,6 +199,12 @@ Do not finalize a whole-site plan until every measurement-brief journey has a
 matching coverage entry. For any important journey not covered by evidence,
 either add a coverage gap or mark the journey as assumed, blocked, or out of
 scope.
+
+For a journey that is applicable but inaccessible, use `assumed` for the
+included specification and keep the blocked state in browser or authenticated-
+journey evidence. Use `blocked` plus `needs_discovery` only when no defensible
+measurement recommendation can yet be made. This prevents an access failure
+from being mistaken for business non-applicability.
 
 For whole-site plans, `journeys_discovered` must list discovered journeys and a
 decision for each one. If a discovered journey is marked `include_in_plan`, it

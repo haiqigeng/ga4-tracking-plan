@@ -19,7 +19,6 @@ WRAPPER_NAMES = [
     "init_tracking_plan.py",
     "inspect_browser_environment.py",
     "inspect_tracking_plan_template.py",
-    "migrate_tracking_plan.py",
     "validate_tracking_plan.py",
 ]
 PACKAGE_FILES = [
@@ -28,7 +27,6 @@ PACKAGE_FILES = [
     ROOT / "LICENSE",
     ROOT / "scripts" / "_run_skill_script.py",
     ROOT / "scripts" / "check_installed_skill_sync.py",
-    ROOT / "scripts" / "validate_fresh_agent_evals.py",
     *(ROOT / "scripts" / name for name in WRAPPER_NAMES),
 ]
 

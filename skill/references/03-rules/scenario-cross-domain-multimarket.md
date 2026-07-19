@@ -14,7 +14,7 @@ currencies, brands, or storefront implementations.
 ## Taxonomy
 
 Reuse event names across markets when the business meaning and trigger are the
-same. Use controlled parameters such as `site_market`, `site_language`,
+same. Use controlled parameters such as `site_market`, `nav_language`,
 `business_unit`, or `storefront_id` only when they support analysis and are
 available consistently.
 

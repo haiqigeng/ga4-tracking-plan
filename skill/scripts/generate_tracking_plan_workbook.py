@@ -23,7 +23,20 @@ from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
-from tracking_plan_screenshots import PREVIEW_HEIGHT, PREVIEW_WIDTH, create_screenshot_preview, resolve_screenshot, screenshot_digest, screenshot_files
+from tracking_plan_contract import (
+    event_ga4_payload,
+    event_parameter_bindings,
+    parameter_allowed_values,
+    primary_journey_id,
+)
+from tracking_plan_screenshots import (
+    PREVIEW_HEIGHT,
+    PREVIEW_WIDTH,
+    create_screenshot_preview,
+    resolve_screenshot,
+    screenshot_digest,
+    screenshot_files,
+)
 from tracking_plan_workbook_layout import (
     CENTER,
     EVENT_SLOT_COUNT,
@@ -46,6 +59,35 @@ from tracking_plan_workbook_layout import (
     title,
 )
 from validate_tracking_plan import render_text, validate_plan_data
+
+
+def workbook_language(plan: dict[str, Any]) -> str:
+    return "fr" if plan.get("language_policy", {}).get("workbook_language") == "fr" else "en"
+
+
+def localized(plan: dict[str, Any], english: str, french: str) -> str:
+    return french if workbook_language(plan) == "fr" else english
+
+
+def localized_enum(plan: dict[str, Any], value: Any) -> str:
+    if workbook_language(plan) != "fr":
+        return str(value)
+    translations = {
+        "event": "événement",
+        "item": "article",
+        "user": "utilisateur",
+        "implementation": "implémentation",
+        "observed": "observé",
+        "confirmed_available": "disponible confirmé",
+        "requires_development": "développement requis",
+        "requires_backend": "source back-end requise",
+        "to_confirm": "à confirmer",
+        "unavailable": "indisponible",
+        "not_applicable": "non applicable",
+        "planned": "prévu",
+        "confirmed": "confirmé",
+    }
+    return translations.get(str(value), str(value))
 
 
 def parse_args() -> argparse.Namespace:
@@ -90,7 +132,7 @@ def transport_event_name(event: dict[str, Any]) -> str:
     data_layer = event.get("data_layer", {})
     if isinstance(data_layer, dict) and data_layer.get("event_key"):
         return str(data_layer["event_key"])
-    ga4_payload = event.get("ga4_payload", {})
+    ga4_payload = event_ga4_payload(event)
     if isinstance(ga4_payload, dict) and ga4_payload.get("event_name"):
         return str(ga4_payload["event_name"])
     return str(event.get("event_name", ""))
@@ -102,7 +144,7 @@ def parameter_value(event: dict[str, Any], parameter: str) -> str:
             return "Array<Item>; see items[] rows below"
         return parameter_matrix_value(event, parameter)
 
-    payload = event.get("ga4_payload", {})
+    payload = event_ga4_payload(event)
     params = payload.get("parameters", {})
     items = payload.get("items", [])
     data_layer = event.get("data_layer", {})
@@ -134,10 +176,49 @@ def parameter_value(event: dict[str, Any], parameter: str) -> str:
 
 
 def parameter_value_rules(parameter: dict[str, Any]) -> str:
-    allowed = [str(value) for value in parameter.get("allowed_values", []) if str(value).strip()]
+    allowed = parameter_allowed_values(parameter)
     if allowed:
         return " | ".join(allowed)
     return str(parameter.get("value_rules", ""))
+
+
+def binding_for_parameter(event: dict[str, Any], parameter_name: str) -> dict[str, Any] | None:
+    return next(
+        (
+            binding
+            for binding in event_parameter_bindings(event)
+            if binding.get("parameter_name") == parameter_name
+        ),
+        None,
+    )
+
+
+def binding_status(plan: dict[str, Any], binding: dict[str, Any] | None) -> str:
+    if binding is None:
+        return localized(plan, "Not applicable", "Non applicable")
+    requirement = localized_enum(plan, binding.get("requirement", ""))
+    availability = localized_enum(plan, binding.get("availability", ""))
+    return " | ".join(value for value in (requirement, availability) if value)
+
+
+def parameter_binding_summary(
+    plan: dict[str, Any],
+    parameter_name: str,
+) -> tuple[str, str]:
+    availability: list[str] = []
+    owners: list[str] = []
+    for event in sorted(plan["events"], key=lambda item: item.get("display_order", 0)):
+        binding = binding_for_parameter(event, parameter_name)
+        if binding is None:
+            continue
+        event_name = str(event.get("event_name", ""))
+        availability.append(
+            f"{event_name}: {localized_enum(plan, binding.get('availability', ''))}"
+        )
+        owner = str(binding.get("data_owner", "")).strip()
+        if owner and owner not in owners:
+            owners.append(owner)
+    return "\n".join(availability), " | ".join(owners)
 
 
 def javascript_object(value: dict[str, Any]) -> str:
@@ -163,22 +244,40 @@ def datalayer_example(event: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def datalayer_parameter_path(push: dict[str, Any], parameter: str) -> str:
+    for wrapper in ("page", "event_data", "ecommerce", "user"):
+        wrapped = push.get(wrapper)
+        if isinstance(wrapped, dict) and parameter in wrapped:
+            return f"{wrapper}.{parameter}"
+    return ""
+
+
 def gtm_mapping(event: dict[str, Any]) -> str:
     name = str(event.get("event_name", ""))
     classification = str(event.get("classification", ""))
-    if classification == "automatic":
-        return "GA4 automatic collection; do not create a duplicate manual event tag."
-    if classification == "enhanced_measurement" and not event.get("data_layer"):
+    collection_source = str(event.get("collection_strategy", {}).get("collection_source", ""))
+    if classification == "enhanced_measurement" and collection_source == "ga4_enhanced_measurement" and not event.get("data_layer"):
         return "Enable in the GA4 web stream; do not create a duplicate manual event tag."
 
-    payload = event.get("ga4_payload", {})
+    payload = event_ga4_payload(event)
     parameters = payload.get("parameters", {}) if isinstance(payload, dict) else {}
     data_layer = event.get("data_layer", {})
     push = data_layer.get("push", {}) if isinstance(data_layer, dict) else {}
-    prefix = "ecommerce" if isinstance(push, dict) and isinstance(push.get("ecommerce"), dict) else "event_data"
-    mappings = [f"Custom Event trigger: {name}", f"GA4 event name: {name}"]
+    native_collection = (
+        (classification == "automatic" and collection_source == "ga4_automatic")
+        or (classification == "enhanced_measurement" and collection_source == "ga4_enhanced_measurement")
+    )
+    mappings = (
+        ["GA4 native collection; do not create a duplicate manual event tag.", "The dataLayer example supplies reusable context only."]
+        if native_collection
+        else [f"Custom Event trigger: {name}", f"GA4 event name: {name}"]
+    )
     for parameter in parameters if isinstance(parameters, dict) else []:
-        mappings.append(f"{prefix}.{parameter} -> {parameter}")
+        source_path = datalayer_parameter_path(push, str(parameter)) if isinstance(push, dict) else ""
+        if native_collection and source_path:
+            mappings.append(f"{source_path} -> {parameter} through Google tag settings when an explicit mapping is required")
+        else:
+            mappings.append(f"{source_path} -> {parameter}" if source_path else f"Automatically collected or configured -> {parameter}")
     if isinstance(payload, dict) and payload.get("items"):
         mappings.append("ecommerce.items -> items")
     notes = str(data_layer.get("mapping_notes", "")) if isinstance(data_layer, dict) else ""
@@ -191,26 +290,33 @@ def build_overview(wb: Workbook, plan: dict[str, Any]) -> None:
     doc = plan["document"]
     ws = wb.create_sheet("00 Overview")
     max_col = 8
-    title(ws, doc["title"], "Document details and workbook navigation.", max_col)
+    title(ws, doc["title"], localized(plan, "Document details and workbook navigation.", "Informations du document et navigation dans le classeur."), max_col)
+
+    document_summary = localized(plan, "Document Summary", "Informations du document")
+    sheet_contents = localized(plan, "Sheet Contents", "Contenu des onglets")
+    version_history = localized(plan, "Version History", "Historique des versions")
 
     rows = [
-        ["Document Summary", "", "", "", "", "", "", "", ""],
-        ["Document", doc["title"], "Owner / contact", doc["owner"], "Publish date", doc["publish_date"], "", ""],
+        [document_summary, "", "", "", "", "", "", "", ""],
+        [localized(plan, "Document", "Document"), doc["title"], localized(plan, "Owner / contact", "Responsable / contact"), doc["owner"], localized(plan, "Publish date", "Date de publication"), doc["publish_date"], "", ""],
         ["Version", doc["version"], "", "", "", "", "", ""],
         [],
-        ["Sheet Contents", "", "", "", "", "", "", "", ""],
-        ["#", "Sheet", "What it is for", "", "", "", "", ""],
-        ["1", "00 Overview", "Document information and version history.", "", "", "", "", ""],
-        ["2", "01 GTM Protocol", "Shared GTM/dataLayer rules and official references.", "", "", "", "", ""],
-        ["3", "02 Parameter Reference", "Variable dictionary and value rules.", "", "", "", "", ""],
-        ["4", "03 Event Matrix", "Main tracking plan: events, parameters, and value rules.", "", "", "", "", ""],
-        ["5", "04 DataLayer Examples", "Complete per-event GTM and dataLayer implementation examples.", "", "", "", "", ""],
-        ["6", "05 Screenshot Register", "Page and interaction evidence supporting implementation.", "", "", "", "", ""],
+        [sheet_contents, "", "", "", "", "", "", "", ""],
+        ["#", localized(plan, "Sheet", "Onglet"), localized(plan, "What it is for", "Utilité"), "", "", "", "", ""],
+        ["1", "00 Overview", localized(plan, "Document information and version history.", "Informations du document et historique des versions."), "", "", "", "", ""],
+        ["2", "01 GTM Protocol", localized(plan, "Shared GTM/dataLayer rules and official references.", "Règles GTM/dataLayer communes et références officielles."), "", "", "", "", ""],
+        ["3", "02 Parameter Reference", localized(plan, "Variable dictionary and value rules.", "Dictionnaire des variables et règles de valeur."), "", "", "", "", ""],
+        ["4", "03 Event Matrix", localized(plan, "Main tracking plan: events, parameters, and value rules.", "Plan de marquage principal : événements, paramètres et règles de valeur."), "", "", "", "", ""],
+        ["5", "04 DataLayer Examples", localized(plan, "Complete per-event GTM and dataLayer implementation examples.", "Exemples complets d'implémentation GTM et dataLayer par événement."), "", "", "", "", ""],
+        ["6", "05 Screenshot Register", localized(plan, "Page and interaction evidence supporting implementation.", "Captures de pages et d'interactions utiles à l'implémentation."), "", "", "", "", ""],
         [],
-        ["Version History", "", "", "", "", "", "", "", ""],
-        ["Version", "Date", "Owner", "Summary", "Publish date", "", "", "", ""],
-        [doc["version"], doc["publish_date"], doc["owner"], "GA4 tracking plan prepared for review.", doc["publish_date"], "", "", "", ""],
+        [version_history, "", "", "", "", "", "", "", ""],
+        ["Version", "Date", localized(plan, "Owner", "Responsable"), localized(plan, "Summary", "Résumé"), localized(plan, "Publish date", "Date de publication"), "", "", "", ""],
+        [doc["version"], doc["publish_date"], doc["owner"], localized(plan, "GA4 tracking plan prepared for review.", "Plan de marquage GA4 préparé pour revue."), doc["publish_date"], "", "", "", ""],
     ]
+    include_screenshots = plan.get("screenshot_capture", {}).get("requirement") != "not_requested"
+    if not include_screenshots:
+        rows = [row for row in rows if len(row) < 2 or row[1] != "05 Screenshot Register"]
     for row in rows:
         ws.append((row + [""] * max_col)[:max_col])
 
@@ -220,11 +326,12 @@ def build_overview(wb: Workbook, plan: dict[str, Any]) -> None:
         "02 Parameter Reference",
         "03 Event Matrix",
         "04 DataLayer Examples",
-        "05 Screenshot Register",
     }
+    if include_screenshots:
+        workbook_tabs.add("05 Screenshot Register")
     for row in range(1, ws.max_row + 1):
         label = ws.cell(row, 1).value
-        if label in {"Document Summary", "Sheet Contents", "Version History"}:
+        if label in {document_summary, sheet_contents, version_history}:
             section(ws, row, str(label), max_col)
         if label == "#" or (label == "Version" and ws.cell(row, 2).value == "Date"):
             header(ws, row, max_col)
@@ -238,14 +345,19 @@ def build_overview(wb: Workbook, plan: dict[str, Any]) -> None:
 
 def build_gtm_protocol(wb: Workbook, plan: dict[str, Any]) -> None:
     ws = wb.create_sheet("01 GTM Protocol")
-    title(ws, "GTM Protocol", "Essential GTM and dataLayer rules for implementing the Event Matrix.", 4)
+    title(ws, localized(plan, "GTM Protocol", "Protocole GTM"), localized(plan, "Essential GTM and dataLayer rules for implementing the Event Matrix.", "Règles GTM et dataLayer essentielles pour implémenter la matrice des événements."), 4)
     user_context = plan.get("user_context", {})
+    language_policy = plan.get("language_policy", {})
+    french_values = language_policy.get("controlled_value_language") == "fr"
+    login_value = "connecte" if french_values else "logged_in"
+    customer_value = "existant" if french_values else "returning"
+    controlled_value_example = "pret_a_porter_femme" if french_values else "women_ready_to_wear"
     user_context_example = (
         "dataLayer.push({\n"
-        "  user_context: {\n"
+        "  user: {\n"
         "    user_id: \"%opaque_user_id%\",\n"
-        "    login_status: \"logged_in\",\n"
-        "    customer_status: \"returning\",\n"
+        f"    login_status: \"{login_value}\",\n"
+        f"    customer_status: \"{customer_value}\",\n"
         "    account_type: \"standard\"\n"
         "  }\n"
         "});"
@@ -254,22 +366,29 @@ def build_gtm_protocol(wb: Workbook, plan: dict[str, Any]) -> None:
         f"{item.get('source_path')} -> GA4 user property {item.get('parameter_name')}"
         for item in user_context.get("user_properties", [])
         if isinstance(item, dict)
-    ) or "No custom GA4 user properties planned."
+    ) or localized(plan, "No custom GA4 user properties planned.", "Aucune propriété utilisateur GA4 personnalisée prévue.")
     ads = user_context.get("advertising_user_data", {})
     ads_rule = str(ads.get("handling_rule", "Direct identifiers are not sent to GA4.")) if isinstance(ads, dict) else "Direct identifiers are not sent to GA4."
     rows = [
-        ["Topic", "Rule", "Example", "Notes"],
-        ["GTM base script", "Load the GTM container once on every page. Replace GTM-XXXX with the project container ID.", "<!-- Google Tag Manager -->\n<script>/* GTM base script with GTM-XXXX */</script>\n<!-- End Google Tag Manager -->", "For SPA websites, keep the container in the root HTML shell."],
-        ["dataLayer push", "Use dataLayer.push for event and context values. Do not overwrite the dataLayer object after GTM loads.", "window.dataLayer = window.dataLayer || [];\ndataLayer.push({ event: \"add_to_cart\" });", "In the dataLayer object, the GTM trigger key is event. GA4 event_name is the GA4 tag setting/payload name."],
-        ["Flush reusable objects", "Flush page_data, ecommerce, or event_data before a new event when previous values could persist.", "dataLayer.push({ ecommerce: null });", "Use a separate push for flushing."],
-        ["Controlled values", "Use lowercase ASCII snake_case, replace spaces with underscores, and remove accents for controlled analytics values.", "pret_a_porter_femme", "Keep product IDs, ISO codes, numeric values, URLs, and safe raw terms when required."],
-        ["GA4 ecommerce", "Use official GA4 ecommerce event names and parameters. Keep ecommerce event blocks separate from interaction events.", "items[].item_id\nitems[].item_name\ncurrency\nvalue", "Map GTM wrapper paths in implementation notes, not as replacements for GA4 names."],
-        ["Consent", "Set and update consent through the CMP or GTM consent APIs before affected tags process user or event data.", "analytics_storage\nad_storage\nad_user_data\nad_personalization", "The tracking plan records dependencies but does not make the legal consent decision."],
-        ["Connected user context", "Push user_context independently when authentication state is known, after successful login, and after logout. Do not repeat these fields inside every event push.", user_context_example, f"Plan status: {user_context.get('status', 'not_applicable')}. Keep the object available before dependent GA4 events."],
-        ["GA4 User-ID", "Map user_context.user_id only to the Google tag user_id setting. Omit before first sign-in and set null after logout.", "user_context.user_id -> Google tag user_id", "Never send user_id as an event parameter or user property, and never register it as a custom dimension."],
-        ["GA4 user properties", "Map only approved low-cardinality connected-user fields as GA4 user properties.", user_properties, "Register planned custom user properties in GA4. Do not include direct identifiers."],
-        ["Advertising user data", "Keep direct identifiers in a separately governed non-GA4 object only when another approved advertising implementation explicitly requires them.", str(ads.get("data_layer_object", "")) or "Not applicable", ads_rule],
-        ["Official references", "Check current official documentation before approving standard, recommended, ecommerce, connected-user, and GTM dataLayer decisions.", "GA4 recommended events: https://developers.google.com/analytics/devguides/collection/ga4/reference/events\nGA4 ecommerce: https://developers.google.com/analytics/devguides/collection/ga4/ecommerce\nGA4 item parameters: https://developers.google.com/analytics/devguides/collection/ga4/item-scoped-ecommerce\nGA4 User-ID: https://developers.google.com/analytics/devguides/collection/ga4/user-id\nGA4 user properties: https://developers.google.com/analytics/devguides/collection/protocol/ga4/user-properties\nGTM dataLayer: https://developers.google.com/tag-platform/tag-manager/datalayer\nConsent mode: https://developers.google.com/tag-platform/security/guides/consent", "Keep external references here, not on the Overview tab."],
+        [localized(plan, "Topic", "Sujet"), localized(plan, "Rule", "Règle"), localized(plan, "Example", "Exemple"), "Notes"],
+        [localized(plan, "Workbook and value language", "Langue du document et des valeurs"), localized(plan, "Use English across multilingual sites. French-only sites may use French human wording and French semantic values; all technical names stay in English.", "Utiliser l'anglais pour les sites multilingues. Un site uniquement français peut utiliser un texte et des valeurs sémantiques en français ; les noms techniques restent en anglais."), f"workbook_language: {language_policy.get('workbook_language', 'en')}\ncontrolled_value_language: {language_policy.get('controlled_value_language', 'en')}", str(language_policy.get("decision_basis", ""))],
+        [localized(plan, "GTM base script", "Script GTM de base"), localized(plan, "Load the GTM container once on every page. Replace GTM-XXXX with the project container ID.", "Charger le conteneur GTM une seule fois sur chaque page. Remplacer GTM-XXXX par l'identifiant du projet."), "<!-- Google Tag Manager -->\n<script>/* GTM base script with GTM-XXXX */</script>\n<!-- End Google Tag Manager -->", localized(plan, "For SPA websites, keep the container in the root HTML shell.", "Pour une SPA, conserver le conteneur dans le shell HTML racine.")],
+        [localized(plan, "Project dataLayer contract", "Convention dataLayer du projet"), localized(plan, "For manual events, keep the final GA4 event name in the top-level event string. Put page context in page, ordinary interaction parameters in event_data, ecommerce data in ecommerce, and connected-user state in user. A native page/core context push omits event.", "Pour les événements manuels, conserver le nom final de l'événement GA4 dans la chaîne event à la racine. Placer le contexte de page dans page, les paramètres d'interaction dans event_data, les données ecommerce dans ecommerce et l'état connecté dans user. Un push de contexte page/core natif omet event."), "dataLayer.push({\n  event: \"search\",\n  event_data: { search_term: \"summer_dresses\" }\n});", localized(plan, "The page, event_data, and user wrappers are project conventions. Each inner key must match the final GA4 parameter or user-property name; GTM unwraps but does not rename it.", "Les wrappers page, event_data et user sont des conventions du projet. Chaque clé interne doit correspondre au nom final du paramètre ou de la propriété utilisateur GA4 ; GTM retire le wrapper sans renommer la clé.")],
+        [localized(plan, "CMP sequence", "Séquence CMP"), localized(plan, "Page/core context may be prepared before CMP readiness. Push every other manual event only after the CMP has established the applicable consent state.", "Le contexte page/core peut être préparé avant que la CMP soit prête. Pousser tout autre événement manuel uniquement après l'établissement de l'état de consentement applicable."), "core_context_before_cmp_ready\nafter_cmp_ready", localized(plan, "An early dataLayer push does not authorize a tag to fire before its consent requirements are satisfied.", "Un push dataLayer anticipé n'autorise pas un tag à se déclencher avant que ses exigences de consentement soient satisfaites.")],
+        [localized(plan, "Flush reusable objects", "Réinitialisation des objets"), localized(plan, "Flush page, ecommerce, event_data, or user before replacement when previous values could persist.", "Réinitialiser page, ecommerce, event_data ou user avant remplacement lorsque des valeurs précédentes peuvent persister."), "dataLayer.push({ event_data: null });", localized(plan, "Use a separate push for flushing.", "Utiliser un push distinct pour la réinitialisation.")],
+        [localized(plan, "Controlled values", "Valeurs contrôlées"), localized(plan, "Use lowercase ASCII snake_case, replace spaces with underscores, and remove accents for controlled analytics values.", "Utiliser le snake_case ASCII en minuscules, remplacer les espaces par des underscores et supprimer les accents."), controlled_value_example, localized(plan, "Keep product IDs, ISO codes, numeric values, URLs, and safe raw terms when required.", "Conserver les identifiants produit, codes ISO, nombres, URL et valeurs brutes sûres lorsque nécessaire.")],
+        ["GA4 ecommerce", localized(plan, "Use official GA4 ecommerce event names and parameters. Keep ecommerce event blocks separate from interaction events.", "Utiliser les noms et paramètres ecommerce GA4 officiels. Séparer les blocs ecommerce des événements d'interaction."), "items[].item_id\nitems[].item_name\ncurrency\nvalue", localized(plan, "Map GTM wrapper paths in implementation notes, not as replacements for GA4 names.", "Documenter les chemins des wrappers GTM sans remplacer les noms GA4.")],
+        [localized(plan, "Connected user context", "Contexte utilisateur connecté"), localized(plan, "Push user independently when authentication state is known, after successful login, and after logout. Do not repeat these fields inside every event push.", "Pousser user lorsque l'état d'authentification est connu, après une connexion réussie et après la déconnexion. Ne pas répéter ces champs dans chaque événement."), user_context_example, localized(plan, f"Plan status: {localized_enum(plan, user_context.get('status', 'not_applicable'))}. Keep the object available before dependent GA4 events.", f"Statut du plan : {localized_enum(plan, user_context.get('status', 'not_applicable'))}. Rendre l'objet disponible avant les événements GA4 dépendants.")],
+        ["GA4 User-ID", localized(plan, "Map user.user_id only to the Google tag user_id setting. Omit before first sign-in and set null after logout.", "Mapper user.user_id uniquement vers le paramètre user_id du Google tag. L'omettre avant la première connexion et envoyer null après déconnexion."), "user.user_id -> Google tag user_id", localized(plan, "Never send user_id as an event parameter or user property, and never register it as a custom dimension.", "Ne jamais envoyer user_id comme paramètre d'événement ou propriété utilisateur, ni l'enregistrer comme dimension personnalisée.")],
+        [localized(plan, "GA4 user properties", "Propriétés utilisateur GA4"), localized(plan, "Map only approved low-cardinality connected-user fields as GA4 user properties.", "Mapper uniquement les champs utilisateur connecté approuvés et à faible cardinalité comme propriétés utilisateur GA4."), user_properties, localized(plan, "Register planned custom user properties in GA4. Do not include direct identifiers.", "Enregistrer les propriétés utilisateur personnalisées prévues dans GA4. Ne pas inclure d'identifiants directs.")],
+        [localized(plan, "Advertising user data", "Données utilisateur publicitaires"), localized(plan, "Keep direct identifiers in a separately governed non-GA4 object only when another approved advertising implementation explicitly requires them.", "Conserver les identifiants directs dans un objet non-GA4 gouverné séparément uniquement si une implémentation publicitaire approuvée les exige."), str(ads.get("data_layer_object", "")) or localized(plan, "Not applicable", "Non applicable"), ads_rule],
+        [localized(plan, "Official references", "Références officielles"), localized(plan, "GA4 recommended events", "Événements GA4 recommandés"), "https://developers.google.com/analytics/devguides/collection/ga4/reference/events", localized(plan, "Check current official documentation before approval. Keep external references here, not on the Overview tab.", "Vérifier la documentation officielle actuelle avant approbation. Conserver les références externes ici, pas dans l'onglet Overview.")],
+        ["", "GA4 ecommerce", "https://developers.google.com/analytics/devguides/collection/ga4/ecommerce", ""],
+        ["", localized(plan, "GA4 item parameters", "Paramètres d'article GA4"), "https://developers.google.com/analytics/devguides/collection/ga4/item-scoped-ecommerce", ""],
+        ["", "GA4 User-ID", "https://developers.google.com/analytics/devguides/collection/ga4/user-id", ""],
+        ["", localized(plan, "GA4 user properties", "Propriétés utilisateur GA4"), "https://developers.google.com/analytics/devguides/collection/protocol/ga4/user-properties", ""],
+        ["", "GTM dataLayer", "https://developers.google.com/tag-platform/tag-manager/datalayer", ""],
+        ["", localized(plan, "Consent mode", "Mode Consentement"), "https://developers.google.com/tag-platform/security/guides/consent", ""],
     ]
     for row in rows:
         ws.append(row)
@@ -282,43 +401,44 @@ def build_gtm_protocol(wb: Workbook, plan: dict[str, Any]) -> None:
 
 def build_parameter_reference(wb: Workbook, plan: dict[str, Any]) -> None:
     ws = wb.create_sheet("02 Parameter Reference")
-    title(ws, "Parameter Reference", "Variable dictionary for parameters used in the Event Matrix.", 11)
+    title(ws, localized(plan, "Parameter Reference", "Référence des paramètres"), localized(plan, "Variable dictionary for parameters used in the Event Matrix.", "Dictionnaire des variables utilisées dans la matrice des événements."), 11)
     headers = [
-        "Variable name",
-        "Display name",
-        "Scope",
+        localized(plan, "Variable name", "Nom de la variable"),
+        localized(plan, "Display name", "Nom affiché"),
+        localized(plan, "Scope", "Portée"),
         "Type",
-        "Description",
-        "Value rules",
-        "Example value",
-        "Availability",
-        "Data owner",
-        "Register in GA4",
-        "Privacy / consent",
+        localized(plan, "Description", "Définition"),
+        localized(plan, "Value rules", "Règles de valeur"),
+        localized(plan, "Example value", "Exemple de valeur"),
+        localized(plan, "Availability by event", "Disponibilité par événement"),
+        localized(plan, "Data owner(s)", "Responsable(s) de la donnée"),
+        localized(plan, "Register in GA4", "Enregistrer dans GA4"),
+        localized(plan, "Privacy / consent", "Vie privée / consentement"),
     ]
     ws.append(headers)
     header(ws, 3, len(headers))
     for param in plan["parameters"]:
+        availability, data_owners = parameter_binding_summary(plan, param["parameter_name"])
         privacy = []
         if param.get("cardinality_risk") != "low":
-            privacy.append(f"Cardinality risk: {param.get('cardinality_risk')}")
+            privacy.append(localized(plan, f"Cardinality risk: {param.get('cardinality_risk')}", f"Risque de cardinalité : {param.get('cardinality_risk')}"))
         if param.get("pii_risk") != "low":
-            privacy.append(f"PII risk: {param.get('pii_risk')}")
+            privacy.append(localized(plan, f"PII risk: {param.get('pii_risk')}", f"Risque de données personnelles : {param.get('pii_risk')}"))
         if param.get("consent_dependency"):
-            privacy.append(f"Consent: {param.get('consent_dependency')}")
+            privacy.append(localized(plan, f"Consent: {param.get('consent_dependency')}", f"Consentement : {param.get('consent_dependency')}"))
         if param.get("scope") == "implementation" and param.get("pii_risk") in {"medium", "high"}:
-            privacy.append("Implementation-only: do not map to ordinary GA4 parameters")
-        register = "Yes" if param.get("register_custom_definition") else "No"
+            privacy.append(localized(plan, "Implementation-only: do not map to ordinary GA4 parameters", "Implémentation uniquement : ne pas mapper vers les paramètres GA4 ordinaires"))
+        register = localized(plan, "Yes", "Oui") if param.get("register_custom_definition") else localized(plan, "No", "Non")
         ws.append([
             param["parameter_name"],
             param["display_name"],
-            param["scope"],
+            localized_enum(plan, param["scope"]),
             param["type"],
             param["description"],
             parameter_value_rules(param),
-            param["example_value"],
-            param["availability"],
-            param["data_owner"],
+            param.get("example_value", ""),
+            availability or localized(plan, "Not used by an event", "Non utilisé par un événement"),
+            data_owners or localized(plan, "Not assigned", "Non attribué"),
             register,
             "; ".join(privacy),
         ])
@@ -331,44 +451,58 @@ def build_parameter_reference(wb: Workbook, plan: dict[str, Any]) -> None:
 def build_event_matrix(wb: Workbook, plan: dict[str, Any]) -> None:
     ws = wb.create_sheet("03 Event Matrix")
     max_col = matrix_max_col()
-    title(ws, "Event Matrix", "Main tracking plan. One event slot is one reusable event definition; ecommerce blocks stay separate.", max_col)
+    title(ws, localized(plan, "Event Matrix", "Matrice des événements"), localized(plan, "Main tracking plan. One event slot is one reusable event definition; ecommerce blocks stay separate.", "Plan de marquage principal. Chaque emplacement décrit un événement réutilisable ; les blocs ecommerce restent séparés."), max_col)
     for slot_index, start_col in enumerate(matrix_value_columns(), 1):
-        cell = ws.cell(4, start_col, f"Event slot {slot_index}")
-        cell.fill = PatternFill("solid", fgColor=GREEN)
-        cell.font = Font(bold=True)
-        cell.alignment = CENTER
-    slot_headers = ["Expected value / rule"] * EVENT_SLOT_COUNT
-    ws.append(["Field / parameter path", "Type", *slot_headers])
+        ws.merge_cells(start_row=4, start_column=start_col, end_row=4, end_column=start_col + 1)
+        ws.cell(4, start_col, localized(plan, f"Event slot {slot_index}", f"Événement {slot_index}"))
+        for column in (start_col, start_col + 1):
+            slot_cell = ws.cell(4, column)
+            slot_cell.fill = PatternFill("solid", fgColor=GREEN)
+            slot_cell.font = Font(bold=True)
+            slot_cell.alignment = CENTER
+    slot_headers: list[str] = []
+    for _ in range(EVENT_SLOT_COUNT):
+        slot_headers.extend([
+            localized(plan, "Expected value / rule", "Valeur attendue / règle"),
+            localized(plan, "Requirement / availability", "Exigence / disponibilité"),
+        ])
+    ws.append([localized(plan, "Field / parameter path", "Champ / chemin du paramètre"), "Type", *slot_headers])
     header(ws, 5, max_col)
 
     parameter_types = {param["parameter_name"]: param["type"] for param in plan["parameters"]}
     journey_names = {brief["journey_id"]: brief["journey_name"] for brief in plan["measurement_brief"]}
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for event in plan["events"]:
-        grouped[(event["journey_id"], event_family(event))].append(event)
+        grouped[(primary_journey_id(event), event_family(event))].append(event)
 
     block_index = 1
     for (journey_id, family), events in grouped.items():
+        events.sort(key=lambda event: (event.get("display_order", 0), event.get("event_name", "")))
         for chunk_index in range(0, len(events), EVENT_SLOT_COUNT):
             chunk = events[chunk_index:chunk_index + EVENT_SLOT_COUNT]
             block_title = f"J-{block_index:03d} - {journey_names.get(journey_id, journey_id)} - {family}"
             row = [block_title, ""]
             for event in chunk:
-                row.append(event["event_name"])
+                row.extend([event["event_name"], ""])
             row.extend([""] * (max_col - len(row)))
             ws.append(row)
 
             standard_rows = [
                 ("event_classification", "string", lambda event: event["classification"]),
-                ("evidence_status", "string", lambda event: f"{event.get('evidence_basis', {}).get('status', '')} | {event.get('evidence_basis', {}).get('confidence', '')}"),
-                ("analysis_use", "string", lambda event: event.get("analysis_use", "")),
+                ("specification_status", "string", lambda event: event.get("evidence_basis", {}).get("status", "")),
+                ("journeys", "string", lambda event: " | ".join(
+                    journey_names.get(event_journey_id, event_journey_id)
+                    for event_journey_id in event.get("journey_ids", [])
+                )),
+                ("journey_stage", "string", lambda event: event.get("journey_stage", "")),
+                ("event_summary", "string", lambda event: event.get("event_summary", "")),
                 ("trigger", "string", lambda event: event["trigger"]),
                 ("event", "string", transport_event_name),
             ]
             for variable, value_type, resolver in standard_rows:
                 matrix_row = [variable, value_type]
                 for event in chunk:
-                    matrix_row.append(resolver(event))
+                    matrix_row.extend([resolver(event), ""])
                 matrix_row.extend([""] * (max_col - len(matrix_row)))
                 ws.append(matrix_row)
 
@@ -376,13 +510,14 @@ def build_event_matrix(wb: Workbook, plan: dict[str, Any]) -> None:
             for parameter in parameters:
                 matrix_row = [parameter, parameter_types.get(parameter, parameter_type(parameter))]
                 for event in chunk:
-                    value = parameter_value(event, parameter)
-                    matrix_row.append(value)
+                    binding = binding_for_parameter(event, parameter)
+                    value = parameter_value(event, parameter) if binding is not None else "-"
+                    matrix_row.extend([value, binding_status(plan, binding)])
                 matrix_row.extend([""] * (max_col - len(matrix_row)))
                 ws.append(matrix_row)
             block_index += 1
 
-    widths = [34, 18] + ([44] * EVENT_SLOT_COUNT)
+    widths = [34, 18] + ([38, 22] * EVENT_SLOT_COUNT)
     set_widths(ws, widths)
     ws.freeze_panes = "C6"
     ws.auto_filter.ref = f"A5:{get_column_letter(max_col)}{ws.max_row}"
@@ -392,8 +527,8 @@ def build_event_matrix(wb: Workbook, plan: dict[str, Any]) -> None:
 
 def build_datalayer_examples(wb: Workbook, plan: dict[str, Any]) -> None:
     ws = wb.create_sheet("04 DataLayer Examples")
-    title(ws, "DataLayer Examples", "Complete developer examples aligned with the Event Matrix and final GA4 payload.", 7)
-    headers = ["Journey", "Event", "Evidence", "Trigger", "dataLayer.push example", "GTM and GA4 mapping", "Implementation notes"]
+    title(ws, localized(plan, "DataLayer Examples", "Exemples dataLayer"), localized(plan, "Complete developer examples aligned with the Event Matrix and final GA4 payload.", "Exemples complets pour les développeurs, alignés avec la matrice et le payload GA4 final."), 7)
+    headers = [localized(plan, "Journey", "Parcours"), "Event", localized(plan, "Evidence", "Preuve"), localized(plan, "Trigger", "Déclencheur"), localized(plan, "dataLayer.push example", "Exemple dataLayer.push"), localized(plan, "GTM and GA4 mapping", "Mapping GTM et GA4"), localized(plan, "Implementation notes", "Notes d'implémentation")]
     ws.append(headers)
     header(ws, 3, len(headers))
     journey_names = {brief["journey_id"]: brief["journey_name"] for brief in plan["measurement_brief"]}
@@ -401,13 +536,19 @@ def build_datalayer_examples(wb: Workbook, plan: dict[str, Any]) -> None:
     for event in plan["events"]:
         notes = str(event.get("implementation_notes", ""))
         if event.get("classification") == "recommended_ecommerce":
-            notes = f"Official GA4 ecommerce event. {notes}".strip()
+            notes = f"{localized(plan, 'Official GA4 ecommerce event.', 'Événement ecommerce GA4 officiel.')} {notes}".strip()
         elif event.get("classification") == "custom":
-            notes = f"Custom GA4 event using the project dataLayer convention. {notes}".strip()
+            notes = f"{localized(plan, 'Custom GA4 event using the project dataLayer convention.', 'Événement GA4 personnalisé utilisant la convention dataLayer du projet.')} {notes}".strip()
+        timing = str(event.get("data_layer", {}).get("consent_timing", ""))
+        if timing:
+            notes = f"{localized(plan, 'CMP sequence', 'Séquence CMP')}: {timing}. {notes}".strip()
         ws.append([
-            journey_names.get(event["journey_id"], event["journey_id"]),
+            " | ".join(
+                journey_names.get(journey_id, journey_id)
+                for journey_id in event.get("journey_ids", [])
+            ),
             event["event_name"],
-            f"{event.get('evidence_basis', {}).get('status', '')} | {event.get('evidence_basis', {}).get('confidence', '')}",
+            event.get("evidence_basis", {}).get("status", ""),
             event["trigger"],
             datalayer_example(event),
             gtm_mapping(event),
@@ -454,11 +595,11 @@ def build_screenshot_register(
     ws = wb.create_sheet("05 Screenshot Register")
     capture = plan["screenshot_capture"]
     capture_outcome = str(capture["outcome"])
-    title(ws, "Screenshot Register", str(capture["delivery_notice"]), 8)
+    title(ws, localized(plan, "Screenshot Register", "Registre des captures"), str(capture["delivery_notice"]), 8)
     if capture_outcome in {"blocked", "partially_captured"}:
         ws.cell(2, 1).fill = PatternFill("solid", fgColor=RED)
         ws.cell(2, 1).font = Font(color="9C1C1C", bold=True, size=11)
-    ws.append(["Journey", "Event(s)", "Screenshot preview", "Page / component", "URL / route", "Capture objective", "Status", "Notes"])
+    ws.append([localized(plan, "Journey", "Parcours"), "Event(s)", localized(plan, "Screenshot preview", "Aperçu de la capture"), localized(plan, "Page / component", "Page / composant"), "URL / route", localized(plan, "Capture objective", "Objectif de la capture"), localized(plan, "Status", "Statut"), "Notes"])
     header(ws, 3, 8)
     journey_names = {brief["journey_id"]: brief["journey_name"] for brief in plan["measurement_brief"]}
     events_by_id = {event["event_id"]: event for event in plan["events"]}
@@ -469,7 +610,11 @@ def build_screenshot_register(
     for evidence in plan["screenshot_evidence"]:
         related_events = [events_by_id[event_id] for event_id in evidence["event_ids"] if event_id in events_by_id]
         event_names = [event["event_name"] for event in related_events]
-        journeys = list(dict.fromkeys(journey_names.get(event["journey_id"], event["journey_id"]) for event in related_events))
+        journeys = list(dict.fromkeys(
+            journey_names.get(journey_id, journey_id)
+            for event in related_events
+            for journey_id in event.get("journey_ids", [])
+        ))
         screenshot_path = resolve_screenshot(evidence, files_by_name)
         notes = str(evidence.get("notes", ""))
         status = str(evidence.get("status", ""))
@@ -521,7 +666,8 @@ def build_workbook(
     build_parameter_reference(wb, plan)
     build_event_matrix(wb, plan)
     build_datalayer_examples(wb, plan)
-    build_screenshot_register(wb, plan, screenshot_dir=screenshot_dir, preview_dir=preview_dir)
+    if plan.get("screenshot_capture", {}).get("requirement") != "not_requested":
+        build_screenshot_register(wb, plan, screenshot_dir=screenshot_dir, preview_dir=preview_dir)
     apply_workbook_settings(wb)
     return wb
 

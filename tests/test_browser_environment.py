@@ -28,7 +28,7 @@ class BrowserEnvironmentTests(unittest.TestCase):
             patch.object(browser_environment, "detect_default_browser", return_value=("msedge", "test association")),
             patch.object(browser_environment, "playwright_status", return_value=(True, "1.61.0")),
             patch.object(browser_environment, "installed_branded_channels", return_value={"msedge": "edge.exe"}),
-            patch.object(browser_environment, "bundled_channels", return_value={"chromium": "chromium.exe"}),
+            patch.object(browser_environment, "bundled_channels", return_value=({"chromium": "chromium.exe"}, "")),
         ):
             result = browser_environment.inspect_browser_environment()
         self.assertTrue(result["default_browser_eligible"])
@@ -39,7 +39,7 @@ class BrowserEnvironmentTests(unittest.TestCase):
             patch.object(browser_environment, "detect_default_browser", return_value=("unknown", "unavailable")),
             patch.object(browser_environment, "playwright_status", return_value=(True, "1.61.0")),
             patch.object(browser_environment, "installed_branded_channels", return_value={"msedge": "edge.exe"}),
-            patch.object(browser_environment, "bundled_channels", return_value={"chromium": "chromium.exe"}),
+            patch.object(browser_environment, "bundled_channels", return_value=({"chromium": "chromium.exe"}, "")),
         ):
             result = browser_environment.inspect_browser_environment()
         self.assertEqual(result["recommended_channel"], "msedge")
@@ -91,7 +91,7 @@ class BrowserEnvironmentTests(unittest.TestCase):
             def wait_for_load_state(self, *args, **kwargs):
                 return None
 
-            def eval_on_selector_all(self, selector, script):
+            def eval_on_selector_all(self, selector, _script):
                 if selector == "a[href]":
                     return [{"url": "https://example.com/product?utm_source=test", "text": " Product "}]
                 if selector == "form":
@@ -102,10 +102,22 @@ class BrowserEnvironmentTests(unittest.TestCase):
         self.assertEqual(result["links"][0]["url"], "https://example.com/product")
         self.assertEqual(result["buttons"], ["Buy now"])
 
+    def test_rendered_discovery_reports_partial_coverage(self) -> None:
+        pages = [
+            {"url": "https://example.com/", "links": []},
+            {"url": "https://example.com/account", "fetch_error": "blocked"},
+        ]
+        errors = [rendered_discovery.SourceError("playwright_crawl", pages[1]["url"], "blocked")]
+
+        outcome, usable, notice = rendered_discovery.discovery_outcome(pages, errors)
+
+        self.assertEqual((outcome, usable), ("partial", 1))
+        self.assertIn("partial", notice.lower())
+
     def test_missing_playwright_is_reported(self) -> None:
         with patch.object(browser_environment.importlib.util, "find_spec", return_value=None):
             self.assertEqual(browser_environment.playwright_status(), (False, "not installed"))
-            self.assertEqual(browser_environment.bundled_channels(), {})
+            self.assertEqual(browser_environment.bundled_channels(), ({}, "Playwright Python is not installed."))
 
     def test_linux_default_browser_uses_xdg_settings(self) -> None:
         with (

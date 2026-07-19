@@ -1,6 +1,6 @@
 # Authenticated User Context
 
-Use a shared `user_context` dataLayer object when signed-in status improves
+Use a shared `user` dataLayer object when signed-in status improves
 journey, retention, or customer analysis. This is a state contract, not an
 event, so document it in `01 GTM Protocol` and define its fields in
 `02 Parameter Reference`. Do not repeat these values in every Event Matrix
@@ -13,7 +13,7 @@ successful login, and immediately after logout:
 
 ```js
 dataLayer.push({
-  user_context: {
+  user: {
     user_id: "<opaque_stable_id>",
     login_status: "logged_in",
     customer_status: "returning",
@@ -26,7 +26,7 @@ After logout, clear the identifier and update the state:
 
 ```js
 dataLayer.push({
-  user_context: {
+  user: {
     user_id: null,
     login_status: "logged_out",
     customer_status: "unknown",
@@ -37,7 +37,7 @@ dataLayer.push({
 
 ## Mapping Rules
 
-- `user_context.user_id` is an opaque, stable, non-PII identifier. Map it only
+- `user.user_id` is an opaque, stable, non-PII identifier. Map it only
   to the Google tag `user_id` setting. Omit it until sign-in and set it to
   `null` on logout. Never send or register it as an event parameter, user
   property, or custom dimension.

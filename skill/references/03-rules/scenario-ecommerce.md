@@ -10,6 +10,11 @@ Use this reference when the scoped journey includes merchandising, product disco
 - Use official GA4 parameter names in the event matrix: `currency`, `value`, `transaction_id`, `coupon`, `shipping`, `tax`, `items`, `items[].item_id`, `items[].item_name`, and other official item parameters.
 - Keep GTM wrapper paths such as `ecommerce.items` in implementation notes or dataLayer examples, not as replacements for official GA4 parameter names.
 - Respect event-level versus item-level scope. Prefer event-level `item_list_id`, `item_list_name`, `promotion_id`, `promotion_name`, `creative_name`, and `creative_slot` when all items share the same value. Use item-level equivalents only for mixed-list or mixed-promotion events because item-level values override event-level values.
+- Choose one effective scope for each list or promotion value. Do not send the
+  same list or promotion value at event and item level. On downstream cart,
+  checkout, and transaction events, keep item-level list provenance only when
+  a named attribution use justifies it and the source list is reliably
+  persisted from selection.
 - Show `items[].quantity` in matrices. GA4 defaults quantity to `1` if omitted, but the plan should still state whether the implementation sends `1`, relies on the default, or cannot provide the value.
 - Use explicit availability states: `send`, `send_default_quantity`, `event_level_used`, `not_available`, or `not_applicable`.
 - If required ecommerce data is unavailable, mark the ecommerce event as not implementable for that scope and consider a separate non-ecommerce intent event.
@@ -26,6 +31,20 @@ Use this reference when the scoped journey includes merchandising, product disco
 - Use `cancel_order` for a backend-confirmed cancellation of an existing order.
   Keep official `refund` for the later financial or item refund. An order can be
   cancelled without an immediate refund, and a refund can be partial.
+- Treat browser discovery as evidence, not as the maximum plan scope. For a
+  whole-site ecommerce plan, retain applicable official funnel events even when
+  checkout or confirmation is blocked. Mark them `recommended`, keep website-
+  specific values `to_confirm`, and use precise official or backend outcome
+  triggers. Exclude a branch only when the business capability is confirmed
+  not applicable; CAPTCHA, login, credentials, and unreachable success pages
+  are not exclusion reasons.
+- Reconcile the complete physical-retail funnel before delivery:
+  `view_item_list`, `select_item`, `view_item`, `add_to_cart`, `view_cart`,
+  `remove_from_cart`, `begin_checkout`, `add_shipping_info`,
+  `add_payment_info`, `purchase`, and `refund`. Add a payment-failure diagnostic
+  after payment submission. When customer service includes returns or order
+  cancellation, add governed `start_return` and `cancel_order` outcomes rather
+  than substituting `refund` for both.
 Read `policy-ga4-ecommerce-parameters.md` before finalizing ecommerce matrices or CSV exports.
 
 ## Event Selection
@@ -43,6 +62,7 @@ Read `policy-ga4-ecommerce-parameters.md` before finalizing ecommerce matrices o
 | Payment method | `add_payment_info` | recommended_ecommerce | `items`; `payment_type` when available |
 | Purchase confirmation | `purchase` | recommended_ecommerce | `transaction_id`; `items`; one of item ID or item name; `currency` required if `value` is sent |
 | Refund | `refund` | recommended_ecommerce | `transaction_id`; item data when item-level refund is available |
+| Return request accepted | `start_return` | custom | `transaction_id`; controlled return scope/reason when useful; fire only when the return request is accepted |
 | Order cancellation confirmed | `cancel_order` | custom | `transaction_id`, controlled cancellation stage/reason; never raw support notes |
 | Promotion impression | `view_promotion` | recommended_ecommerce | promotion metadata and `items` when promotion references items or offers |
 | Promotion click | `select_promotion` | recommended_ecommerce | same identifiers as `view_promotion` for impression-to-click analysis |

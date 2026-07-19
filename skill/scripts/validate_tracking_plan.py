@@ -10,6 +10,7 @@ from typing import Any, Iterable
 from ecommerce_matrix import (
     OFFICIAL_ITEM_PARAMETERS,
 )
+from tracking_plan_contract import event_journey_ids
 from tracking_plan_validation_catalogs import (
     CUSTOM_CLASSIFICATIONS,
     CUSTOM_PARAMETER_CLASSIFICATIONS,
@@ -17,7 +18,6 @@ from tracking_plan_validation_catalogs import (
     OFFICIAL_ECOMMERCE_PARAMETER_CLASSES,
     OFFICIAL_PARAMETER_CLASSES,
     OFFICIAL_SOURCE_DOMAINS,
-    REPORTING_PURPOSE_RE,
     WEAK_NOT_TRACKED_REASONS,
     WEAK_REPORTING_PURPOSES,
     WEAK_VALUE_RULES,
@@ -35,7 +35,9 @@ from tracking_plan_validation_events import (
     is_ga4_event,
     should_lint_ga4_parameter_name,
 )
+from tracking_plan_validation_governance import check_governance_contract
 from tracking_plan_validation_model import Issue, add_issue
+from tracking_plan_validation_quality import check_quality_contract
 from tracking_plan_validation_screenshot_capture import check_screenshot_capture, check_screenshot_evidence
 
 
@@ -102,13 +104,13 @@ def check_execution_context(plan: dict[str, Any], issues: list[Issue]) -> None:
     }
     policy_mode = str(template_policy.get("mode", ""))
     if mode == "client_template_adaptation":
-        if policy_mode not in {"strict_client_template", "hybrid_preserve_client_structure"}:
+        if policy_mode not in {"strict_client_template", "approved_structural_extension"}:
             add_issue(
                 issues,
                 "error",
                 "CLIENT_TEMPLATE_POLICY_MISSING",
                 "$.execution_context.template_policy.mode",
-                "Client-template adaptation must use strict_client_template or hybrid_preserve_client_structure.",
+                "Client-template adaptation must use strict_client_template or approved_structural_extension.",
             )
         if not (artifact_types & {"template_workbook", "client_tracking_plan", "tracking_plan_dev_doc", "tracking_plan_review", "event_inventory"}):
             add_issue(
@@ -118,13 +120,13 @@ def check_execution_context(plan: dict[str, Any], issues: list[Issue]) -> None:
                 "$.execution_context.input_artifact_inventory",
                 "Client-template adaptation needs a client template, tracking plan, development document, review plan, or event inventory artifact.",
             )
-        if template_policy.get("template_diff_required") and not context.get("template_diff_summary"):
+        if not template_policy.get("template_diff_required"):
             add_issue(
                 issues,
-                "warning",
-                "TEMPLATE_DIFF_SUMMARY_MISSING",
-                "$.execution_context.template_diff_summary",
-                "Strict or hybrid client-template work should include a concise template diff summary.",
+                "error",
+                "TEMPLATE_ARTIFACT_DIFF_NOT_REQUIRED",
+                "$.execution_context.template_policy.template_diff_required",
+                "Every client-template delivery must require an external artifact-bound fidelity report.",
             )
     if mode == "greenfield_best_practice" and policy_mode != "default_skill_template":
         add_issue(
@@ -135,7 +137,7 @@ def check_execution_context(plan: dict[str, Any], issues: list[Issue]) -> None:
             "Greenfield best-practice mode should normally use default_skill_template.",
         )
     preservation = template_policy.get("preservation_requirements", [])
-    if policy_mode in {"strict_client_template", "hybrid_preserve_client_structure"} and not preservation:
+    if policy_mode in {"strict_client_template", "approved_structural_extension"} and not preservation:
         add_issue(
             issues,
             "error",
@@ -154,8 +156,7 @@ def check_measurement_alignment(plan: dict[str, Any], issues: list[Issue]) -> No
     event_ids_by_journey: dict[str, set[str]] = defaultdict(set)
 
     for event_index, event in enumerate(events):
-        journey_id = str(event.get("journey_id", ""))
-        if journey_id:
+        for journey_id in event_journey_ids(event):
             events_by_journey[journey_id].append(event)
             event_names_by_journey[journey_id].add(str(event.get("event_name", "")))
             event_ids_by_journey[journey_id].add(str(event.get("event_id", "")))
@@ -164,7 +165,7 @@ def check_measurement_alignment(plan: dict[str, Any], issues: list[Issue]) -> No
                     issues,
                     "error",
                     "EVENT_JOURNEY_UNKNOWN",
-                    f"$.events[{event_index}].journey_id",
+                    f"$.events[{event_index}].journey_ids",
                     f"Event references unknown journey_id '{journey_id}'. Add the journey to measurement_brief or correct the event.",
                 )
 
@@ -217,7 +218,7 @@ def check_strategy_families(selected_families: list[Any], issues: list[Issue]) -
         if family.get("family_id"):
             family_ids.add(str(family["family_id"]))
         reason = str(family.get("reason", "")).strip()
-        if len(reason.split()) < 6:
+        if not reason:
             add_issue(
                 issues,
                 "error",
@@ -262,7 +263,7 @@ def check_custom_event_acceptance(entries: list[Any], issues: list[Issue]) -> se
             names.add(str(item["event_name"]))
         reason = str(item.get("business_reason", "")).strip()
         alternatives = item.get("official_alternatives_considered", [])
-        if len(reason.split()) < 8 or not alternatives:
+        if not reason or not alternatives:
             add_issue(
                 issues,
                 "error",
@@ -389,7 +390,7 @@ def check_not_tracked_decisions(plan: dict[str, Any], issues: list[Issue]) -> No
         if not isinstance(decision, dict):
             continue
         reason = str(decision.get("reason", "")).strip()
-        if reason.lower().rstrip(".") in WEAK_NOT_TRACKED_REASONS or len(reason.split()) < 5:
+        if reason.lower().rstrip(".") in WEAK_NOT_TRACKED_REASONS:
             add_issue(
                 issues,
                 "error",
@@ -406,7 +407,10 @@ def check_official_source_inventory(plan: dict[str, Any], events: list[Any], iss
         if isinstance(source, dict) and source.get("source_type") == "official"
     ]
     has_ga4_events = any(isinstance(event, dict) and is_ga4_event(event) for event in events)
-    if has_ga4_events and not any(any(domain in url for domain in OFFICIAL_SOURCE_DOMAINS["ga4"]) for url in source_urls):
+    if has_ga4_events and not any(
+        any(domain in url for domain in OFFICIAL_SOURCE_DOMAINS["google_measurement"])
+        for url in source_urls
+    ):
         add_issue(issues, "error", "GA4_OFFICIAL_SOURCE_MISSING", "$.documentation_sources_checked", "GA4 plans must cite at least one official Google Analytics documentation source.")
 
 
@@ -452,16 +456,11 @@ def check_parameter_documentation(param: dict[str, Any], index: int, issues: lis
     classification = param.get("classification")
     purpose = str(param.get("reporting_purpose", "")).strip()
     normalized_purpose = purpose.lower().rstrip(".")
-    if normalized_purpose in WEAK_REPORTING_PURPOSES or len(purpose.split()) < 5:
+    if purpose and normalized_purpose in WEAK_REPORTING_PURPOSES:
         add_issue(issues, "error", "PARAMETER_REPORTING_PURPOSE_WEAK", f"$.parameters[{index}].reporting_purpose", f"Parameter '{name}' needs a concrete reporting or analysis purpose.")
-    elif classification in CUSTOM_PARAMETER_CLASSIFICATIONS and not REPORTING_PURPOSE_RE.search(purpose):
-        add_issue(issues, "error", "CUSTOM_PARAMETER_REPORTING_PURPOSE_WEAK", f"$.parameters[{index}].reporting_purpose", f"Custom parameter '{name}' must state the analysis, segmentation, QA, or optimization use it supports.")
     rules = str(param.get("value_rules", "")).strip()
-    if classification in CUSTOM_PARAMETER_CLASSIFICATIONS and (rules.lower().rstrip(".") in WEAK_VALUE_RULES or len(rules.split()) < 3):
+    if classification in CUSTOM_PARAMETER_CLASSIFICATIONS and rules.lower().rstrip(".") in WEAK_VALUE_RULES:
         add_issue(issues, "error", "CUSTOM_PARAMETER_VALUE_RULES_WEAK", f"$.parameters[{index}].value_rules", f"Custom parameter '{name}' needs concrete value rules or controlled values.")
-    availability = str(param.get("availability", ""))
-    if availability in {"requires_development", "requires_backend", "to_confirm", "unavailable"} and len(str(param.get("data_owner", "")).split()) < 2:
-        add_issue(issues, "error", "PARAMETER_DATA_OWNER_MISSING", f"$.parameters[{index}].data_owner", f"Parameter '{name}' needs a clear owner because its availability is '{availability}'.")
 
 
 def validate_plan_data(plan: dict[str, Any], schema_path: Path | None = None) -> list[Issue]:
@@ -488,6 +487,7 @@ def validate_plan_data(plan: dict[str, Any], schema_path: Path | None = None) ->
     check_screenshot_capture(plan, issues)
     check_screenshot_evidence(plan, issues)
     check_delivery_rules(plan, issues)
+    check_governance_contract(plan, issues)
     check_official_source_inventory(plan, events, issues)
     for index, param in enumerate(parameters):
         if isinstance(param, dict):
@@ -496,6 +496,7 @@ def validate_plan_data(plan: dict[str, Any], schema_path: Path | None = None) ->
     for index, event in enumerate(events):
         if isinstance(event, dict):
             check_event(event, index, parameter_lookup, ga4_catalog, issues)
+    check_quality_contract(plan, issues)
     return issues
 
 def render_text(issues: list[Issue]) -> str:

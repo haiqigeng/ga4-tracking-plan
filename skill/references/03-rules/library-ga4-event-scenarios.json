@@ -2,11 +2,13 @@
   "version": "2026-06-26",
   "catalog_metadata": {
     "catalog_schema_version": "1.0.0",
-    "generated_date": "2026-07-12",
+    "generated_date": "2026-07-18",
     "generator_version": "1.0.0",
-    "official_source_last_updated": "2026-06-26"
+    "official_source_last_updated": "2026-06-26",
+    "ecommerce_source_last_updated": "2026-06-25",
+    "automatic_enhanced_checked_date": "2026-07-18"
   },
-  "scope": "GA4 web tracking-plan scenario library for human analysts and AI-agent-assisted tracking plan generation.",
+  "scope": "GA4 web tracking-plan scenario library for human analysis and implementation planning.",
   "source_priority": "Official Google documentation first. Trusted practitioner sources only for custom-event patterns and implementation judgement.",
   "value_convention": "For controlled analytics values, use lowercase ASCII snake_case, remove accents/diacritics, and list finite options with pipes. Preserve official IDs, ISO codes, numeric values, URLs, and raw native/user-entered fields only when required and privacy-safe.",
   "sources": [
@@ -94,105 +96,157 @@
       "event": "page_view",
       "group": "automatic / enhanced measurement",
       "scenario": "page view, SPA route change",
-      "trigger": "Page load or browser history state change.",
-      "parameters": "page_location, page_referrer, page_title, engagement_time_msec",
-      "implementation": "Usually automatic. Manually control only when SPA/infinite-scroll behavior requires it."
+      "implementation": "Usually automatic. Manually control only when SPA/infinite-scroll behavior requires it.",
+      "description": "This event signifies that the page loaded or the active site changed the browser history state.",
+      "trigger": "Each time the page loads or the browser history state is changed by the active site.",
+      "official_trigger": "each time the page loads or the browser history state is changed by the active site",
+      "parameters": "page_location, page_referrer",
+      "source_url": "https://support.google.com/analytics/answer/9216061?hl=en",
+      "source_section": "Events measurement and parameters > Page views > page_view"
     },
     {
       "event": "first_visit",
       "group": "automatic",
       "scenario": "new user acquisition",
-      "trigger": "First visit from a user/client.",
-      "parameters": "client_id, ga_session_id, ga_session_number, page_location, page_referrer, page_title",
-      "implementation": "Automatic; do not implement manually."
+      "implementation": "Automatic; do not implement manually.",
+      "description": "This event signifies the first time a user visits a website with Analytics enabled.",
+      "trigger": "The first time a user visits a website with Analytics enabled.",
+      "official_trigger": "the first time a user visits a website or launches an Android instant app with Analytics enabled",
+      "parameters": "client_id, ga_session_id, ga_session_number, ignore_referrer, page_location, page_referrer, page_title, traffic_type",
+      "source_url": "https://support.google.com/analytics/answer/9234069?hl=en",
+      "source_section": "Automatically collected events > first_visit"
     },
     {
       "event": "session_start",
       "group": "automatic",
       "scenario": "session analysis",
-      "trigger": "User starts or resumes a session.",
-      "parameters": "client_id, ga_session_id, ga_session_number, page_location, page_referrer, page_title",
-      "implementation": "Automatic; do not implement manually."
+      "implementation": "Automatic; do not implement manually.",
+      "description": "This event signifies that a user engaged with the website and GA4 started a session.",
+      "trigger": "When a user engages the website and GA4 starts a session.",
+      "official_trigger": "when a user engages the app or website",
+      "parameters": "client_id, ga_session_id, ga_session_number, ignore_referrer, page_location, page_referrer, page_title, traffic_type",
+      "source_url": "https://support.google.com/analytics/answer/9234069?hl=en",
+      "source_section": "Automatically collected events > session_start"
     },
     {
       "event": "user_engagement",
       "group": "automatic",
       "scenario": "engagement time",
-      "trigger": "Webpage is in focus for at least one second.",
+      "implementation": "Automatic; do not implement manually.",
+      "description": "This event signifies that the webpage was in focus for at least one second.",
+      "trigger": "When the webpage is in focus for at least one second.",
+      "official_trigger": "when the app is in the foreground or webpage is in focus for at least one second",
       "parameters": "engagement_time_msec",
-      "implementation": "Automatic; do not implement manually."
+      "source_url": "https://support.google.com/analytics/answer/9234069?hl=en",
+      "source_section": "Automatically collected events > user_engagement"
     },
     {
       "event": "scroll",
       "group": "enhanced measurement",
       "scenario": "content engagement",
-      "trigger": "First time a user reaches 90% vertical depth.",
+      "implementation": "Enhanced measurement. Use a custom scroll-depth event only when additional thresholds answer an analysis need.",
+      "description": "This event signifies the first time a user reaches the bottom of a page, when 90% vertical depth becomes visible.",
+      "trigger": "The first time a user reaches the bottom of each page, when 90% vertical depth becomes visible.",
+      "official_trigger": "the first time a user reaches the bottom of each page (i.e., when a 90% vertical depth becomes visible)",
       "parameters": "engagement_time_msec",
-      "implementation": "Enhanced measurement. Custom scroll_depth event only if 25/50/75 thresholds are needed."
+      "source_url": "https://support.google.com/analytics/answer/9216061?hl=en",
+      "source_section": "Events measurement and parameters > Scrolls > scroll"
     },
     {
       "event": "click",
       "group": "enhanced measurement",
       "scenario": "outbound link click",
-      "trigger": "User clicks a link leading away from the current domain.",
+      "implementation": "Enhanced measurement. Avoid duplicating it with a custom outbound-click event.",
+      "description": "This event signifies that a user clicked a link leading away from the current domain to another website.",
+      "trigger": "Each time a user clicks a link that leads away from the current domain to another website.",
+      "official_trigger": "each time a user clicks a link that leads away from the current domain and to another website",
       "parameters": "link_classes, link_domain, link_id, link_url, outbound",
-      "implementation": "Enhanced measurement. Avoid duplicating with custom outbound_click unless needed."
+      "source_url": "https://support.google.com/analytics/answer/9216061?hl=en",
+      "source_section": "Events measurement and parameters > Outbound clicks > click"
     },
     {
       "event": "view_search_results",
       "group": "enhanced measurement",
       "scenario": "search results page",
-      "trigger": "Search results page is shown based on configured query parameter.",
-      "parameters": "search_term, q_<additional key>",
-      "implementation": "Enhanced measurement. Use recommended search for explicit submitted-search tracking."
+      "implementation": "Enhanced measurement. Optional configured query keys are emitted as q_<key>; use recommended search when explicit submitted-search measurement is also needed.",
+      "description": "This event signifies that a user was presented with a search results page identified by a configured URL query parameter.",
+      "trigger": "Each time a user is presented with a search results page identified by a configured URL query parameter.",
+      "official_trigger": "each time a user is presented with a search results page, as indicated by the presence of a URL query parameter",
+      "parameters": "search_term",
+      "source_url": "https://support.google.com/analytics/answer/9216061?hl=en",
+      "source_section": "Events measurement and parameters > Site search > view_search_results"
     },
     {
       "event": "video_start",
       "group": "enhanced measurement",
       "scenario": "YouTube embedded video",
-      "trigger": "Supported YouTube video starts.",
+      "implementation": "Enhanced measurement for embedded YouTube videos with JavaScript API support.",
+      "description": "This event signifies that a supported embedded YouTube video started playing.",
+      "trigger": "When an embedded YouTube video with JavaScript API support starts playing.",
+      "official_trigger": "when the video starts playing",
       "parameters": "video_current_time, video_duration, video_percent, video_provider, video_title, video_url, visible",
-      "implementation": "Enhanced measurement when YouTube JS API support exists."
+      "source_url": "https://support.google.com/analytics/answer/9216061?hl=en",
+      "source_section": "Events measurement and parameters > Video engagement > video_start"
     },
     {
       "event": "video_progress",
       "group": "enhanced measurement",
       "scenario": "YouTube embedded video",
-      "trigger": "Supported video passes 10%, 25%, 50%, or 75%.",
+      "implementation": "Enhanced measurement for embedded YouTube videos with JavaScript API support.",
+      "description": "This event signifies that a supported embedded YouTube video passed 10%, 25%, 50%, or 75% of its duration.",
+      "trigger": "When an embedded YouTube video with JavaScript API support passes 10%, 25%, 50%, or 75% of its duration.",
+      "official_trigger": "when the video progresses past 10%, 25%, 50%, and 75% duration time",
       "parameters": "video_current_time, video_duration, video_percent, video_provider, video_title, video_url, visible",
-      "implementation": "Enhanced measurement when YouTube JS API support exists."
+      "source_url": "https://support.google.com/analytics/answer/9216061?hl=en",
+      "source_section": "Events measurement and parameters > Video engagement > video_progress"
     },
     {
       "event": "video_complete",
       "group": "enhanced measurement",
       "scenario": "YouTube embedded video",
-      "trigger": "Supported video completes.",
+      "implementation": "Enhanced measurement for embedded YouTube videos with JavaScript API support.",
+      "description": "This event signifies that a supported embedded YouTube video ended.",
+      "trigger": "When an embedded YouTube video with JavaScript API support ends.",
+      "official_trigger": "when the video ends",
       "parameters": "video_current_time, video_duration, video_percent, video_provider, video_title, video_url, visible",
-      "implementation": "Enhanced measurement when YouTube JS API support exists."
+      "source_url": "https://support.google.com/analytics/answer/9216061?hl=en",
+      "source_section": "Events measurement and parameters > Video engagement > video_complete"
     },
     {
       "event": "file_download",
       "group": "enhanced measurement",
       "scenario": "downloadable file click",
-      "trigger": "User clicks a common downloadable file extension.",
+      "implementation": "Enhanced measurement. Use a custom file event only for a materially different gated or classified outcome.",
+      "description": "This event signifies that a user clicked a link to a file with a common supported download extension.",
+      "trigger": "When a user clicks a link to a file whose extension matches the enhanced-measurement download list.",
+      "official_trigger": "when a user clicks a link leading to a file (with a common file extension) of the following types",
       "parameters": "file_extension, file_name, link_classes, link_id, link_text, link_url",
-      "implementation": "Enhanced measurement. Custom file events only for gated downloads or special classifications."
+      "source_url": "https://support.google.com/analytics/answer/9216061?hl=en",
+      "source_section": "Events measurement and parameters > File downloads > file_download"
     },
     {
       "event": "form_start",
       "group": "enhanced measurement",
       "scenario": "form engagement",
-      "trigger": "First time a user interacts with a form in a session.",
+      "implementation": "Enhanced measurement. Use custom form-step events only when the form funnel requires them.",
+      "description": "This event signifies the first time a user interacted with a form in a session.",
+      "trigger": "The first time a user interacts with a form in a session.",
+      "official_trigger": "the first time a user interacts with a form in a session",
       "parameters": "form_id, form_name, form_destination",
-      "implementation": "Enhanced measurement. Custom form_step events when multi-step funnel detail is required."
+      "source_url": "https://support.google.com/analytics/answer/9216061?hl=en",
+      "source_section": "Events measurement and parameters > Form interactions > form_start"
     },
     {
       "event": "form_submit",
       "group": "enhanced measurement",
       "scenario": "form submission",
-      "trigger": "User submits a form.",
+      "implementation": "Enhanced measurement records submission, not confirmed lead success; use generate_lead only after a valid lead outcome.",
+      "description": "This event signifies that a user submitted a form.",
+      "trigger": "When the user submits a form.",
+      "official_trigger": "when the user submits a form",
       "parameters": "form_id, form_name, form_destination, form_submit_text",
-      "implementation": "Enhanced measurement. Use generate_lead for validated lead success."
+      "source_url": "https://support.google.com/analytics/answer/9216061?hl=en",
+      "source_section": "Events measurement and parameters > Form interactions > form_submit"
     }
   ],
   "typical_custom_events": [
@@ -427,7 +481,7 @@
       "website_examples": "media site, blog, documentation, editorial brand",
       "official_events": "page_view, scroll, select_content, share, file_download, video_start, video_progress, video_complete",
       "typical_custom_events": "newsletter_signup_intent, accordion_open, modal_open",
-      "primary_parameters": "page_data.template, content_type, content_id, content_name, link_url, video_title",
+      "primary_parameters": "page_template, content_type, content_id, content_name, link_url, video_title",
       "notes": "Prefer enhanced measurement for scroll/video/download when it is sufficient; use select_content for content card/article selections."
     },
     {
@@ -527,10 +581,10 @@
       "gtm_mapping": "Custom Event trigger = custom_event_name. GA4 Event tag event name = {{Event}} or fixed event name. Map event_data.* as event parameters."
     },
     {
-      "name": "Manual page_view with page_data",
+      "name": "Manual page_view with page",
       "use_for": "SPA route changes or explicit pageview control.",
-      "format": "dataLayer.push({'page_data': null});\ndataLayer.push({\n  'event': 'page_view',\n  'page_data': {\n    'location': 'https://example.com/page',\n    'title': 'Page title',\n    'template': 'homepage',\n    'language': 'fr'\n  }\n});",
-      "gtm_mapping": "Trigger on page_view. Map page_data.location/title/template/language into GA4 parameters when needed."
+      "format": "dataLayer.push({'page': null});\ndataLayer.push({\n  'event': 'page_view',\n  'page': {\n    'page_location': 'https://example.com/page',\n    'page_title': 'Page title',\n    'page_referrer': 'https://example.com/',\n    'page_template': 'homepage',\n    'nav_language': 'fr',\n    'nav_environment': 'production'\n  },\n  'user': {\n    'login_status': 'logged_out'\n  }\n});",
+      "gtm_mapping": "Trigger on page_view. Map page.page_location/page_title/page_referrer/page_template/nav_language/nav_environment to identically named GA4 parameters when needed. Map approved user fields separately."
     },
     {
       "name": "Recommended search event",

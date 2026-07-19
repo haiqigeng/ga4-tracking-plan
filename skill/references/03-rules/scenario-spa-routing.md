@@ -13,7 +13,8 @@ Use this reference when the website is a single-page app, has client-side route 
 ## Recommended Flow
 
 1. On initial load, allow the normal GA4 page_view or send one controlled manual page_view, not both.
-2. On route change, update `page_data`.
+2. On route change, replace the `page` object with the complete current route
+   context.
 3. Send `page_view` only if the route should appear as a page/screen in GA4.
 4. Send route-specific recommended or custom events after page context is ready.
 5. For ecommerce routes, send `page_view` first, then `view_item`, `view_item_list`, cart, checkout, or purchase events.
@@ -21,13 +22,16 @@ Use this reference when the website is a single-page app, has client-side route 
 ## DataLayer Pattern
 
 ```js
-dataLayer.push({ page_data: null });
+dataLayer.push({ page: null });
 dataLayer.push({
   event: "page_view",
-  page_data: {
-    location: "https://example.com/category/dresses",
-    title: "Dresses",
-    template: "listing_page"
+  page: {
+    page_location: "https://example.com/category/dresses",
+    page_title: "Dresses",
+    page_referrer: "https://example.com/",
+    page_template: "listing_page",
+    nav_language: "en",
+    nav_environment: "production"
   }
 });
 ```

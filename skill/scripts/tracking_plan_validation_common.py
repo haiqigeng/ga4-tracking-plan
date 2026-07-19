@@ -2,14 +2,9 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from datetime import date
 from typing import Any, Iterable
 
-from tracking_plan_validation_catalogs import (
-    OFFICIAL_SOURCE_DOMAINS,
-    WEAK_BUSINESS_QUESTION_RE,
-    WEAK_BUSINESS_QUESTIONS,
-)
+from tracking_plan_validation_catalogs import WEAK_BUSINESS_QUESTIONS
 from tracking_plan_validation_model import Issue, add_issue
 
 
@@ -35,7 +30,7 @@ def check_business_question(value: Any, path: str, issues: list[Issue]) -> None:
     if not question:
         return
     normalized = question.lower().rstrip(".")
-    if normalized in WEAK_BUSINESS_QUESTIONS or WEAK_BUSINESS_QUESTION_RE.search(question):
+    if normalized in WEAK_BUSINESS_QUESTIONS:
         add_issue(
             issues,
             "error",
@@ -55,27 +50,17 @@ def check_official_verification(
 ) -> None:
     if not isinstance(verification, dict):
         if required:
-            add_issue(issues, "error", "OFFICIAL_VERIFICATION_MISSING", path, "Official-first choices need source URL, checked date, and scope note.")
+            add_issue(issues, "error", "OFFICIAL_VERIFICATION_MISSING", path, "Official-first choices need a registered source, locator, and scope note.")
         return
     status = str(verification.get("status", ""))
-    source_url = str(verification.get("source_url", "")).lower()
+    source_id = str(verification.get("source_id", "")).strip()
     scope_note = str(verification.get("scope_note", "")).strip()
-    checked_date = str(verification.get("checked_date", ""))
     if required and status != "verified":
         add_issue(issues, "error", "OFFICIAL_VERIFICATION_NOT_VERIFIED", f"{path}.status", "Official/native/recommended/platform-standard fields must be marked verified against official documentation.")
-    if required and platform in OFFICIAL_SOURCE_DOMAINS and not any(domain in source_url for domain in OFFICIAL_SOURCE_DOMAINS[platform]):
-        add_issue(issues, "error", "OFFICIAL_VERIFICATION_SOURCE_INVALID", f"{path}.source_url", f"Official verification for {platform} must cite an official source domain.")
-    if required and len(scope_note.split()) < 3:
+    if required and not source_id:
+        add_issue(issues, "error", "OFFICIAL_VERIFICATION_SOURCE_MISSING", f"{path}.source_id", f"Official verification for {platform} must reference the checked-source registry.")
+    if required and not scope_note:
         add_issue(issues, "error", "OFFICIAL_VERIFICATION_SCOPE_WEAK", f"{path}.scope_note", "Official verification must state event, item, property, or implementation scope clearly.")
-    if required and checked_date:
-        try:
-            age_days = (date.today() - date.fromisoformat(checked_date)).days
-        except ValueError:
-            return
-        if age_days < 0:
-            add_issue(issues, "error", "OFFICIAL_VERIFICATION_DATE_FUTURE", f"{path}.checked_date", "Official verification date cannot be in the future.")
-        elif age_days > 180:
-            add_issue(issues, "warning", "OFFICIAL_VERIFICATION_STALE", f"{path}.checked_date", "Official verification is more than 180 days old and should be refreshed before approval.")
 
 
 def governed_sensitive_implementation_parameter(parameter: dict[str, Any]) -> bool:

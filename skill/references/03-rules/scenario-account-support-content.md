@@ -6,12 +6,17 @@ Playwright MCP unless the user explicitly opts out. Cover
 successful signup and login, password recovery, account navigation, orders,
 returns, wishlist, preferences, loyalty, and reorder capabilities when present.
 If the environment cannot complete access, record the synthetic-access gap and
-the required follow-up. Do not specify inaccessible capabilities as events
-unless they are observed or client-confirmed.
+the required follow-up. Do not present an inaccessible capability as observed
+or client-confirmed. A recurrent account or service outcome may remain in a
+whole-site specification only as a visibly `recommended` row when it answers a
+named business question; keep its website data `to_confirm` and its confidence
+low or medium.
 
 Apply this evidence rule to every event behind login. Official generic events
 such as `page_view`, `view_item_list`, `view_item`, or `add_to_cart` are not
-exceptions and must not be inferred from public navigation or account labels.
+exceptions: public navigation or account labels cannot prove that they occur
+behind authentication or supply their site-specific pages, values, or trigger
+details.
 
 Use this reference for account entry, authentication context, self-service support, FAQ, editorial content, documents, videos, downloads, outbound links, and contact channels.
 
@@ -90,7 +95,7 @@ Use this reference for account entry, authentication context, self-service suppo
 
 ## DataLayer Pattern
 
-For shared authenticated state, use the separate `user_context` protocol in
+For shared authenticated state, use the separate `user` dataLayer protocol in
 `policy-authenticated-user-context.md`. Do not add those fields to each event.
 
 ```js

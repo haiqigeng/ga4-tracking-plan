@@ -1,143 +1,103 @@
-# Validation Commands
+# Execution Commands
 
-Use this file to decide which local checks to run and when.
+Use only the commands needed for the current plan.
 
-## Contents
+## Scaffold And Browser Preflight
 
-- [Package Checks](#package-checks)
-- [Tracking Plan Scaffold](#tracking-plan-scaffold)
-- [Tracking Plan JSON Checks](#tracking-plan-json-checks)
-- [Website Discovery Helper](#website-discovery-helper)
-- [Contract Migration](#contract-migration)
-- [Workbook And CSV Checks](#workbook-and-csv-checks)
-- [Fresh-Agent Acceptance](#fresh-agent-acceptance)
-- [Release Package](#release-package)
-
-## Package Checks
-
-Run before committing or releasing the reusable skill package:
+Create a focused v3 draft. Browser discovery remains required independently of
+the screenshot choice.
 
 ```powershell
-ruff check .
-python -m compileall -q scripts skill/scripts tests
-python -m unittest discover -s tests
-python -m coverage run --source=skill/scripts -m unittest discover -s tests
-python -m coverage report --include="skill/scripts/validate_tracking_plan.py" --fail-under=90
-python -m coverage report --include="skill/scripts/ecommerce_matrix.py" --fail-under=95
-python -m coverage report --include="skill/scripts/adapt_tracking_plan_workbook.py" --fail-under=90
-python -m coverage report --include="skill/scripts/inspect_tracking_plan_template.py" --fail-under=90
-python -m coverage report --include="skill/scripts/init_tracking_plan.py" --fail-under=90
-python -m coverage report --include="skill/scripts/tracking_plan_workbook_layout.py" --fail-under=85
-python -m coverage report --include="skill/scripts/validate_tracking_plan.py,skill/scripts/tracking_plan_validation_*.py,skill/scripts/ecommerce_matrix.py,skill/scripts/official_ga4_catalog.py,skill/scripts/generate_tracking_plan_workbook.py,skill/scripts/tracking_plan_workbook_layout.py,skill/scripts/adapt_tracking_plan_workbook.py,skill/scripts/inspect_tracking_plan_template.py,skill/scripts/init_tracking_plan.py" --fail-under=88
-python -m coverage report --include="skill/scripts/browser_environment.py,skill/scripts/discover_site_journeys_playwright.py" --fail-under=70
-python scripts/validate_fresh_agent_evals.py
-python scripts/validate_package.py
-python scripts/check_official_catalog.py --offline
-git diff --check
-git status --short
-```
-
-If Python is unavailable, run the non-Python checks and state the Python
-blocker.
-
-## Tracking Plan Scaffold
-
-Create the smallest useful page-context draft before website discovery:
-
-```powershell
-python scripts/init_tracking_plan.py https://www.example.com/ --journey-name "Initial journey" --output plan.json
-```
-
-The default draft remains blocked on the Playwright MCP screenshot attempt.
-Use `--screenshots not_requested` only after the requester explicitly excludes
-screenshots.
-
-## Tracking Plan JSON Checks
-
-Run when producing or reviewing a structured tracking plan:
-
-```powershell
-python scripts/validate_tracking_plan.py path\to\tracking-plan.json
-python scripts/validate_tracking_plan.py path\to\tracking-plan.json --warnings-as-errors
-```
-
-The validator checks structure, journey alignment, analyst purpose, evidence
-confidence, GA4 classifications, ecommerce scope, custom-event justification,
-parameter availability and ownership, template policy, website coverage,
-official verification, collection source, duplicate risk, screenshot mapping,
-capture outcome and Playwright MCP attempt, privacy-sensitive names, and legacy
-Universal Analytics fields.
-
-## Website Discovery Helper
-
-Run when a broad website scope needs support URL and journey evidence:
-
-```powershell
-python scripts/discover_site_journeys.py https://www.example.com/ --output path\to\site_discovery.json
-```
-
-The output is a privacy-safe completeness aid. It does not replace the
-user/client scope, existing client files, manual browser exploration, or
-Playwright for dynamic checkout, filters, account, forms, modals, or SPA
-routes.
-
-Use rendered-DOM discovery when dynamic navigation, filters, forms, or SPA
-routes materially affect whole-site coverage:
-
-```powershell
-python -m pip install playwright
+python scripts/init_tracking_plan.py https://www.example.com/ --site-scope whole_site --journey-name "Initial journey" --output plan.json
 python scripts/inspect_browser_environment.py
-python scripts/discover_site_journeys_playwright.py https://www.example.com/ --browser auto --output path\to\site_discovery_rendered.json
 ```
 
-The Playwright helper samples rendered pages without submitting forms, logging
-in, placing orders, or mutating live state. For a gated journey, use an
-interactive browser or Playwright MCP with synthetic information. If the real
-journey cannot be completed, create no event behind authentication. When the
-tracking plan requires screenshots, actively attempt Playwright MCP first and
-record a visible blocked outcome if evidence cannot be captured.
+Use `--screenshots not_requested` only when the requester excludes screenshot
+delivery. Set `--workbook-language en|fr` and repeat `--site-language` for every
+observed or confirmed site language.
 
-## Contract Migration
+## Website Discovery
 
-Migrate an older plan to the GA4-only schema `2.4.0` contract:
+Static discovery is supporting evidence only. It exits non-zero when it cannot
+produce usable coverage and never authorizes a complete rendered-discovery claim:
 
 ```powershell
-python scripts/migrate_tracking_plan.py old-plan.json --output plan-v2.json
+python scripts/discover_site_journeys.py https://www.example.com/ --output site-discovery.json
 ```
 
-Migration never invents a Playwright MCP attempt. Resolve any resulting
-`not_recorded` screenshot-capture status before delivery.
-
-## Workbook And CSV Checks
-
-Run when generating reviewer-facing files:
+Rendered discovery captures dynamic navigation and routes without submitting
+forms or mutating live state. It reports `completed`, `partial`, or `blocked`
+and exits non-zero unless coverage completed:
 
 ```powershell
-python scripts/generate_tracking_plan_workbook.py path\to\tracking-plan.json --output path\to\tracking-plan.xlsx
-python scripts/export_tracking_plan_csv.py path\to\tracking-plan.json --output path\to\tracking-plan.csv
+python scripts/discover_site_journeys_playwright.py https://www.example.com/ --browser auto --output site-discovery-rendered.json
 ```
 
-Generated files should remain outside the reusable skill package unless they
-are deliberate, generic examples.
+Use an interactive browser or Playwright MCP with synthetic information for
+signup and authenticated journeys. If access fails, record the gap. Do not
+claim site-specific gated behavior as observed; retain applicable official or
+recurrent sector outcomes only as explicit recommendations with confirmation
+dependencies.
 
-## Fresh-Agent Acceptance
+## Official Source Check
 
-Validate the reusable clean-session cases before release:
+Resolve official event definitions, trigger guidance, parameter rows, and
+conditions from current Google documentation before publication. The local
+catalog command checks bundled metadata and compares recommended-event
+definitions and parameters, ecommerce trigger guidance, and automatic and
+enhanced-measurement triggers and documented parameters with live Google
+documentation:
+
+Use offline mode only for catalog maintenance:
 
 ```powershell
-python scripts/validate_fresh_agent_evals.py
-python scripts/validate_fresh_agent_evals.py --results path\to\fresh-agent-results.json
+python scripts/check_official_catalog.py --offline
 ```
 
-Follow `fresh-agent-evaluation.md`; keep run artifacts outside the repository.
-
-## Release Package
-
-Run before attaching release assets manually:
+For a deliverable, bind a live receipt to the exact draft, then resolve a new
+artifact. The receipt covers every official source referenced by the plan and
+the current bundled catalog signature:
 
 ```powershell
-python scripts/create_release_package.py --version vX.Y.Z
+python scripts/check_official_catalog.py --plan draft-plan.json --receipt official-source-receipt.json
+python scripts/resolve_tracking_plan.py draft-plan.json --receipt official-source-receipt.json --output resolved-plan.json
 ```
 
-The generated zip belongs in the ignored `release/` folder and should contain
-only public reusable package files.
+A failed, offline, stale, incomplete, or catalog-mismatched receipt blocks
+resolution. Never stamp source dates manually.
+
+## Plan Validation
+
+```powershell
+python scripts/validate_tracking_plan.py resolved-plan.json
+python scripts/validate_tracking_plan.py resolved-plan.json --warnings-as-errors
+```
+
+The validator checks v3 structure, journey coherence, official source
+locators, canonical wording and trigger basis, event-specific parameter
+requiredness and availability, value-level evidence, ecommerce scope,
+dataLayer parity, CMP timing, browser coverage, screenshots, privacy, and
+client-template policy.
+
+## Human Deliverables
+
+```powershell
+python scripts/generate_tracking_plan_workbook.py resolved-plan.json --output tracking-plan.xlsx
+python scripts/export_tracking_plan_csv.py resolved-plan.json --output tracking-plan.csv
+```
+
+Screenshot Register is omitted when screenshots are not requested. When they
+are requested, pass `--screenshot-dir screenshots` if the folder is not beside
+the JSON.
+
+For a client workbook, inspect first, prepare a SHA-bound structured mapping,
+then adapt. The adapter always writes a fidelity report.
+
+```powershell
+python scripts/inspect_tracking_plan_template.py client-template.xlsx --output template-inventory.json
+python scripts/adapt_tracking_plan_workbook.py resolved-plan.json client-template.xlsx --mapping template-mapping.json --output tracking-plan.xlsx
+```
+
+If the inventory reports a workbook feature the approved backend cannot
+preserve, adaptation stops. Do not switch to an undeclared editor or generate
+an approximate clone.

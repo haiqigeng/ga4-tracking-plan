@@ -26,12 +26,22 @@ class PlanInitializerTests(unittest.TestCase):
             screenshots="not_requested",
         )
 
-        self.assertEqual(validate_plan_data(plan), [])
-        self.assertEqual(plan["schema_version"], "2.4.0")
+        self.assertEqual(
+            {issue.code for issue in validate_plan_data(plan)},
+            {"OFFICIAL_SOURCE_RECEIPT_INVALID", "PLAYWRIGHT_EXPLORATION_ATTEMPT_MISSING"},
+        )
+        self.assertEqual(plan["schema_version"], "3.0.0")
         self.assertEqual([event["event_name"] for event in plan["events"]], ["page_view"])
         self.assertEqual(plan["measurement_brief"][0]["journey_id"], "product_discovery")
-        self.assertEqual(plan["screenshot_evidence"][0]["status"], "not_needed")
+        self.assertEqual(plan["screenshot_evidence"], [])
         self.assertNotIn("user_id", {item["parameter_name"] for item in plan["parameters"]})
+        self.assertIn("page", plan["events"][0]["data_layer"]["push"])
+        self.assertNotIn("event", plan["events"][0]["data_layer"]["push"])
+        self.assertNotIn("page_data", plan["events"][0]["data_layer"]["push"])
+        self.assertEqual(plan["user_context"]["data_layer_object"], "user")
+        self.assertEqual(plan["language_policy"]["site_languages"], [])
+        self.assertEqual(plan["language_policy"]["controlled_value_language"], "en")
+        self.assertEqual(plan["events"][0]["data_layer"]["push"]["page"]["page_template"], "%page_template_to_resolve%")
 
     def test_default_scaffold_keeps_playwright_gate_open(self) -> None:
         plan = initialize_plan("https://example.com/")
@@ -40,6 +50,23 @@ class PlanInitializerTests(unittest.TestCase):
         self.assertIn("PLAYWRIGHT_MCP_ATTEMPT_MISSING", codes)
         self.assertEqual(plan["screenshot_capture"]["outcome"], "blocked")
         self.assertEqual(plan["screenshot_evidence"][0]["status"], "blocked")
+
+    def test_french_scaffold_is_valid_and_localizes_human_copy(self) -> None:
+        plan = initialize_plan(
+            "https://example.fr/",
+            workbook_language="fr",
+            site_languages=["fr"],
+            screenshots="not_requested",
+        )
+
+        self.assertEqual(
+            {issue.code for issue in validate_plan_data(plan)},
+            {"OFFICIAL_SOURCE_RECEIPT_INVALID", "PLAYWRIGHT_EXPLORATION_ATTEMPT_MISSING"},
+        )
+        self.assertEqual(plan["language_policy"]["workbook_language"], "fr")
+        self.assertEqual(plan["events"][0]["official_verification"]["translation_status"], "analyst_translation")
+        self.assertIn("page a été chargée", plan["events"][0]["event_summary"])
+        self.assertEqual(plan["parameters"][0]["display_name"], "URL de la page")
 
     def test_invalid_url_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "absolute"):

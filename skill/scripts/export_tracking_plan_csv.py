@@ -17,21 +17,23 @@ from ecommerce_matrix import (
     parameter_type,
     scope_rule,
 )
+from tracking_plan_contract import event_parameter_bindings, primary_journey_id, source_registry
 
 FIELDS = [
     "block",
     "journey_id",
     "journey_name",
+    "journey_stage",
     "event_name",
     "classification",
     "measurement_role",
     "business_event_family",
     "official_match",
+    "event_summary",
     "official_verification_status",
     "official_verification_source",
     "collection_source",
     "duplicate_risk_level",
-    "parameter_profile",
     "page_or_component",
     "business_question",
     "analysis_use",
@@ -40,7 +42,6 @@ FIELDS = [
     "trigger",
     "data_dependencies",
     "key_event",
-    "priority",
     "parameter_name",
     "parameter_scope",
     "parameter_type",
@@ -82,21 +83,11 @@ def parameter_lookup(plan: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {param["parameter_name"]: param for param in plan.get("parameters", []) if isinstance(param, dict)}
 
 
-def requirement_for(event: dict[str, Any], parameter: str, metadata: dict[str, Any] | None) -> str:
-    event_name = str(event.get("event_name", ""))
-    if metadata and metadata.get("required"):
-        return str(metadata["required"])
-    if parameter == "items":
-        return "required"
-    if parameter in {"items[].item_id", "items[].item_name"}:
-        return "one_of_required"
-    if parameter == "transaction_id" and event_name in {"purchase", "refund"}:
-        return "required"
-    if parameter == "currency" and "value" in event.get("ga4_payload", {}).get("parameters", {}):
-        return "conditional"
-    if parameter == "items[].quantity":
-        return "optional_default_1"
-    return "optional"
+def binding_for(event: dict[str, Any], parameter: str) -> dict[str, Any]:
+    return next(
+        (binding for binding in event_parameter_bindings(event) if binding.get("parameter_name") == parameter),
+        {},
+    )
 
 
 def parameter_source(parameter: str, metadata: dict[str, Any] | None) -> str:
@@ -116,28 +107,36 @@ def parameter_source(parameter: str, metadata: dict[str, Any] | None) -> str:
 
 def export_rows(plan: dict[str, Any]) -> list[dict[str, Any]]:
     params = parameter_lookup(plan)
+    sources = source_registry(plan)
     journeys = {brief["journey_id"]: brief["journey_name"] for brief in plan.get("measurement_brief", [])}
     rows: list[dict[str, Any]] = []
 
     for event in plan.get("events", []):
         block = event_family(event)
+        journey_id = primary_journey_id(event)
         for parameter in ordered_parameters_for_events([event]):
             metadata = params.get(parameter)
+            binding = binding_for(event, parameter)
+            source_id = str(event.get("official_verification", {}).get("source_id", ""))
             rows.append(
                 {
                     "block": block,
-                    "journey_id": event.get("journey_id", ""),
-                    "journey_name": journeys.get(event.get("journey_id", ""), event.get("journey_id", "")),
+                    "journey_id": " | ".join(event.get("journey_ids", [journey_id])),
+                    "journey_name": " | ".join(
+                        journeys.get(event_journey_id, event_journey_id)
+                        for event_journey_id in event.get("journey_ids", [journey_id])
+                    ),
+                    "journey_stage": event.get("journey_stage", ""),
                     "event_name": event.get("event_name", ""),
                     "classification": event.get("classification", ""),
                     "measurement_role": event.get("measurement_role", ""),
                     "business_event_family": event.get("business_event_family", ""),
                     "official_match": official_match_for(event),
+                    "event_summary": event.get("event_summary", ""),
                     "official_verification_status": event.get("official_verification", {}).get("status", ""),
-                    "official_verification_source": event.get("official_verification", {}).get("source_url", ""),
+                    "official_verification_source": sources.get(source_id, {}).get("url", ""),
                     "collection_source": event.get("collection_strategy", {}).get("collection_source", ""),
                     "duplicate_risk_level": event.get("collection_strategy", {}).get("duplicate_risk", {}).get("level", ""),
-                    "parameter_profile": event.get("parameter_profile", {}).get("profile_id", ""),
                     "page_or_component": event.get("page_or_component", ""),
                     "business_question": event.get("business_question", ""),
                     "analysis_use": event.get("analysis_use", ""),
@@ -146,16 +145,15 @@ def export_rows(plan: dict[str, Any]) -> list[dict[str, Any]]:
                     "trigger": event.get("trigger", ""),
                     "data_dependencies": compact_json(event.get("data_dependencies", [])),
                     "key_event": str(event.get("key_event", "")).lower(),
-                    "priority": event.get("priority", ""),
                     "parameter_name": parameter,
                     "parameter_scope": metadata.get("scope") if metadata else parameter_scope(parameter),
                     "parameter_type": metadata.get("type") if metadata else parameter_type(parameter),
-                    "requirement": requirement_for(event, parameter, metadata),
+                    "requirement": binding.get("requirement", ""),
                     "classification_or_source": parameter_source(parameter, metadata),
                     "reporting_purpose": metadata.get("reporting_purpose", "") if metadata else "",
                     "expected_value": parameter_matrix_value(event, parameter),
-                    "availability": metadata.get("availability") if metadata else parameter_availability(event, parameter),
-                    "data_owner": metadata.get("data_owner", "") if metadata else "",
+                    "availability": binding.get("availability") or parameter_availability(event, parameter),
+                    "data_owner": binding.get("data_owner", ""),
                     "scope_rule": scope_rule(parameter),
                     "implementation_notes": event.get("implementation_notes", ""),
                 }

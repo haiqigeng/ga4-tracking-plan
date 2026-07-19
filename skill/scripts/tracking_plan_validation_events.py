@@ -3,9 +3,9 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from tracking_plan_contract import event_ga4_payload, event_parameter_names
 from tracking_plan_validation_catalogs import (
     CUSTOM_CLASSIFICATIONS,
-    CUSTOM_RATIONALE_RE,
     GA4_CLASSIFICATIONS,
     GA4_EVENT_NAME_RE,
     GA4_PARAMETER_NAME_RE,
@@ -59,7 +59,7 @@ def check_legacy_ua_field(name: str, path: str, issues: list[Issue]) -> None:
 def is_ga4_event(event: dict[str, Any]) -> bool:
     if event.get("classification") in GA4_CLASSIFICATIONS:
         return True
-    if event.get("ga4_payload") or event.get("data_layer"):
+    if event.get("data_layer"):
         return True
     return False
 
@@ -113,23 +113,13 @@ def should_lint_ga4_parameter_name(name: str, param: dict[str, Any]) -> bool:
     return is_ga4_parameter_reference(param)
 
 
-def check_ga4_event_shape(
-    event: dict[str, Any],
-    index: int,
-    ga4_catalog: dict[str, Any],
+def _check_event_names(
+    names: list[str],
+    classification: str,
+    base: str,
     issues: list[Issue],
 ) -> None:
-    if not is_ga4_event(event):
-        return
-
-    base = f"$.events[{index}]"
-    event_name = str(event.get("event_name", ""))
-    classification = str(event.get("classification", ""))
-    payload = event.get("ga4_payload", {})
-    payload_name = str(payload.get("event_name", "")) if isinstance(payload, dict) else ""
-    ga4_names = [name for name in [event_name, payload_name] if name]
-
-    for name in sorted(set(ga4_names)):
+    for name in sorted(set(names)):
         check_ga4_name(name, f"{base}.event_name", "event", issues)
         if name in GA4_RESERVED_EVENT_NAMES and classification == "custom":
             add_issue(
@@ -140,23 +130,23 @@ def check_ga4_event_shape(
                 f"'{name}' is reserved by GA4 and must not be used as a custom event.",
             )
 
+
+def _check_event_classification(
+    event_name: str,
+    classification: str,
+    ga4_catalog: dict[str, Any],
+    base: str,
+    issues: list[Issue],
+) -> None:
     if classification == "recommended" and event_name not in ga4_catalog["recommended"]:
-        if event_name in ga4_catalog["ecommerce"]:
-            add_issue(
-                issues,
-                "error",
-                "GA4_RECOMMENDED_ECOMMERCE_MISCLASSIFIED",
-                f"{base}.classification",
-                f"'{event_name}' is a GA4 ecommerce event; classify it as recommended_ecommerce.",
-            )
-        else:
-            add_issue(
-                issues,
-                "error",
-                "GA4_RECOMMENDED_EVENT_UNKNOWN",
-                f"{base}.event_name",
-                f"'{event_name}' is classified as recommended but is not in the bundled official GA4 recommended-event catalog.",
-            )
+        code = "GA4_RECOMMENDED_ECOMMERCE_MISCLASSIFIED" if event_name in ga4_catalog["ecommerce"] else "GA4_RECOMMENDED_EVENT_UNKNOWN"
+        message = (
+            f"'{event_name}' is a GA4 ecommerce event; classify it as recommended_ecommerce."
+            if code == "GA4_RECOMMENDED_ECOMMERCE_MISCLASSIFIED"
+            else f"'{event_name}' is classified as recommended but is not in the bundled official GA4 recommended-event catalog."
+        )
+        path = f"{base}.classification" if code == "GA4_RECOMMENDED_ECOMMERCE_MISCLASSIFIED" else f"{base}.event_name"
+        add_issue(issues, "error", code, path, message)
     if classification == "recommended_ecommerce" and event_name not in ga4_catalog["ecommerce"]:
         add_issue(
             issues,
@@ -190,29 +180,64 @@ def check_ga4_event_shape(
             f"'{event_name}' matches an official GA4 event; use the official classification instead of custom.",
         )
 
+
+def _check_required_recommended_parameters(
+    event: dict[str, Any],
+    event_name: str,
+    classification: str,
+    payload_parameters: dict[str, Any],
+    ga4_catalog: dict[str, Any],
+    base: str,
+    issues: list[Issue],
+) -> None:
+    if classification != "recommended" or event_name not in ga4_catalog["recommended"]:
+        return
+    required = ga4_catalog.get("recommended_required_parameters", {}).get(event_name, set())
+    missing = sorted(
+        (required - set(event_parameter_names(event)))
+        | (required - set(payload_parameters))
+    )
+    if missing:
+        add_issue(
+            issues,
+            "error",
+            "GA4_RECOMMENDED_PARAMETER_MISSING",
+            f"{base}.data_layer.push",
+            f"Recommended GA4 event '{event_name}' is missing required official parameter(s): {', '.join(missing)}.",
+        )
+
+
+def check_ga4_event_shape(
+    event: dict[str, Any],
+    index: int,
+    ga4_catalog: dict[str, Any],
+    issues: list[Issue],
+) -> None:
+    if not is_ga4_event(event):
+        return
+
+    base = f"$.events[{index}]"
+    event_name = str(event.get("event_name", ""))
+    classification = str(event.get("classification", ""))
+    payload = event_ga4_payload(event)
+    payload_name = str(payload.get("event_name", "")) if isinstance(payload, dict) else ""
+    ga4_names = [name for name in [event_name, payload_name] if name]
+    _check_event_names(ga4_names, classification, base, issues)
+    _check_event_classification(event_name, classification, ga4_catalog, base, issues)
+
     payload_parameters = payload.get("parameters", {}) if isinstance(payload, dict) and isinstance(payload.get("parameters"), dict) else {}
     for name in payload_parameters:
-        check_ga4_name(str(name), f"{base}.ga4_payload.parameters.{name}", "parameter", issues)
+        check_ga4_name(str(name), f"{base}.data_layer.push.{name}", "parameter", issues)
 
-    if classification == "recommended" and event_name in ga4_catalog["recommended"]:
-        required_parameters = ga4_catalog.get("recommended_required_parameters", {}).get(event_name, set())
-        if required_parameters:
-            event_parameters = {
-                str(parameter)
-                for parameter in event.get("parameters", [])
-                if isinstance(parameter, str)
-            }
-            missing_from_event = sorted(required_parameters - event_parameters)
-            missing_from_payload = sorted(required_parameters - set(payload_parameters))
-            if missing_from_event or missing_from_payload:
-                missing = sorted(set(missing_from_event) | set(missing_from_payload))
-                add_issue(
-                    issues,
-                    "error",
-                    "GA4_RECOMMENDED_PARAMETER_MISSING",
-                    f"{base}.ga4_payload.parameters",
-                    f"Recommended GA4 event '{event_name}' is missing required official parameter(s): {', '.join(missing)}.",
-                )
+    _check_required_recommended_parameters(
+        event,
+        event_name,
+        classification,
+        payload_parameters,
+        ga4_catalog,
+        base,
+        issues,
+    )
 
 
 def check_custom_event_rationale(event: dict[str, Any], index: int, issues: list[Issue]) -> None:
@@ -222,18 +247,6 @@ def check_custom_event_rationale(event: dict[str, Any], index: int, issues: list
 
     base = f"$.events[{index}]"
     event_name = str(event.get("event_name", ""))
-    rationale_text = " ".join(
-        str(event.get(key, ""))
-        for key in ["official_match", "business_question", "trigger", "implementation_notes"]
-    )
-    if not CUSTOM_RATIONALE_RE.search(rationale_text):
-        add_issue(
-            issues,
-            "error",
-            "CUSTOM_EVENT_RATIONALE_MISSING",
-            f"{base}.official_match",
-            "Custom events must state why native, recommended, ecommerce, or platform-standard events are not sufficient and what business/diagnostic need they answer.",
-        )
     if event_name in LOW_SIGNAL_CUSTOM_EVENT_NAMES:
         add_issue(
             issues,
@@ -242,4 +255,3 @@ def check_custom_event_rationale(event: dict[str, Any], index: int, issues: list
             f"{base}.event_name",
             f"Custom event '{event_name}' is a generic click name. Prefer an official event or a semantic business-intent name.",
         )
-
