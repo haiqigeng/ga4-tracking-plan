@@ -461,6 +461,21 @@ def check_parameter_documentation(param: dict[str, Any], index: int, issues: lis
     rules = str(param.get("value_rules", "")).strip()
     if classification in CUSTOM_PARAMETER_CLASSIFICATIONS and rules.lower().rstrip(".") in WEAK_VALUE_RULES:
         add_issue(issues, "error", "CUSTOM_PARAMETER_VALUE_RULES_WEAK", f"$.parameters[{index}].value_rules", f"Custom parameter '{name}' needs concrete value rules or controlled values.")
+    if classification not in CUSTOM_PARAMETER_CLASSIFICATIONS:
+        return
+    if not purpose:
+        add_issue(issues, "error", "CUSTOM_PARAMETER_REPORTING_PURPOSE_MISSING", f"$.parameters[{index}].reporting_purpose", f"Custom parameter '{name}' needs a concrete reporting or analysis purpose.")
+    official_gap = str(param.get("official_gap", "")).strip()
+    if official_gap.lower().rstrip(".") in {"", "none", "not applicable", "custom", "no official parameter", "tbd", "to confirm", "unknown"}:
+        add_issue(issues, "error", "CUSTOM_PARAMETER_OFFICIAL_GAP_MISSING", f"$.parameters[{index}].official_gap", f"Custom parameter '{name}' must identify the official fields reviewed and the specific need they do not answer.")
+    if not str(param.get("source", "")).strip():
+        add_issue(issues, "error", "CUSTOM_PARAMETER_SOURCE_MISSING", f"$.parameters[{index}].source", f"Custom parameter '{name}' needs a concrete website, application, dataLayer, or backend source.")
+    if not isinstance(param.get("register_custom_definition"), bool):
+        add_issue(issues, "error", "CUSTOM_PARAMETER_REGISTRATION_DECISION_MISSING", f"$.parameters[{index}].register_custom_definition", f"Custom parameter '{name}' needs an explicit GA4 custom-definition registration decision.")
+    if param.get("cardinality_risk") not in {"low", "medium", "high"}:
+        add_issue(issues, "error", "CUSTOM_PARAMETER_CARDINALITY_MISSING", f"$.parameters[{index}].cardinality_risk", f"Custom parameter '{name}' needs an explicit cardinality assessment.")
+    if param.get("pii_risk") not in {"low", "medium", "high"}:
+        add_issue(issues, "error", "CUSTOM_PARAMETER_PRIVACY_MISSING", f"$.parameters[{index}].pii_risk", f"Custom parameter '{name}' needs an explicit privacy assessment.")
 
 
 def validate_plan_data(plan: dict[str, Any], schema_path: Path | None = None) -> list[Issue]:

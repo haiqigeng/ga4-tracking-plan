@@ -78,15 +78,29 @@ Recommendations must not claim observation or high confidence.
 
 ## 5. Parameter Design
 
-For each event, include:
+For each event, first read its complete current official parameter table, then
+include:
 
 1. unconditional official requirements;
-2. conditional official requirements whose conditions apply;
-3. optional official parameters with a concrete need;
-4. custom parameters with clear scope, ownership, privacy, and use.
+2. conditional official requirements whose conditions apply; when
+   applicability is plausible but unresolved, retain the field with a concrete
+   confirmation or development dependency instead of silently excluding it;
+3. applicable optional official parameters supported by website evidence, the
+   business model, a recurrent analysis or activation use, or a feasible
+   implementation source. Prefer inclusion when those signals exist, but do
+   not copy every official row mechanically. Require evidenced taxonomy depth
+   and a named use for `items[].item_category4` and
+   `items[].item_category5`;
+4. custom parameters only when the official table does not answer the need,
+   with the official gap, event-specific classification, scope, source,
+   ownership, persistence, reporting purpose, registration decision,
+   cardinality, and privacy made explicit.
 
-Requiredness and availability belong to the event binding. Unavailable data is
-a development dependency, not permission to drop a mandatory parameter.
+Requiredness, event-specific classification, availability, source, and any
+cross-event persistence belong to the event binding. A parameter name may be
+official for one event and a custom extension on another; classify each binding
+accordingly. Unavailable data is a development dependency, not permission to
+drop a mandatory parameter.
 Official ecommerce requiredness is event-specific. `items` is required only
 when the current event table requires it or the analyst selects item detail for
 that event; each sent item needs `item_id` or `item_name`.

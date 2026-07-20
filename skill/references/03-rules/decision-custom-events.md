@@ -19,7 +19,12 @@ Use this reference before proposing custom events. A custom event is acceptable 
 3. Use the official event when its meaning matches the action.
 4. Consolidate repeated same-name interactions with controlled parameters.
 5. Create a custom event only when the action has a distinct business or diagnostic meaning.
-6. Define required parameters, value rules, reporting registration needs, privacy risk, and implementation expectations.
+6. For every parameter, review the chosen event's official fields before adding
+   a custom one. A custom parameter must record the official gap, reporting
+   purpose, event or item scope, value source, availability, owner,
+   registration decision, cardinality, privacy, and persistence when it crosses
+   events.
+7. Define required parameters, value rules, reporting registration needs, privacy risk, and implementation expectations.
 
 ## GA4 Official-First Replacements
 
@@ -117,3 +122,11 @@ For each custom event, document:
 - custom dimensions or metrics to register
 - privacy/cardinality risk
 - reproducible trigger, required source data, and expected GA4 payload
+
+For each custom parameter, additionally document:
+
+- the official event table reviewed and the specific gap left by its fields
+- the business question and reporting use that justify collection
+- event or item scope and event-specific classification
+- source path, availability, owner, and any cross-event persistence/reset rule
+- custom-dimension or BigQuery-only decision, cardinality, and privacy risk

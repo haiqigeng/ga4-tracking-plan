@@ -1060,6 +1060,10 @@
           "type": "string",
           "minLength": 1
         },
+        "classification": {
+          "$ref": "#/$defs/parameterClassification",
+          "description": "Event-specific parameter classification. Use when the same name is official for one event and a custom extension for another; otherwise the reusable parameter classification applies."
+        },
         "requirement": {
           "enum": [
             "required",
@@ -1074,6 +1078,11 @@
           "type": "string",
           "minLength": 1
         },
+        "official_gap": {
+          "type": "string",
+          "minLength": 1,
+          "description": "For an event-specific custom binding, the official fields reviewed and the precise need they do not answer."
+        },
         "availability": {
           "enum": [
             "observed",
@@ -1087,6 +1096,16 @@
         "data_owner": {
           "type": "string",
           "minLength": 1
+        },
+        "source_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Event-specific implementation source or data path for the value."
+        },
+        "persistence_rule": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Capture, retention, fallback, and reset rule when a value is carried across events."
         },
         "official_source_id": {
           "type": "string"
@@ -1340,6 +1359,11 @@
         "reporting_purpose": {
           "type": "string",
           "minLength": 1
+        },
+        "official_gap": {
+          "type": "string",
+          "minLength": 1,
+          "description": "For a custom event parameter, item parameter, or user property, explain which official fields were reviewed and why they do not answer the need."
         },
         "value_rules": {
           "type": "string",

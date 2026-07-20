@@ -41,11 +41,19 @@ acceptance criteria, and non-goals.
   diagnostic outcome not adequately represented by an official event.
 - Consolidate events only when their meaning, trigger, and parameter contract
   are materially the same. Group related events by journey in human output.
-- Select parameters per event: unconditional official requirements first,
-  applicable conditional requirements second, then optional official or
-  custom parameters with a concrete analysis or implementation need. Missing
-  source data creates a development dependency; it never makes a mandatory
-  parameter disappear.
+- Resolve the current official event table before proposing parameters. Select
+  unconditional official requirements first and applicable conditional
+  requirements second. For other applicable official parameters, prefer
+  inclusion when website evidence, the business model, a recurrent analysis
+  use, or a feasible implementation source supports them; do not copy the
+  complete table mechanically. Treat `items[].item_category4` and
+  `items[].item_category5` more conservatively and include them only for an
+  evidenced taxonomy depth and analysis need. Missing source data creates a
+  development dependency; it never makes a mandatory parameter disappear.
+- Add a custom parameter only after checking that the selected event's official
+  parameters do not answer the need. Record the official gap, event or item
+  scope, reporting purpose, source, availability, owner, registration choice,
+  cardinality, privacy, and any cross-event persistence rule.
 - For ecommerce, use the current event-specific official table. Do not assume
   every ecommerce event requires `items`; when `items` is selected, include a
   valid `ecommerce.items` example and at least `item_id` or `item_name` per
@@ -136,8 +144,10 @@ acceptance criteria, and non-goals.
    scenario and policy references.
 5. Decide official-first events, custom-event exceptions, ecommerce branches,
    exclusions, and recommendation evidence.
-6. Select event-specific parameters, ownership, privacy handling, and finite
-   value domains. Write precise definitions and triggers.
+6. Resolve the selected events' official parameter tables, then make
+   event-specific parameter decisions, including official/custom
+   classification, ownership, source and persistence, privacy handling, and
+   finite value domains. Write precise definitions and triggers.
 7. Specify canonical dataLayer examples and CMP timing. Reconcile every
    selected binding with the example.
 8. Capture or explicitly block requested screenshots after event design.

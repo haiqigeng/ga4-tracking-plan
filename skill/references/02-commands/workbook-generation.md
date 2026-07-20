@@ -15,38 +15,44 @@ Use this workflow for the analyst-facing XLSX deliverable.
    artifact.
 5. Validate the resolved artifact. Rendering must not enrich or repair it.
 6. Confirm journey grouping, event consolidation, parameter availability, and
-   ecommerce isolation. Start with mandatory and applicable conditional
-   parameters; include optional parameters only for explicit analysis needs.
-7. Use browser or client evidence to exhaust practical finite values and record
+   ecommerce isolation. Review each selected event's complete official table;
+   start with mandatory and applicable conditional parameters, then prefer
+   other applicable official fields when evidence, use, and a feasible source
+   support them. Do not copy every row mechanically, and require explicit
+   taxonomy/use evidence for category levels four and five.
+7. Confirm every custom parameter records the official gap, reporting purpose,
+   event-specific classification, source, registration decision, cardinality,
+   privacy, and persistence when carried across events.
+8. Use browser or client evidence to exhaust practical finite values and record
    their provenance. Use precise rules for dynamic domains.
-8. Confirm every event has a complete dataLayer example or an explicit
+9. Confirm every event has a complete dataLayer example or an explicit
    no-manual-push decision and that GTM paths map to final GA4 parameters. Do
    not keep a duplicate GA4 payload or ecommerce profile in the plan.
-9. Confirm page/core context uses `core_context_before_cmp_ready`, every other
+10. Confirm page/core context uses `core_context_before_cmp_ready`, every other
    manual event uses `after_cmp_ready`, and page/user context is complete.
-10. After the event model is final, assign screenshot coverage: one
+11. After the event model is final, assign screenshot coverage: one
    representative scenario for repetitive generic events, or every materially
    different visible scenario for finite events.
-11. When screenshots are required, actively discover and attempt Playwright MCP
+12. When screenshots are required, actively discover and attempt Playwright MCP
    before using a fallback browser. Only bypass that attempt when final image files
    were supplied by the requester or screenshots were explicitly excluded.
    This screenshot choice never waives required live browser journey discovery.
-12. Capture 1920 x 1080 viewport evidence where practical. Use no labels or
+13. Capture 1920 x 1080 viewport evidence where practical. Use no labels or
    captions inside images; add only a bold red rectangle around an interaction
    area, confirmation, or error state. Page views normally need no rectangle.
-13. Record the `screenshot_capture` outcome. For blocked or partial capture,
+14. Record the `screenshot_capture` outcome. For blocked or partial capture,
    write a concise notice that will appear at the top of Screenshot Register and
    repeat it in the delivery response. Use `blocked`, never an unresolved final
    status, when required evidence cannot be captured.
-14. Put screenshot files in a `screenshots` folder beside the JSON, or pass a
+15. Put screenshot files in a `screenshots` folder beside the JSON, or pass a
    folder explicitly.
-15. Generate the default workbook from the validated resolved JSON, or apply an
+16. Generate the default workbook from the validated resolved JSON, or apply an
     artifact-bound strict client-template cell write map. The generator rejects
     a row marked captured when its image file is missing.
-16. For strict templates, compare the saved result with the source and allow
+17. For strict templates, compare the saved result with the source and allow
     only the mapped cell-value changes. Deliver the fidelity report with source,
     mapping, and output hashes. Any other difference blocks delivery.
-17. Review every 480 x 270 preview at normal spreadsheet zoom.
+18. Review every 480 x 270 preview at normal spreadsheet zoom.
 
 ```powershell
 python scripts/check_official_catalog.py --plan draft-plan.json --receipt official-source-receipt.json

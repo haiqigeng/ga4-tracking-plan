@@ -9,12 +9,18 @@ Use this reference when the scoped journey includes merchandising, product disco
 - Split ecommerce event blocks by compatible parameter family: promotions, product lists, product detail, cart, checkout, and transactions.
 - Use official GA4 parameter names in the event matrix: `currency`, `value`, `transaction_id`, `coupon`, `shipping`, `tax`, `items`, `items[].item_id`, `items[].item_name`, and other official item parameters.
 - Keep GTM wrapper paths such as `ecommerce.items` in implementation notes or dataLayer examples, not as replacements for official GA4 parameter names.
-- Respect event-level versus item-level scope. Prefer event-level `item_list_id`, `item_list_name`, `promotion_id`, `promotion_name`, `creative_name`, and `creative_slot` when all items share the same value. Use item-level equivalents only for mixed-list or mixed-promotion events because item-level values override event-level values.
-- Choose one effective scope for each list or promotion value. Do not send the
-  same list or promotion value at event and item level. On downstream cart,
-  checkout, and transaction events, keep item-level list provenance only when
-  a named attribution use justifies it and the source list is reliably
-  persisted from selection.
+- Respect event-level versus item-level scope. Use event-level `item_list_id`,
+  `item_list_name`, `promotion_id`, `promotion_name`, `creative_name`, and
+  `creative_slot` as a homogeneous event default. Use item-level equivalents
+  for mixed sources or to retain each item's reliable originating list or
+  promotion on later interactions and purchase. When both scopes are sent,
+  document that item-level values override the event-level default and ensure
+  their meanings do not conflict. Event- and item-level `coupon` remain
+  independent.
+- On downstream cart, checkout, and transaction events, keep item-level list
+  provenance only when a named attribution use justifies it and the source list
+  is reliably persisted from selection. Record the value source, persistence
+  key, reset rule, and owner.
 - Show `items[].quantity` in matrices. GA4 defaults quantity to `1` if omitted, but the plan should still state whether the implementation sends `1`, relies on the default, or cannot provide the value.
 - Use explicit availability states: `send`, `send_default_quantity`, `event_level_used`, `not_available`, or `not_applicable`.
 - If required ecommerce data is unavailable, mark the ecommerce event as not implementable for that scope and consider a separate non-ecommerce intent event.
@@ -28,6 +34,12 @@ Use this reference when the scoped journey includes merchandising, product disco
 - After `add_payment_info`, represent unsuccessful payment with a custom
   diagnostic `payment_error` or governed `checkout_error`; reserve `purchase`
   for confirmed order success.
+- Prefer a rich but purposeful `purchase` contract. Retain stable checkout
+  context used for transaction analysis when it is reliably persisted to the
+  order. `shipping_tier` and `payment_type` are official on their respective
+  checkout events but custom extensions on `purchase`; classify the purchase
+  bindings accordingly and document their source and persistence. Do not carry
+  transient errors, UI state, or user-entered form data into `purchase`.
 - Use `cancel_order` for a backend-confirmed cancellation of an existing order.
   Keep official `refund` for the later financial or item refund. An order can be
   cancelled without an immediate refund, and a refund can be partial.
@@ -94,4 +106,6 @@ dataLayer.push({
 - Confirm the ecommerce object is flushed before each ecommerce event when reusable ecommerce data can persist.
 - Specify the event name, ecommerce object, and item array at the exact trigger.
 - For purchase and refund, document `transaction_id` ownership and uniqueness expectations.
+- For purchase, document reliable lineage for any originating list, promotion,
+  shipping, payment, or other checkout value propagated from an earlier event.
 - For promotions, use the same `promotion_id` and `promotion_name` across impression and selection when applicable.

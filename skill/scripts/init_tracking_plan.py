@@ -375,7 +375,7 @@ def initialize_plan(
     )
 
     plan = {
-        "schema_version": "3.0.0",
+        "schema_version": "3.1.0",
         "plan_id": plan_id,
         "execution_context": {
             "execution_mode": "greenfield_best_practice",

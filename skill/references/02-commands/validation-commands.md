@@ -75,9 +75,10 @@ python scripts/validate_tracking_plan.py resolved-plan.json --warnings-as-errors
 
 The validator checks v3 structure, journey coherence, official source
 locators, canonical wording and trigger basis, event-specific parameter
-requiredness and availability, value-level evidence, ecommerce scope,
-dataLayer parity, CMP timing, browser coverage, screenshots, privacy, and
-client-template policy.
+requiredness, classification, availability and propagated-value lineage,
+custom-parameter official-gap decisions, value-level evidence, ecommerce
+scope, dataLayer parity, CMP timing, browser coverage, screenshots, privacy,
+and client-template policy.
 
 ## Human Deliverables
 

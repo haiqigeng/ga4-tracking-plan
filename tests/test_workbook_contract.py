@@ -9,7 +9,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "skill" / "scripts"))
 
-from generate_tracking_plan_workbook import build_workbook  # noqa: E402
+from export_tracking_plan_csv import export_rows  # noqa: E402
+from generate_tracking_plan_workbook import binding_status, build_workbook  # noqa: E402
 
 
 class WorkbookContractTests(unittest.TestCase):
@@ -78,6 +79,38 @@ class WorkbookContractTests(unittest.TestCase):
         self.assertEqual(protocol.page_setup.fitToHeight, 1)
         self.assertEqual(workbook["04 DataLayer Examples"].page_setup.fitToHeight, 1)
         self.assertEqual(workbook["05 Screenshot Register"].page_setup.fitToHeight, 0)
+
+    def test_event_specific_parameter_governance_is_visible_in_exports(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        event = next(item for item in plan["events"] if item["event_name"] == "view_promotion")
+        binding = {
+            "parameter_name": "search_term",
+            "classification": "custom_event_parameter",
+            "requirement": "optional",
+            "inclusion_reason": "Connect promotion exposure with the originating on-site search.",
+            "availability": "confirmed_available",
+            "data_owner": "Analytics",
+            "official_gap": "The view_promotion table has no field for the originating search query.",
+            "source_path": "search.query",
+            "persistence_rule": "Capture with the promotion context, retain until selection, and clear when the list context changes.",
+        }
+        event["parameter_bindings"].append(binding)
+
+        status = binding_status(plan, binding)
+        self.assertIn("custom_event_parameter", status)
+        self.assertIn("Official gap:", status)
+        self.assertIn("Source: search.query", status)
+        self.assertIn("Persistence:", status)
+
+        row = next(
+            item
+            for item in export_rows(plan)
+            if item["event_name"] == "view_promotion" and item["parameter_name"] == "search_term"
+        )
+        self.assertEqual(row["classification_or_source"], "custom_event_parameter")
+        self.assertEqual(row["binding_official_gap"], binding["official_gap"])
+        self.assertEqual(row["source_path"], "search.query")
+        self.assertEqual(row["persistence_rule"], binding["persistence_rule"])
 
     def test_reusable_event_is_rendered_once_with_all_journeys(self) -> None:
         plan = copy.deepcopy(self.fixture)

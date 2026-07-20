@@ -6,7 +6,14 @@ Use this reference whenever a plan includes GA4 ecommerce events or an ecommerce
 
 - Check current official GA4 ecommerce and recommended-event docs before finalizing event names, parameter names, and parameter scope.
 - Use event-level `currency` whenever `value` is sent.
-- Treat every ecommerce parameter that the implementation reliably has as a candidate, following Google's recommendation, but retain an optional parameter in the client plan only when it supports a stated analysis, reporting, activation, or implementation need. Record meaningful exclusions instead of filling the matrix with unused fields.
+- Review every field in the selected event's current official table as an
+  internal candidate. Retain required fields and applicable conditional fields.
+  For other applicable official fields, prefer inclusion when website evidence,
+  the business model, a recurrent analysis or activation use, or a feasible
+  source supports them; do not fill the client matrix mechanically with the
+  complete table. A plausible unresolved conditional field remains visible as
+  `to_confirm`, `requires_development`, or `requires_backend` rather than being
+  silently excluded.
 - Use `items` when product/item detail is part of the event. When `items` is sent, each item needs one of `items[].item_id` or `items[].item_name`. Do not make `items` mandatory for an event such as `refund` when the current official event table marks it optional and the plan intentionally specifies a full-transaction refund.
 - `items[].quantity` is optional and GA4 defaults it to `1` when omitted, but tracking plans should still display the intended quantity so analysts and developers do not confuse omission with absence.
 - `items[].affiliation` and `items[].location_id` are item-scoped only.
@@ -14,27 +21,69 @@ Use this reference whenever a plan includes GA4 ecommerce events or an ecommerce
 - `item_list_id`, `item_list_name`, `promotion_id`, `promotion_name`, `creative_name`, and `creative_slot` can have event-level and item-level forms. If item-level values are set, they override event-level values. If item-level values are not set, GA4 uses event-level values when present.
 - Non-official item fields are custom item-scoped parameters, not GA4 ecommerce item parameters. Classify them as `custom_item_parameter`, document the business question, and register an item-scoped custom dimension when the value must be usable in GA4 UI reporting.
 - Use official `items[].item_variant` before creating a separate custom item field for variant, color, size, or other product-option analysis.
+- Include `items[].item_category4` and `items[].item_category5` only when the
+  website or an authoritative client source confirms that taxonomy depth and a
+  named analysis need uses it. Do not generate empty hierarchy levels.
+- There is no prescribed `items[].item_size` field. Add it only as a custom item
+  parameter when size must be analysed separately and `items[].item_variant`
+  cannot answer the question.
 
 ## Preferred Planning Convention
 
 Select parameters in this order:
 
 1. Include every unconditionally required official parameter.
-2. Include each conditionally required parameter when its condition applies, such as `currency` when `value` is sent.
+2. Include each conditionally required parameter when its condition applies,
+   such as `currency` when `value` is sent. When applicability is plausible but
+   not yet proven, prefer retaining it with a concrete confirmation or
+   development dependency over exclusion.
 3. Include at least one item identity field, `items[].item_id` or `items[].item_name`, for every ecommerce item.
-4. Add optional official parameters only when the business questions, available data, and intended reporting justify them.
-5. Add a custom event or item parameter only when no native field answers the same need and the reporting purpose, value rule, scope, registration decision, cardinality, privacy, and owner are explicit.
+4. Add applicable optional official parameters when business questions,
+   website or client evidence, recurrent ecommerce analysis, activation, or a
+   feasible source justifies them. Prefer inclusion when those signals exist,
+   except that category levels four and five require explicit taxonomy and use
+   evidence. Do not add every optional field by default.
+5. Add a custom event or item parameter only when no official field answers the
+   same need and the official gap, reporting purpose, value rule, scope,
+   event-specific classification, source, registration decision, cardinality,
+   privacy, and owner are explicit.
 
 Do not use a canonical profile as an instruction to add every field. Profiles
 control stable row order for the parameters selected by the analyst; they do
 not expand the event specification.
 
-Prefer event-level list and promotion parameters when all items in the event share the same list or promotion:
+Use event-level list and promotion parameters as the current event default when
+all items share the same list or promotion:
 
 - `item_list_id`, `item_list_name` for homogeneous listing/search/recommendation events
 - `promotion_id`, `promotion_name`, `creative_name`, `creative_slot` for homogeneous promotion impressions and clicks
 
-Use item-level equivalents only when items in the same event genuinely come from different lists, promotions, creatives, or placements. In human matrices, show the item-level row as `event_level_used` when that fallback is intentional.
+Use item-level equivalents when items genuinely come from different lists,
+promotions, creatives, or placements, or when the implementation reliably
+retains each item's originating list or promotion for downstream attribution.
+Google permits both scopes: item-level list and promotion values override the
+event-level default, while event- and item-level `coupon` values are
+independent. Dual scope must be intentional and non-conflicting; it is not an
+automatic error. In human matrices, show the item-level row as
+`event_level_used` only when the event-level fallback is intentional and no
+item override is sent.
+
+## Checkout And Purchase Continuity
+
+Treat `purchase` as the durable transaction record analysts will reuse. Carry
+stable, analysis-useful checkout context into `purchase` when the value is
+reliably persisted to the confirmed order and has a named reporting use. This
+can include originating item list or promotion fields and selected shipping or
+payment descriptors. Do not propagate transient UI state, raw errors, or form
+input.
+
+`shipping_tier` is prescribed for `add_shipping_info`, and `payment_type` is
+prescribed for `add_payment_info`; neither is prescribed in the official
+`purchase` event table. If either is deliberately sent on `purchase`, classify
+that purchase binding as `custom_event_parameter`, document the official gap,
+source path, persistence and reset rule, registration decision, cardinality,
+privacy, and owner. The same parameter name may therefore be official on its
+checkout event and custom on `purchase`.
 
 Use these availability values instead of silent blanks:
 

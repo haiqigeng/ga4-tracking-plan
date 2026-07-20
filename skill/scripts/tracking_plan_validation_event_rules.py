@@ -6,7 +6,11 @@ from ecommerce_matrix import (
     EVENT_PARAMETERS_BY_EVENT,
     OFFICIAL_ITEM_PARAMETERS,
 )
-from tracking_plan_contract import event_ga4_payload, event_parameter_names
+from tracking_plan_contract import (
+    event_ga4_payload,
+    event_parameter_bindings,
+    event_parameter_names,
+)
 from tracking_plan_validation_catalogs import (
     ECOMMERCE_EVENTS,
     GA4_CLASSIFICATIONS,
@@ -31,14 +35,7 @@ from tracking_plan_validation_events import (
 )
 from tracking_plan_validation_model import Issue, add_issue
 
-EVENT_ITEM_SCOPE_PAIRS = {
-    "item_list_id": "item_list_id",
-    "item_list_name": "item_list_name",
-    "promotion_id": "promotion_id",
-    "promotion_name": "promotion_name",
-    "creative_name": "creative_name",
-    "creative_slot": "creative_slot",
-}
+
 def check_collection_strategy(event: dict[str, Any], index: int, issues: list[Issue]) -> None:
     base = f"$.events[{index}]"
     event_name = str(event.get("event_name", ""))
@@ -138,12 +135,17 @@ def check_ecommerce_payload_parameters(event: dict[str, Any], index: int, parame
     payload = event_ga4_payload(event)
     payload_parameters = payload.get("parameters", {}) if isinstance(payload, dict) and isinstance(payload.get("parameters"), dict) else {}
     official_parameters = EVENT_PARAMETERS_BY_EVENT.get(event_name, set())
+    bindings = {
+        str(binding.get("parameter_name", "")): binding
+        for binding in event_parameter_bindings(event)
+    }
     for name in payload_parameters:
         metadata = parameter_lookup.get(name)
+        effective_classification = str(bindings.get(name, {}).get("classification") or (metadata or {}).get("classification") or "")
         if name not in official_parameters:
             if metadata is None:
                 add_issue(issues, "warning", "CUSTOM_ECOMMERCE_PARAMETER_NOT_DEFINED", f"{base}.data_layer.push.ecommerce.{name}", f"Custom ecommerce event parameter '{name}' must be defined in the parameter reference.")
-            elif metadata.get("classification") in OFFICIAL_ECOMMERCE_PARAMETER_CLASSES:
+            elif effective_classification in OFFICIAL_ECOMMERCE_PARAMETER_CLASSES:
                 add_issue(issues, "error", "CUSTOM_ECOMMERCE_PARAMETER_MISCLASSIFIED", f"{base}.data_layer.push.ecommerce.{name}", f"'{name}' is not an official parameter for {event_name}; classify it as custom_event_parameter or remove it.")
 
 
@@ -151,6 +153,10 @@ def check_ecommerce_items(event: dict[str, Any], index: int, parameter_lookup: d
     base = f"$.events[{index}]"
     payload = event_ga4_payload(event)
     items = payload.get("items", []) if isinstance(payload, dict) else []
+    bindings = {
+        str(binding.get("parameter_name", "")): binding
+        for binding in event_parameter_bindings(event)
+    }
     if "items" in set(event_parameter_names(event)) and (not isinstance(items, list) or not items):
         add_issue(issues, "error", "ECOMMERCE_ITEMS_MISSING", f"{base}.data_layer.push.ecommerce.items", "The selected items parameter needs a non-empty ecommerce.items example.")
     for item_index, item in enumerate(items if isinstance(items, list) else []):
@@ -163,11 +169,12 @@ def check_ecommerce_items(event: dict[str, Any], index: int, parameter_lookup: d
         for key in item:
             parameter_name = f"items[].{key}"
             metadata = parameter_lookup.get(parameter_name)
+            effective_classification = str(bindings.get(parameter_name, {}).get("classification") or (metadata or {}).get("classification") or "")
             if parameter_name in OFFICIAL_ITEM_PARAMETERS:
                 continue
             if metadata is None:
                 add_issue(issues, "warning", "CUSTOM_ITEM_PARAMETER_NOT_DEFINED", f"{base}.data_layer.push.ecommerce.items[{item_index}].{key}", f"Custom item parameter '{parameter_name}' must be defined in the parameter reference.")
-            elif metadata.get("classification") in OFFICIAL_ECOMMERCE_PARAMETER_CLASSES:
+            elif effective_classification in OFFICIAL_ECOMMERCE_PARAMETER_CLASSES:
                 add_issue(issues, "error", "CUSTOM_ITEM_PARAMETER_MISCLASSIFIED", f"{base}.data_layer.push.ecommerce.items[{item_index}].{key}", f"'{parameter_name}' is not an official GA4 item parameter; classify it as custom_item_parameter or remove it.")
     if "ecommerce" not in set(event.get("data_layer", {}).get("flush_keys", [])):
         add_issue(issues, "warning", "ECOMMERCE_FLUSH_MISSING", f"{base}.data_layer.flush_keys", "Flush ecommerce before ecommerce pushes to prevent stale item data.")
@@ -184,31 +191,6 @@ def check_ecommerce_transaction(event: dict[str, Any], index: int, issues: list[
         add_issue(issues, "error", "CURRENCY_MISSING", f"{base}.data_layer.push.ecommerce", "currency is required when value is sent.")
 
 
-def check_ecommerce_scope_precedence(event: dict[str, Any], index: int, issues: list[Issue]) -> None:
-    base = f"$.events[{index}]"
-    selected = set(event_parameter_names(event))
-    payload = event_ga4_payload(event)
-    if isinstance(payload, dict):
-        parameters = payload.get("parameters", {})
-        if isinstance(parameters, dict):
-            selected.update(str(value) for value in parameters)
-        for item in payload.get("items", []) if isinstance(payload.get("items"), list) else []:
-            if isinstance(item, dict):
-                selected.update(f"items[].{value}" for value in item)
-
-    for event_parameter, item_key in EVENT_ITEM_SCOPE_PAIRS.items():
-        item_parameter = f"items[].{item_key}"
-        if event_parameter in selected and item_parameter in selected:
-            add_issue(
-                issues,
-                "error",
-                "ECOMMERCE_DUPLICATE_SCOPE_PRECEDENCE",
-                f"{base}.parameter_bindings",
-                f"Choose one effective scope for '{event_parameter}'. Item-level '{item_parameter}' overrides the event-level value; do not send both for the same event design.",
-            )
-
-
-
 def check_ecommerce_event(event: dict[str, Any], index: int, parameter_lookup: dict[str, dict[str, Any]], issues: list[Issue]) -> None:
     base = f"$.events[{index}]"
     event_name = str(event.get("event_name", ""))
@@ -223,7 +205,6 @@ def check_ecommerce_event(event: dict[str, Any], index: int, parameter_lookup: d
     check_ecommerce_payload_parameters(event, index, parameter_lookup, issues)
     check_ecommerce_items(event, index, parameter_lookup, issues)
     check_ecommerce_transaction(event, index, issues)
-    check_ecommerce_scope_precedence(event, index, issues)
 
 
 def check_event_privacy_and_catalog(event: dict[str, Any], index: int, ga4_catalog: dict[str, Any], issues: list[Issue]) -> None:

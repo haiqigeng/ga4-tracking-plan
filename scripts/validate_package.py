@@ -163,8 +163,8 @@ def check_schema_and_fixture() -> None:
     errors = sorted(Draft202012Validator(schema).iter_errors(fixture), key=lambda item: list(item.path))
     if errors:
         fail("Generic GA4 fixture does not match schema:\n" + "\n".join(error.message for error in errors))
-    if fixture.get("schema_version") != "3.0.0":
-        fail("Generic fixture must use schema_version 3.0.0")
+    if fixture.get("schema_version") != "3.1.0":
+        fail("Generic fixture must use schema_version 3.1.0")
     final_screenshot_statuses = schema["$defs"]["screenshotEvidence"]["properties"]["status"]["enum"]
     if final_screenshot_statuses != ["captured", "shared_evidence", "not_needed", "blocked"]:
         fail(f"Screenshot evidence enum contains non-final states: {final_screenshot_statuses}")
@@ -356,7 +356,7 @@ def check_migration() -> None:
         source.write_text(json.dumps(legacy), encoding="utf-8")
         run([sys.executable, "-B", "scripts/migrate_tracking_plan.py", str(source), "--output", str(output)], "Contract migration")
         migrated = load_json(output)
-        if migrated.get("schema_version") != "3.0.0" or "analytics_platforms" in migrated or "qa_cases" in migrated:
+        if migrated.get("schema_version") != "3.1.0" or "analytics_platforms" in migrated or "qa_cases" in migrated:
             fail("Contract migration did not produce a clean v3 plan")
         attempt = migrated.get("screenshot_capture", {}).get("playwright_mcp_attempt", {}).get("status")
         if attempt != "not_recorded":

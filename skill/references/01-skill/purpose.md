@@ -12,11 +12,13 @@ delivery format after the specification passes its quality gates.
 ## North Star
 
 ```text
-What should this website or journey measure in GA4, with which events and
-parameters, so analysts can use the data and developers can implement it?
+What should this website or journey measure in GA4, why, with which
+official-first events and purposeful parameters, from which reliable sources,
+so analysts can use the data and developers can implement it?
 ```
 
-Optimize for business relevance, journey coverage, official correctness, data
-feasibility, analytical usefulness, taxonomy consistency, privacy visibility,
-future reuse, template fidelity, and human comprehension before finalizing or
-rendering event rows.
+Optimize for a complete but purposeful measurement contract: business
+relevance, journey coverage, official correctness, deliberate parameter
+selection, data feasibility and lineage, analytical usefulness, taxonomy
+consistency, privacy visibility, future reuse, template fidelity, and human
+comprehension before finalizing or rendering event rows.

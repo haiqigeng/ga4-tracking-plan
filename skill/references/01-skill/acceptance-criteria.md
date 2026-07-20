@@ -45,15 +45,25 @@ A complete GA4 tracking plan must satisfy all applicable criteria.
 ## Parameter And Data Quality
 
 - Every unconditional official requirement and applicable conditional
-  dependency is present. Missing availability is a development dependency, not
-  a reason to remove a mandatory parameter.
-- Optional parameters have a named analysis or implementation use.
-- Event bindings state event-specific requirement, condition, availability,
-  and a real data owner when unresolved.
+  dependency is present. A plausible unresolved condition remains visible with
+  a confirmation or development dependency rather than being silently
+  excluded. Missing availability is not a reason to remove a mandatory field.
+- Optional official parameters have a named analysis, activation, or
+  implementation use and are preferentially retained when that use and a
+  feasible source exist. The plan is curated rather than a mechanical copy of
+  every official row; category levels four and five require evidenced taxonomy
+  depth and a named use.
+- Every custom parameter documents the official gap, reporting purpose, source,
+  scope, registration decision, cardinality, privacy, and ownership.
+- Event bindings state event-specific requiredness and classification,
+  condition, availability, source, persistence when values cross events, and a
+  real data owner when unresolved.
 - Ecommerce requiredness and event/item scope follow the event-specific
   official table. When `items` is sent, each item has `item_id` or `item_name`.
-- Parameter bindings and the dataLayer example agree. No duplicate GA4 payload
-  or ecommerce profile snapshot is stored.
+- Parameter bindings and the dataLayer example agree. Event/item precedence is
+  intentional and non-conflicting, and downstream attribution values have a
+  reliable persistence rule. No duplicate GA4 payload or ecommerce profile
+  snapshot is stored.
 - Manual pushes use top-level `event` and the governed `page`, `event_data`,
   `ecommerce`, and `user` wrappers. Inner keys match final GA4 names.
 - Page/core context uses `core_context_before_cmp_ready`; all other manual

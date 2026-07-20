@@ -51,6 +51,9 @@ FIELDS = [
     "expected_value",
     "availability",
     "data_owner",
+    "binding_official_gap",
+    "source_path",
+    "persistence_rule",
     "scope_rule",
     "implementation_notes",
 ]
@@ -90,7 +93,9 @@ def binding_for(event: dict[str, Any], parameter: str) -> dict[str, Any]:
     )
 
 
-def parameter_source(parameter: str, metadata: dict[str, Any] | None) -> str:
+def parameter_source(parameter: str, metadata: dict[str, Any] | None, binding: dict[str, Any] | None = None) -> str:
+    if binding and str(binding.get("classification", "")).strip():
+        return str(binding["classification"])
     if metadata:
         classification = str(metadata.get("classification") or metadata.get("source") or "")
         if parameter.startswith("items[].") and parameter not in OFFICIAL_ITEM_PARAMETERS and classification in {"ga4_ecommerce_parameter", "ga4_ecommerce_item_parameter"}:
@@ -149,11 +154,14 @@ def export_rows(plan: dict[str, Any]) -> list[dict[str, Any]]:
                     "parameter_scope": metadata.get("scope") if metadata else parameter_scope(parameter),
                     "parameter_type": metadata.get("type") if metadata else parameter_type(parameter),
                     "requirement": binding.get("requirement", ""),
-                    "classification_or_source": parameter_source(parameter, metadata),
+                    "classification_or_source": parameter_source(parameter, metadata, binding),
                     "reporting_purpose": metadata.get("reporting_purpose", "") if metadata else "",
                     "expected_value": parameter_matrix_value(event, parameter),
                     "availability": binding.get("availability") or parameter_availability(event, parameter),
                     "data_owner": binding.get("data_owner", ""),
+                    "binding_official_gap": binding.get("official_gap", ""),
+                    "source_path": binding.get("source_path", ""),
+                    "persistence_rule": binding.get("persistence_rule", ""),
                     "scope_rule": scope_rule(parameter),
                     "implementation_notes": event.get("implementation_notes", ""),
                 }

@@ -77,9 +77,9 @@ class EcommerceMatrixTests(unittest.TestCase):
         self.assertEqual(parameter_scope("currency"), "event")
 
         expected_fragments = {
-            "item_list_id": "homogeneous product lists",
-            "promotion_id": "all promoted items",
-            "items[].item_list_id": "item-level values override",
+            "item_list_id": "homogeneous list default",
+            "promotion_id": "homogeneous promotion default",
+            "items[].item_list_id": "Item-level values override",
             "coupon": "independent",
             "currency": "Required when value",
             "value": "price * quantity",

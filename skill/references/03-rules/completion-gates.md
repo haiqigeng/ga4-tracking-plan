@@ -43,14 +43,24 @@ Do not deliver until every applicable gate passes.
 
 ## Data Gate
 
-- Unconditional and applicable conditional official parameters are present.
-- Optional parameters have a concrete analysis or implementation need.
-- Event bindings state requirement, applicable condition, availability, and a
-  real source owner when unresolved.
+- Unconditional and applicable conditional official parameters are present;
+  plausible unresolved conditions remain visible with a confirmation or
+  development dependency. Applicable non-mandatory official fields are
+  preferentially retained when a credible use and feasible source exist,
+  without copying the complete official table mechanically. Category levels
+  four and five require evidenced taxonomy depth and a named use.
+- Optional parameters have a concrete analysis, activation, or implementation
+  need. Every custom parameter also records why official fields are
+  insufficient.
+- Event bindings state event-specific requiredness and classification,
+  applicable condition, availability, value source, cross-event persistence
+  when needed, and a real source owner when unresolved.
 - Ecommerce requiredness follows the current event-specific table. When
   `items` is sent, the example contains item identity and valid item scope.
-- Event and item scope are not duplicated where item-level values override the
-  event-level value.
+- Event and item scope follow Google's precedence rules. Dual scope is allowed
+  when intentional: `coupon` values remain independent, while item-level list
+  and promotion values override the event-level default without contradictory
+  semantics.
 - Bindings and the dataLayer example agree exactly. No duplicate stored GA4
   payload or parameter profile exists.
 - Manual pushes use top-level `event` plus only `page`, `event_data`,

@@ -600,7 +600,7 @@ def migrate_user_properties(plan: dict[str, Any]) -> None:
 
 def migrate_plan(plan: dict[str, Any]) -> dict[str, Any]:
     plan = json.loads(json.dumps(plan))
-    plan["schema_version"] = "3.0.0"
+    plan["schema_version"] = "3.1.0"
     for key in ("analytics_platforms", "custom_definitions", "key_events", "qa_cases"):
         plan.pop(key, None)
     migrate_execution_context(plan)

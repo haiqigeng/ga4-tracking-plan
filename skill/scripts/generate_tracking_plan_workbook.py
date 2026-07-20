@@ -196,9 +196,20 @@ def binding_for_parameter(event: dict[str, Any], parameter_name: str) -> dict[st
 def binding_status(plan: dict[str, Any], binding: dict[str, Any] | None) -> str:
     if binding is None:
         return localized(plan, "Not applicable", "Non applicable")
+    classification = str(binding.get("classification", "")).strip()
     requirement = localized_enum(plan, binding.get("requirement", ""))
     availability = localized_enum(plan, binding.get("availability", ""))
-    return " | ".join(value for value in (requirement, availability) if value)
+    lines = [" | ".join(value for value in (classification, requirement, availability) if value)]
+    official_gap = str(binding.get("official_gap", "")).strip()
+    source_path = str(binding.get("source_path", "")).strip()
+    persistence_rule = str(binding.get("persistence_rule", "")).strip()
+    if official_gap:
+        lines.append(f"{localized(plan, 'Official gap', 'Écart officiel')}: {official_gap}")
+    if source_path:
+        lines.append(f"{localized(plan, 'Source', 'Source')}: {source_path}")
+    if persistence_rule:
+        lines.append(f"{localized(plan, 'Persistence', 'Persistance')}: {persistence_rule}")
+    return "\n".join(lines)
 
 
 def parameter_binding_summary(
@@ -213,7 +224,15 @@ def parameter_binding_summary(
             continue
         event_name = str(event.get("event_name", ""))
         availability.append(
-            f"{event_name}: {localized_enum(plan, binding.get('availability', ''))}"
+            f"{event_name}: "
+            + " | ".join(
+                value
+                for value in (
+                    str(binding.get("classification", "")).strip(),
+                    localized_enum(plan, binding.get("availability", "")),
+                )
+                if value
+            )
         )
         owner = str(binding.get("data_owner", "")).strip()
         if owner and owner not in owners:

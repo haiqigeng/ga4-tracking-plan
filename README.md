@@ -9,10 +9,11 @@ implementation-ready GA4 tracking plans. Tracking-plan quality is the product;
 XLSX is one human delivery format.
 
 It starts from the website, business goals, journeys, expected actions, and
-analysis needs. It then selects appropriate GA4 events, keeps only justified
-parameters without dropping mandatory fields, grounds definitions in the exact
-Google documentation sections, and produces a plan that analysts and developers
-can act on.
+analysis needs. It then resolves the selected events' current official Google
+tables, retains mandatory and applicable conditional fields, preferentially
+includes other applicable official parameters when evidence and use justify
+them, and adds custom parameters only for a documented official gap. The result
+is a plan that analysts and developers can act on.
 
 ## Who It Is For
 
@@ -69,25 +70,32 @@ can act on.
 7. Select GA4 automatic, enhanced-measurement, recommended, and ecommerce
    events before considering custom events. Decide whether form outcomes share
    `generate_lead` or need separate success events.
-8. Include mandatory and applicable conditional parameters first. Add optional
-   or custom parameters only for a stated analysis or implementation need.
-   Requiredness, conditions, availability, and ownership are decided per event.
-9. Use the live website or authoritative client evidence to exhaust practical
+8. Read the complete current official table for each selected event. Include
+   mandatory fields and applicable conditional fields first. Prefer other
+   applicable official fields when website evidence, business needs, recurrent
+   analysis, activation, or a feasible source supports them, but do not copy
+   every row mechanically. Category levels four and five require evidenced
+   taxonomy depth and use.
+9. Add a custom parameter only when the official fields do not answer the need.
+   Record the official gap, event-specific classification, scope, reporting
+   purpose, source, availability, ownership, registration decision,
+   cardinality, privacy, and cross-event persistence when applicable.
+10. Use the live website or authoritative client evidence to exhaust practical
    finite values. Each finite value keeps its original label, normalized value,
    language, mapping method, and evidence source. Dynamic values use precise rules.
-10. Specify one complete developer-readable dataLayer and GA4 mapping example
+11. Specify one complete developer-readable dataLayer and GA4 mapping example
    per event, using the project's `page`, `event_data`, `ecommerce`, and `user`
    wrappers. Native page/core context omits a Custom Event trigger and may
    precede CMP readiness; every other manual
    event follows CMP readiness.
-11. Define connected-user state once in GTM Protocol when relevant, with GA4
+12. Define connected-user state once in GTM Protocol when relevant, with GA4
    User-ID and user-property mappings kept separate from event payloads.
-12. After event design, attempt screenshot capture with Playwright MCP: one
+13. After event design, attempt screenshot capture with Playwright MCP: one
    representative image for repetitive generic events and all materially
    different scenarios for finite events.
-13. If capture is blocked or partial, show the reason in Screenshot Register and
+14. If capture is blocked or partial, show the reason in Screenshot Register and
    tell the reviewer before returning the workbook.
-14. Validate semantic quality and, for a client template, prove that only
+15. Validate semantic quality and, for a client template, prove that only
     approved cells changed before returning the workbook.
 
 For ecommerce customer spaces, the skill considers meaningful order, return,
@@ -115,8 +123,8 @@ Without a client template, the main output is an XLSX workbook with five core ta
 
 - `00 Overview`: document details, navigation, and version history;
 - `01 GTM Protocol`: shared GTM/dataLayer rules and official links;
-- `02 Parameter Reference`: definitions, values, event-specific availability,
-  owners, and GA4 registration needs;
+- `02 Parameter Reference`: definitions, values, event-specific classification
+  and availability, owners, source lineage, and GA4 registration needs;
 - `03 Event Matrix`: the main tracking plan grouped by journey;
 - `04 DataLayer Examples`: complete per-event GTM implementation examples;
 - `05 Screenshot Register` when screenshots are requested: explicit page and
@@ -311,9 +319,12 @@ values only.
 
 ## Versioning
 
-The GA4-only v3 contract is a breaking change from v2. Schema `3.0.0` adds
+The GA4-only v3 contract is a breaking change from v2. Schema `3.0.0` added
 event-specific parameter requiredness and availability, reusable multi-journey
 events, evidence-bearing finite values, a normalized official-source registry,
 conditional screenshot sheets, and artifact-bound client-template fidelity.
-Future minor releases add compatible analyst or scenario improvements; patch
-releases fix documentation, validation, or rendering defects.
+Schema `3.1.0` adds compatible event-binding classification and source/
+persistence lineage, plus an explicit official-gap assessment for custom
+parameters. Future minor releases add compatible analyst or scenario
+improvements; patch releases fix documentation, validation, or rendering
+defects.

@@ -174,7 +174,7 @@ ITEM_FALLBACK_TO_EVENT_LEVEL = {
 }
 
 EVENT_ITEM_FALLBACK_NOTE = (
-    "Use event-level when every item shares the same value; item-level values override event-level values."
+    "Use the event-level value as a homogeneous default; use item-level values for mixed or retained origin context. Item-level values override the event-level default."
 )
 
 
@@ -224,9 +224,9 @@ def parameter_scope(parameter: str) -> str:
 
 def scope_rule(parameter: str) -> str:
     if parameter in {"item_list_id", "item_list_name"}:
-        return "Prefer event-level for homogeneous product lists; item-level list values override event-level values."
+        return "Use event-level for the current homogeneous list default; use item-level values for mixed items or reliably retained origin attribution. Item-level values override the event-level default."
     if parameter in {"promotion_id", "promotion_name", "creative_name", "creative_slot"}:
-        return "Prefer event-level when all promoted items share the same promotion; item-level promotion values override event-level values."
+        return "Use event-level for the current homogeneous promotion default; use item-level values for mixed items or reliably retained origin attribution. Item-level values override the event-level default."
     if parameter in ITEM_FALLBACK_TO_EVENT_LEVEL:
         return EVENT_ITEM_FALLBACK_NOTE
     if parameter in {"coupon", "items[].coupon"}:

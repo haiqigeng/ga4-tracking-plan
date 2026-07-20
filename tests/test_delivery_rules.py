@@ -121,12 +121,52 @@ class DeliveryRuleTests(unittest.TestCase):
         plan["events"][1]["event_name"] = "purchase"
         self.assertIn("PAYMENT_FAILURE_BRANCH_MISSING", self.codes(plan))
 
-    def test_ecommerce_list_values_cannot_be_sent_at_both_scopes(self) -> None:
+    def test_ecommerce_list_values_may_use_both_scopes_with_google_precedence(self) -> None:
         plan = copy.deepcopy(self.fixture)
         event = next(item for item in plan["events"] if item["event_name"] == "view_promotion")
         self.add_binding(event, "items[].promotion_id")
         event["data_layer"]["push"]["ecommerce"]["items"][0]["promotion_id"] = "%promotion_id%"
-        self.assertIn("ECOMMERCE_DUPLICATE_SCOPE_PRECEDENCE", self.codes(plan))
+        self.assertNotIn("ECOMMERCE_DUPLICATE_SCOPE_PRECEDENCE", self.codes(plan))
+
+    def test_official_name_used_outside_its_event_needs_binding_classification(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        event = next(item for item in plan["events"] if item["event_name"] == "view_promotion")
+        self.add_binding(event, "search_term")
+        self.assertIn("EVENT_PARAMETER_CLASSIFICATION_AMBIGUOUS", self.codes(plan))
+
+        binding = next(item for item in event["parameter_bindings"] if item["parameter_name"] == "search_term")
+        binding["classification"] = "custom_event_parameter"
+        self.assertIn("EVENT_PARAMETER_OFFICIAL_GAP_MISSING", self.codes(plan))
+
+        binding["official_gap"] = "The view_promotion table was reviewed; none of its official fields represents the originating search query needed for promotion-context analysis."
+        self.assertNotIn("EVENT_PARAMETER_CLASSIFICATION_AMBIGUOUS", self.codes(plan))
+        self.assertNotIn("EVENT_PARAMETER_OFFICIAL_GAP_MISSING", self.codes(plan))
+
+    def test_purchase_propagated_context_needs_source_and_persistence(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        event = next(item for item in plan["events"] if item["event_name"] == "view_promotion")
+        event["event_name"] = "purchase"
+        self.add_binding(event, "payment_type")
+        binding = next(item for item in event["parameter_bindings"] if item["parameter_name"] == "payment_type")
+        binding["classification"] = "custom_event_parameter"
+        codes = self.codes(plan)
+        self.assertIn("EVENT_PARAMETER_OFFICIAL_GAP_MISSING", codes)
+        self.assertIn("PROPAGATED_PARAMETER_SOURCE_MISSING", codes)
+        self.assertIn("PROPAGATED_PARAMETER_PERSISTENCE_MISSING", codes)
+
+        binding["official_gap"] = "The purchase event table was reviewed; it has no official payment method field, while confirmed-order analysis needs the method selected during checkout."
+        binding["source_path"] = "checkout.payment_type"
+        binding["persistence_rule"] = "Capture after accepted payment selection, persist on the order, omit if unknown, and clear after order completion."
+        codes = self.codes(plan)
+        self.assertNotIn("EVENT_PARAMETER_OFFICIAL_GAP_MISSING", codes)
+        self.assertNotIn("PROPAGATED_PARAMETER_SOURCE_MISSING", codes)
+        self.assertNotIn("PROPAGATED_PARAMETER_PERSISTENCE_MISSING", codes)
+
+    def test_custom_parameter_needs_an_official_gap_assessment(self) -> None:
+        plan = copy.deepcopy(self.fixture)
+        parameter = next(item for item in plan["parameters"] if item["parameter_name"] == "page_template")
+        parameter.pop("official_gap")
+        self.assertIn("CUSTOM_PARAMETER_OFFICIAL_GAP_MISSING", self.codes(plan))
 
     def test_downstream_list_attribution_is_not_approved_by_prose_heuristics(self) -> None:
         plan = copy.deepcopy(self.fixture)

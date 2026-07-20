@@ -22,7 +22,7 @@ from official_ga4_catalog import (
 )
 from official_source_receipt import receipt_validation_errors, tracking_plan_sha256
 from tracking_plan_contract import event_ga4_payload, event_parameter_bindings, event_parameter_names, source_registry
-from tracking_plan_validation_catalogs import OFFICIAL_SOURCE_DOMAINS
+from tracking_plan_validation_catalogs import CUSTOM_PARAMETER_CLASSIFICATIONS, OFFICIAL_SOURCE_DOMAINS
 from tracking_plan_validation_model import Issue, add_issue
 
 RULES_DIR = Path(__file__).resolve().parents[1] / "references" / "03-rules"
@@ -376,7 +376,95 @@ def _check_ecommerce_item_examples(base: str, event: dict[str, Any], issues: lis
         )
 
 
-def check_event_parameter_bindings(event: dict[str, Any], index: int, issues: list[Issue]) -> None:
+PURCHASE_PROPAGATED_PARAMETERS = {
+    "shipping_tier",
+    "payment_type",
+    "items[].item_list_id",
+    "items[].item_list_name",
+}
+WEAK_OFFICIAL_GAPS = {
+    "",
+    "none",
+    "not applicable",
+    "custom",
+    "no official parameter",
+    "tbd",
+    "to confirm",
+    "unknown",
+}
+
+
+def _check_purchase_parameter_lineage(
+    event_name: str,
+    name: str,
+    binding: dict[str, Any],
+    path: str,
+    issues: list[Issue],
+) -> None:
+    if event_name != "purchase" or name not in PURCHASE_PROPAGATED_PARAMETERS:
+        return
+    if not str(binding.get("source_path", "")).strip():
+        add_issue(issues, "error", "PROPAGATED_PARAMETER_SOURCE_MISSING", f"{path}.source_path", f"Purchase parameter '{name}' needs the event-specific source from which the confirmed order receives the value.")
+    if not str(binding.get("persistence_rule", "")).strip():
+        add_issue(issues, "error", "PROPAGATED_PARAMETER_PERSISTENCE_MISSING", f"{path}.persistence_rule", f"Purchase parameter '{name}' needs a capture, retention, fallback, and reset rule.")
+
+
+def _check_unprescribed_event_parameter(
+    event_name: str,
+    name: str,
+    binding: dict[str, Any],
+    metadata_classification: str,
+    path: str,
+    issues: list[Issue],
+) -> None:
+    binding_classification = str(binding.get("classification", ""))
+    effective_classification = binding_classification or metadata_classification
+    if binding_classification in OFFICIAL_PARAMETER_CLASSES:
+        add_issue(issues, "error", "EVENT_PARAMETER_CLASSIFICATION_INVALID", f"{path}.classification", f"Parameter '{name}' is not prescribed for {event_name}; do not classify this event binding as official.")
+    elif metadata_classification in OFFICIAL_PARAMETER_CLASSES and not binding_classification:
+        add_issue(issues, "error", "EVENT_PARAMETER_CLASSIFICATION_AMBIGUOUS", f"{path}.classification", f"Parameter '{name}' is official elsewhere in GA4 but not prescribed for {event_name}; classify this binding explicitly as a custom event or item parameter.")
+    if effective_classification == "custom_event_parameter" and name.startswith("items[]."):
+        add_issue(issues, "error", "EVENT_PARAMETER_CUSTOM_SCOPE_INVALID", f"{path}.classification", f"Item path '{name}' must use custom_item_parameter when it is not prescribed for {event_name}.")
+    elif effective_classification == "custom_item_parameter" and not name.startswith("items[]."):
+        add_issue(issues, "error", "EVENT_PARAMETER_CUSTOM_SCOPE_INVALID", f"{path}.classification", f"Event parameter '{name}' must use custom_event_parameter when it is not prescribed for {event_name}.")
+    if binding_classification in CUSTOM_PARAMETER_CLASSIFICATIONS:
+        official_gap = str(binding.get("official_gap", "")).strip()
+        if official_gap.lower().rstrip(".") in WEAK_OFFICIAL_GAPS:
+            add_issue(
+                issues,
+                "error",
+                "EVENT_PARAMETER_OFFICIAL_GAP_MISSING",
+                f"{path}.official_gap",
+                f"Custom {event_name} binding '{name}' must identify the official fields reviewed and the specific need they do not answer.",
+            )
+
+
+def _check_prescribed_event_parameter(
+    event_name: str,
+    name: str,
+    binding: dict[str, Any],
+    record: dict[str, Any],
+    path: str,
+    issues: list[Issue],
+) -> None:
+    binding_classification = str(binding.get("classification", ""))
+    if binding_classification in CUSTOM_PARAMETER_CLASSIFICATIONS:
+        add_issue(issues, "error", "EVENT_PARAMETER_OFFICIAL_MISCLASSIFIED", f"{path}.classification", f"Parameter '{name}' is prescribed in the official {event_name} table and must not be classified as custom on this binding.")
+    if name.startswith("items[].") and binding_classification and binding_classification != "ga4_ecommerce_item_parameter":
+        add_issue(issues, "error", "EVENT_PARAMETER_OFFICIAL_SCOPE_INVALID", f"{path}.classification", f"Official item path '{name}' must use ga4_ecommerce_item_parameter on this binding.")
+    expected = normalize_requiredness(record.get("required"))
+    if binding.get("requirement") != expected:
+        add_issue(issues, "error", "EVENT_PARAMETER_REQUIREDNESS_MISMATCH", f"{path}.requirement", f"Parameter '{name}' is '{expected}' for {event_name} in the official event table.")
+    if not str(binding.get("official_source_id", "")).strip() or str(binding.get("official_source_locator", "")) != name:
+        add_issue(issues, "error", "EVENT_PARAMETER_SOURCE_LOCATOR_INVALID", path, f"Official parameter '{name}' must reference its checked event-table source and exact parameter locator.")
+
+
+def check_event_parameter_bindings(
+    event: dict[str, Any],
+    index: int,
+    parameter_lookup: dict[str, dict[str, Any]],
+    issues: list[Issue],
+) -> None:
     base = f"$.events[{index}].parameter_bindings"
     bindings = event_parameter_bindings(event)
     names = [str(binding.get("parameter_name", "")) for binding in bindings]
@@ -390,6 +478,7 @@ def check_event_parameter_bindings(event: dict[str, Any], index: int, issues: li
         requirement = str(binding.get("requirement", ""))
         condition = str(binding.get("condition", "")).strip()
         reason = str(binding.get("inclusion_reason", "")).strip()
+        metadata_classification = str(parameter_lookup.get(name, {}).get("classification", ""))
         if requirement == "conditional" and not condition:
             add_issue(issues, "error", "CONDITIONAL_PARAMETER_CONDITION_MISSING", f"{path}.condition", f"Conditional parameter '{name}' needs the precise official or business condition that makes it required.")
         if requirement == "optional" and not reason:
@@ -397,16 +486,17 @@ def check_event_parameter_bindings(event: dict[str, Any], index: int, issues: li
         owner = str(binding.get("data_owner", "")).strip()
         if binding.get("availability") in {"requires_development", "requires_backend", "to_confirm", "unavailable"} and owner.lower() in {"", "tbd", "to confirm", "unknown"}:
             add_issue(issues, "error", "EVENT_PARAMETER_OWNER_MISSING", f"{path}.data_owner", f"Parameter '{name}' needs a clear source owner for this event.")
+        _check_purchase_parameter_lineage(event_name, name, binding, path, issues)
         if not official_event:
+            continue
+        event_record = next((item for item in RECOMMENDED_CATALOG if item.get("event") == event_name), None)
+        if not event_record:
             continue
         record = event_parameter(RECOMMENDED_CATALOG, event_name, name)
         if not record:
+            _check_unprescribed_event_parameter(event_name, name, binding, metadata_classification, path, issues)
             continue
-        expected = normalize_requiredness(record.get("required"))
-        if requirement != expected:
-            add_issue(issues, "error", "EVENT_PARAMETER_REQUIREDNESS_MISMATCH", f"{path}.requirement", f"Parameter '{name}' is '{expected}' for {event_name} in the official event table.")
-        if not str(binding.get("official_source_id", "")).strip() or str(binding.get("official_source_locator", "")) != name:
-            add_issue(issues, "error", "EVENT_PARAMETER_SOURCE_LOCATOR_INVALID", path, f"Official parameter '{name}' must reference its checked event-table source and exact parameter locator.")
+        _check_prescribed_event_parameter(event_name, name, binding, record, path, issues)
 
 
 def check_ecommerce_parameter_selection(event: dict[str, Any], index: int, issues: list[Issue]) -> None:
@@ -428,11 +518,16 @@ def check_ecommerce_parameter_selection(event: dict[str, Any], index: int, issue
 def check_quality_contract(plan: dict[str, Any], issues: list[Issue]) -> None:
     check_official_source_registry(plan, issues)
     check_official_verification_freshness(plan, issues)
+    parameter_lookup = {
+        str(parameter.get("parameter_name", "")): parameter
+        for parameter in plan.get("parameters", [])
+        if isinstance(parameter, dict)
+    }
     for index, event in enumerate(plan.get("events", [])):
         if not isinstance(event, dict):
             continue
         check_event_wording(plan, event, index, issues)
-        check_event_parameter_bindings(event, index, issues)
+        check_event_parameter_bindings(event, index, parameter_lookup, issues)
         check_ecommerce_parameter_selection(event, index, issues)
     for index, parameter in enumerate(plan.get("parameters", [])):
         if isinstance(parameter, dict):

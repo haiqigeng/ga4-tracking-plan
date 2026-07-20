@@ -9,7 +9,8 @@ privacy, workbook readability, or deterministic validation.
 ## Rules
 
 - Start from an analyst or developer use case.
-- Check GA4 claims against current official Google documentation.
+- Check the complete event-specific GA4 parameter table against current
+  official Google documentation before proposing custom parameters.
 - Keep detailed rules in `skill/references/03-rules/`.
 - Keep `skill/SKILL.md` concise and update it only when behavior changes.
 - Keep examples generic and free of client data.
@@ -18,6 +19,8 @@ privacy, workbook readability, or deterministic validation.
 - Do not add another analytics platform, runtime testing, GTM mutation, or
   unrelated implementation scope.
 - Add tests for new validator, renderer, migration, or catalog behavior.
+- Do not add a runtime utility without an explicit product need and maintainer
+  approval; prefer extending an existing validated contract or rule.
 
 ## Validation
 

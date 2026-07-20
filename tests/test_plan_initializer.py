@@ -30,7 +30,7 @@ class PlanInitializerTests(unittest.TestCase):
             {issue.code for issue in validate_plan_data(plan)},
             {"OFFICIAL_SOURCE_RECEIPT_INVALID", "PLAYWRIGHT_EXPLORATION_ATTEMPT_MISSING"},
         )
-        self.assertEqual(plan["schema_version"], "3.0.0")
+        self.assertEqual(plan["schema_version"], "3.1.0")
         self.assertEqual([event["event_name"] for event in plan["events"]], ["page_view"])
         self.assertEqual(plan["measurement_brief"][0]["journey_id"], "product_discovery")
         self.assertEqual(plan["screenshot_evidence"], [])

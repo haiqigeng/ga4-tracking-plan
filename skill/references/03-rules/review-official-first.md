@@ -10,13 +10,20 @@ intent into GA4.
 3. Check automatic and enhanced-measurement coverage.
 4. Check current GA4 recommended and ecommerce events.
 5. Accept a custom event only when official semantics do not fit.
-6. Verify event and item parameters, scope, availability, ownership, privacy,
-   cardinality, and custom-definition need.
-7. Produce a live source receipt, resolve a new plan artifact, and validate
+6. Read the selected event's complete current official parameter table before
+   choosing rows. Retain unconditional requirements and applicable conditional
+   requirements. Prefer other applicable official parameters when website or
+   business evidence gives them a credible use and feasible source, without
+   copying the table mechanically; require explicit justification for category
+   levels four and five.
+7. Add a custom parameter only when the reviewed official fields cannot answer
+   the business question. Record the official gap, scope, source, availability,
+   ownership, persistence, privacy, cardinality, and custom-definition need.
+8. Produce a live source receipt, resolve a new plan artifact, and validate
    that exact artifact before rendering.
-8. Remove Universal Analytics fields, generic wrapper events, and duplicate
+9. Remove Universal Analytics fields, generic wrapper events, and duplicate
    GA4 payload or ecommerce-profile snapshots.
-9. Keep only human-useful workbook content.
+10. Keep only human-useful workbook content.
 
 ## Evidence Quality
 

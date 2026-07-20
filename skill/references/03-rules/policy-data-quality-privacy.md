@@ -24,7 +24,14 @@ Use this reference during every tracking-plan review, regardless of scenario.
 - Every event must include `official_match`; custom events must explain why GA4 official events are insufficient.
 - Macro conversions must be separated from micro conversions and diagnostic events.
 - Ecommerce events must not be mixed with interaction-only parameters unless those custom item/event parameters are intentionally documented.
-- Optional parameters should be included only when they improve analysis or implementation clarity.
+- Review the selected event's official table before adding any custom field.
+- Prefer an applicable official parameter when it improves analysis,
+  activation, or implementation clarity and has a feasible source, but do not
+  add official fields without a credible use. Apply a stricter evidence and use
+  test to item category levels four and five.
+- Every custom parameter must state the unmet business question, why official
+  fields are insufficient, its value source, reporting destination or explicit
+  no-registration decision, and its privacy and cardinality risks.
 - Events intentionally not tracked should be listed with a reason.
 
 ## Reusable Package Safety

@@ -31,7 +31,7 @@ class ContractMigrationTests(unittest.TestCase):
         )
         migrated = migrate_plan(legacy)
 
-        self.assertEqual(migrated["schema_version"], "3.0.0")
+        self.assertEqual(migrated["schema_version"], "3.1.0")
         self.assertNotIn("analytics_platforms", migrated)
         self.assertNotIn("qa_cases", migrated)
         self.assertNotIn("primary_platform", migrated["events"][0])

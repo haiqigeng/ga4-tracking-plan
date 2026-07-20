@@ -20,15 +20,19 @@ For each journey, check:
    official events do not cover cleanly.
 6. Parameter synergy: shared business concepts reuse the same parameter names,
    value rules, and controlled values across events.
-7. Ecommerce isolation: ecommerce events keep official GA4 ecommerce parameter
+7. Parameter sufficiency: the selected event's current official parameter table
+   is reviewed before any custom field; applicable official fields have a
+   reasoned inclusion decision and every custom field identifies the remaining
+   official gap.
+8. Ecommerce isolation: ecommerce events keep official GA4 ecommerce parameter
    scope and are not mixed with generic interaction-event variables.
-8. Not-tracked choices: noisy, duplicate, sensitive, unavailable, or
+9. Not-tracked choices: noisy, duplicate, sensitive, unavailable, or
    non-actionable interactions are explicitly excluded.
-9. Screenshot evidence: when screenshots are requested, every event has a
+10. Screenshot evidence: when screenshots are requested, every event has a
    Screenshot Register row with captured evidence, shared evidence, a blocked
    reason, or a not-needed reason. When screenshots are excluded, the register
    and its rows are absent.
-10. Future scale: future pages, markets, components, or funnel variants can
+11. Future scale: future pages, markets, components, or funnel variants can
     reuse the event families and parameters without a full redesign.
 
 ## Blockers
@@ -39,6 +43,8 @@ Do not approve the plan when:
 - the same journey is scattered across unrelated blocks without a readable
   grouping;
 - custom events replace official GA4 events without a documented reason;
+- custom parameters lack a documented official-field review, reporting use,
+  source, or governance decision;
 - ecommerce events are missing official item, transaction, list, promotion, or
   checkout parameters required for the scenario;
 - parameter names change for the same business concept across events;

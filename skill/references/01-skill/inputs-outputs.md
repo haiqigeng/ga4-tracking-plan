@@ -23,7 +23,8 @@ The primary output is a human-readable XLSX tracking plan with:
 
 - a concise Overview;
 - shared GTM Protocol rules;
-- a Parameter Reference including availability and ownership;
+- a Parameter Reference including official/custom status, availability,
+  ownership, source lineage, registration, and custom-field justification;
 - a journey-grouped Event Matrix;
 - complete per-event dataLayer examples and GTM-to-GA4 mappings;
 - a Screenshot Register with embedded previews when screenshots are requested,
@@ -31,9 +32,10 @@ The primary output is a human-readable XLSX tracking plan with:
 
 Structured JSON is the source used to validate and render the human workbook.
 The publication artifact includes a live official-source receipt and stores
-event-specific parameter bindings, one canonical dataLayer example, and
-evidence-bearing finite-value entries. It does not store a duplicate GA4
-payload or ecommerce profile. Those machine fields remain subordinate to the
-human deliverable.
+event-specific parameter bindings with classification and persistence where
+needed, one canonical dataLayer example, and evidence-bearing finite-value
+entries. Custom parameter definitions state the official gap they fill. It
+does not store a duplicate GA4 payload or ecommerce profile. Those machine
+fields remain subordinate to the human deliverable.
 A long-format CSV can support review and comparison. Internal IDs and reasoning
 must not appear in the visible Event Matrix.
