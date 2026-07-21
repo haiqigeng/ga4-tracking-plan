@@ -6,7 +6,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from browser_environment import inspect_browser_environment, resolve_browser_channel
+from browser_environment import inspect_browser_environment, load_playwright_sync_api, resolve_browser_channel
 from discover_site_journeys import (
     SourceError,
     canonical_url,
@@ -47,14 +47,13 @@ def discovery_outcome(pages: list[dict], errors: list[SourceError]) -> tuple[str
 
 def require_playwright():
     try:
-        from playwright.sync_api import sync_playwright
-    except ImportError as error:
+        return load_playwright_sync_api()
+    except Exception as error:
         raise SystemExit(
-            "Playwright is required for rendered-DOM discovery. Install it with "
-            "`python -m pip install playwright`. Then run "
+            f"Playwright is required and must be importable for rendered-DOM discovery ({type(error).__name__}: {error}). "
+            "Repair the skill runtime with `python -m pip install --upgrade --force-reinstall -r requirements.txt`. Then run "
             "`python scripts/inspect_browser_environment.py` to reuse an eligible installed browser or identify the browser build still needed."
         ) from error
-    return sync_playwright
 
 
 def launch_browser(playwright: Any, channel: str, headless: bool):

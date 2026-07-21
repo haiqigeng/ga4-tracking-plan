@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import tomllib
 import zipfile
 from pathlib import Path
 
@@ -23,6 +24,7 @@ WRAPPER_NAMES = [
 ]
 PACKAGE_FILES = [
     ROOT / "requirements.txt",
+    ROOT / "pyproject.toml",
     ROOT / "README.md",
     ROOT / "LICENSE",
     ROOT / "scripts" / "_run_skill_script.py",
@@ -67,6 +69,10 @@ def iter_package_files() -> list[Path]:
 
 def main() -> int:
     args = parse_args()
+    project_version = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+    requested_version = args.version.removeprefix("v")
+    if args.version not in {"local", "validation"} and requested_version != project_version:
+        raise ValueError(f"Release version {args.version} does not match pyproject.toml version {project_version}.")
     output = args.output or ROOT / "release" / f"ga4-tracking-plan-package-{args.version}.zip"
     output.parent.mkdir(parents=True, exist_ok=True)
     files = iter_package_files()

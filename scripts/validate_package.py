@@ -6,7 +6,9 @@ import re
 import subprocess
 import sys
 import tempfile
+import tomllib
 import zipfile
+from datetime import date
 from itertools import chain
 from operator import attrgetter
 from pathlib import Path
@@ -31,6 +33,7 @@ REQUIRED_FILES = {
     ROOT / "requirements.txt",
     ROOT / "pyproject.toml",
     SKILL / "SKILL.md",
+    SKILL / "release.json",
     SKILL / "agents" / "openai.yaml",
     RULES / "execution-contract.md",
     RULES / "completion-gates.md",
@@ -96,6 +99,7 @@ SECRET_PATTERNS = {
     "GTM container ID": re.compile(r"\bGTM-[A-Z0-9]{6,}\b"),
     "GA4 measurement ID": re.compile(r"\bG-[A-Z0-9]{8,}\b"),
 }
+REQUIRED_RUNTIME_DEPENDENCIES = {"greenlet", "jsonschema", "openpyxl", "pillow", "playwright"}
 
 
 def fail(message: str) -> None:
@@ -129,6 +133,44 @@ def check_skill_metadata() -> None:
     for expected in ("GA4 Web Analyst", "$ga4-tracking-plan"):
         if expected not in agent:
             fail(f"agents/openai.yaml is missing {expected}")
+
+
+def dependency_name(requirement: str) -> str:
+    return re.split(r"[<>=!~;\s\[]", requirement.strip(), maxsplit=1)[0].lower().replace("_", "-")
+
+
+def check_release_metadata_and_dependencies() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    version = str(project.get("version", ""))
+    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        fail(f"pyproject.toml contains an invalid semantic version: {version}")
+    release = load_json(SKILL / "release.json")
+    if release.get("name") != "ga4-tracking-plan" or release.get("version") != version:
+        fail("skill/release.json must identify ga4-tracking-plan and match pyproject.toml version")
+    if release.get("python_requires") != project.get("requires-python"):
+        fail("skill/release.json python_requires must match pyproject.toml")
+    try:
+        date.fromisoformat(str(release.get("released_on", "")))
+    except ValueError:
+        fail("skill/release.json released_on must be an ISO date")
+    fixture = load_json(FIXTURE)
+    if release.get("schema_version") != fixture.get("schema_version"):
+        fail("skill/release.json schema_version must match the generic fixture")
+    project_dependencies = {dependency_name(value) for value in project.get("dependencies", [])}
+    requirement_dependencies = {
+        dependency_name(line)
+        for line in (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    if project_dependencies != requirement_dependencies:
+        fail("requirements.txt and pyproject.toml runtime dependencies must match")
+    missing = sorted(REQUIRED_RUNTIME_DEPENDENCIES - project_dependencies)
+    if missing:
+        fail(f"Runtime dependency declarations are missing: {', '.join(missing)}")
+    try:
+        from playwright.sync_api import sync_playwright  # noqa: F401
+    except Exception as error:
+        fail(f"Playwright runtime import failed: {type(error).__name__}: {error}")
 
 
 def check_reference_navigation() -> None:
@@ -366,11 +408,28 @@ def check_migration() -> None:
 def check_release_package() -> None:
     with tempfile.TemporaryDirectory() as raw:
         output = Path(raw) / "package.zip"
+        mismatch = subprocess.run(
+            [sys.executable, "-B", "scripts/create_release_package.py", "--version", "v0.0.0", "--output", str(output)],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            encoding="utf-8",
+        )
+        if mismatch.returncode == 0 or output.exists():
+            fail("Release packager must reject a version that differs from pyproject.toml")
         run([sys.executable, "-B", "scripts/create_release_package.py", "--version", "validation", "--output", str(output)], "Release package")
         with zipfile.ZipFile(output) as archive:
             names = archive.namelist()
         if not any(name.endswith("skill/SKILL.md") for name in names):
             fail("Release package is missing skill/SKILL.md")
+        for required in ("pyproject.toml", "skill/release.json"):
+            if required not in names:
+                fail(f"Release package is missing {required}")
+        with zipfile.ZipFile(output) as archive:
+            packaged_release = json.loads(archive.read("skill/release.json"))
+            packaged_project = tomllib.loads(archive.read("pyproject.toml").decode("utf-8"))["project"]
+        if packaged_release.get("version") != packaged_project.get("version"):
+            fail("Release package contains inconsistent version metadata")
         required_commands = {
             "scripts/_run_skill_script.py",
             "scripts/check_installed_skill_sync.py",
@@ -453,6 +512,7 @@ def check_xlsx_privacy(path: Path, relative: Path) -> None:
 CHECKS = [
     check_required_files,
     check_skill_metadata,
+    check_release_metadata_and_dependencies,
     check_reference_navigation,
     check_ga4_only_scope,
     check_schema_and_fixture,

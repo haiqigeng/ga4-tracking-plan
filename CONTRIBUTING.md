@@ -31,11 +31,14 @@ python -m unittest discover -s tests
 python -m coverage run --source=skill/scripts -m unittest discover -s tests
 python scripts/validate_eval_manifest.py
 python scripts/check_official_catalog.py --offline
+python scripts/inspect_browser_environment.py
 python scripts/validate_package.py
 ```
 
 Release assets must be created with `scripts/create_release_package.py` and
-must contain only generic reusable files.
+must contain only generic reusable files. Keep the versions in
+`pyproject.toml` and `skill/release.json` synchronized; the release tag must
+match that version.
 
 `validate_eval_manifest.py` checks only evaluation-case structure. A real
 fresh-agent release gate requires clean sessions and a completed result file:

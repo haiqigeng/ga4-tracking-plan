@@ -12,6 +12,11 @@ python scripts/init_tracking_plan.py https://www.example.com/ --site-scope whole
 python scripts/inspect_browser_environment.py
 ```
 
+The preflight is ready only when Playwright imports successfully and an
+eligible browser is available. `playwright_import_failed` and
+`playwright_runtime_failed` are blocking local-runtime states; repair the
+declared dependencies before using the local rendered-discovery command.
+
 Use `--screenshots not_requested` only when the requester excludes screenshot
 delivery. Set `--workbook-language en|fr` and repeat `--site-language` for every
 observed or confirmed site language.

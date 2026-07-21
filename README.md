@@ -189,12 +189,13 @@ journeys are in scope, the workflow attempts Playwright MCP before a fallback.
 The local preflight below checks whether a usable browser is also available:
 
 ```powershell
-python -m pip install playwright
 python scripts/inspect_browser_environment.py
 ```
 
 The preflight prefers the eligible system default browser, including Microsoft
-Edge through `msedge`, and reports when another browser build is needed.
+Edge through `msedge`. Playwright and its compatible `greenlet` runtime are
+installed by `requirements.txt`; an import or driver failure is reported as a
+blocking runtime error even when a supported system browser is present.
 
 ## Common Commands
 
@@ -297,9 +298,15 @@ Before release:
 ruff check .
 python -m compileall -q scripts skill/scripts maintenance/scripts tests
 python -m unittest discover -s tests
+python scripts/inspect_browser_environment.py
 python scripts/validate_package.py
 git diff --check
 ```
+
+`pyproject.toml` and `skill/release.json` must carry the same semantic version.
+The release packager rejects a tag/version mismatch, and the package validator
+checks dependency parity, Playwright importability, package metadata, generated
+outputs, privacy, and release cleanliness.
 
 The GitHub workflows run the package on Windows and Ubuntu. CI validates the
 fresh-agent case manifest but does not claim that an agent was executed. Real

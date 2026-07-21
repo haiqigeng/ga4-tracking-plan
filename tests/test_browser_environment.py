@@ -26,7 +26,7 @@ class BrowserEnvironmentTests(unittest.TestCase):
     def test_eligible_default_edge_is_preferred(self) -> None:
         with (
             patch.object(browser_environment, "detect_default_browser", return_value=("msedge", "test association")),
-            patch.object(browser_environment, "playwright_status", return_value=(True, "1.61.0")),
+            patch.object(browser_environment, "playwright_status", return_value=(True, "1.61.0", "")),
             patch.object(browser_environment, "installed_branded_channels", return_value={"msedge": "edge.exe"}),
             patch.object(browser_environment, "bundled_channels", return_value=({"chromium": "chromium.exe"}, "")),
         ):
@@ -37,7 +37,7 @@ class BrowserEnvironmentTests(unittest.TestCase):
     def test_installed_branded_browser_precedes_bundled_fallback(self) -> None:
         with (
             patch.object(browser_environment, "detect_default_browser", return_value=("unknown", "unavailable")),
-            patch.object(browser_environment, "playwright_status", return_value=(True, "1.61.0")),
+            patch.object(browser_environment, "playwright_status", return_value=(True, "1.61.0", "")),
             patch.object(browser_environment, "installed_branded_channels", return_value={"msedge": "edge.exe"}),
             patch.object(browser_environment, "bundled_channels", return_value=({"chromium": "chromium.exe"}, "")),
         ):
@@ -78,7 +78,10 @@ class BrowserEnvironmentTests(unittest.TestCase):
 
     def test_real_preflight_has_a_supported_shape(self) -> None:
         result = browser_environment.inspect_browser_environment()
-        self.assertIn(result["readiness"], {"ready", "playwright_python_missing", "eligible_browser_missing"})
+        self.assertIn(
+            result["readiness"],
+            {"ready", "playwright_python_missing", "playwright_import_failed", "playwright_runtime_failed", "eligible_browser_missing"},
+        )
         self.assertIn("installed_channels", result)
         if result["recommended_channel"]:
             self.assertIn(result["recommended_channel"], browser_environment.SUPPORTED_CHANNELS)
@@ -116,8 +119,36 @@ class BrowserEnvironmentTests(unittest.TestCase):
 
     def test_missing_playwright_is_reported(self) -> None:
         with patch.object(browser_environment.importlib.util, "find_spec", return_value=None):
-            self.assertEqual(browser_environment.playwright_status(), (False, "not installed"))
+            self.assertEqual(browser_environment.playwright_status(), (False, "not installed", ""))
             self.assertEqual(browser_environment.bundled_channels(), ({}, "Playwright Python is not installed."))
+
+    def test_broken_playwright_import_is_not_reported_ready(self) -> None:
+        with (
+            patch.object(browser_environment, "detect_default_browser", return_value=("msedge", "test association")),
+            patch.object(browser_environment, "playwright_status", return_value=(False, "1.61.0", "ImportError: broken greenlet")),
+            patch.object(browser_environment, "installed_branded_channels", return_value={"msedge": "edge.exe"}),
+            patch.object(browser_environment, "bundled_channels", return_value=({}, "ImportError: broken greenlet")),
+        ):
+            result = browser_environment.inspect_browser_environment()
+        self.assertEqual(result["readiness"], "playwright_import_failed")
+        self.assertIn("broken greenlet", result["playwright_probe_error"])
+        with self.assertRaisesRegex(RuntimeError, "installed but unusable"):
+            browser_environment.resolve_browser_channel("auto", result)
+
+    def test_playwright_runtime_probe_failure_is_not_reported_ready(self) -> None:
+        with (
+            patch.object(browser_environment, "detect_default_browser", return_value=("msedge", "test association")),
+            patch.object(browser_environment, "playwright_status", return_value=(True, "1.61.0", "")),
+            patch.object(browser_environment, "installed_branded_channels", return_value={"msedge": "edge.exe"}),
+            patch.object(browser_environment, "bundled_channels", return_value=({}, "RuntimeError: driver failed")),
+        ):
+            result = browser_environment.inspect_browser_environment()
+        self.assertEqual(result["readiness"], "playwright_runtime_failed")
+
+    def test_require_playwright_reports_non_import_errors(self) -> None:
+        with patch.object(rendered_discovery, "load_playwright_sync_api", side_effect=OSError("missing runtime")):
+            with self.assertRaisesRegex(SystemExit, "missing runtime"):
+                rendered_discovery.require_playwright()
 
     def test_linux_default_browser_uses_xdg_settings(self) -> None:
         with (

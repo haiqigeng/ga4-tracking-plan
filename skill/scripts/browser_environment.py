@@ -123,21 +123,36 @@ def installed_branded_channels() -> dict[str, str]:
     return result
 
 
-def playwright_status() -> tuple[bool, str]:
+def load_playwright_sync_api():
+    from playwright.sync_api import sync_playwright
+
+    return sync_playwright
+
+
+def playwright_status() -> tuple[bool, str, str]:
     if importlib.util.find_spec("playwright") is None:
-        return False, "not installed"
+        return False, "not installed", ""
     try:
-        return True, metadata.version("playwright")
+        version = metadata.version("playwright")
     except metadata.PackageNotFoundError:
-        return True, "installed"
+        version = "installed"
+    try:
+        load_playwright_sync_api()
+    except Exception as error:
+        return False, version, f"{type(error).__name__}: {error}"
+    return True, version, ""
 
 
 def bundled_channels() -> tuple[dict[str, str], str]:
-    available, _ = playwright_status()
+    available, version, import_error = playwright_status()
     if not available:
+        if import_error:
+            return {}, import_error
+        if version != "not installed":
+            return {}, f"Playwright Python {version} is not importable."
         return {}, "Playwright Python is not installed."
     try:
-        from playwright.sync_api import sync_playwright
+        sync_playwright = load_playwright_sync_api()
 
         with sync_playwright() as playwright:
             candidates = {
@@ -152,14 +167,18 @@ def bundled_channels() -> tuple[dict[str, str], str]:
 
 def inspect_browser_environment() -> dict[str, Any]:
     default_browser, default_source = detect_default_browser()
-    python_available, playwright_version = playwright_status()
+    python_available, playwright_version, import_error = playwright_status()
     channels = installed_branded_channels()
     bundled, probe_error = bundled_channels()
     channels.update({name: path for name, path in bundled.items() if name not in channels})
     eligible_default = default_browser in channels and default_browser in SUPPORTED_CHANNELS
     recommended = default_browser if eligible_default else next((name for name in ("msedge", "chrome", "firefox", "chromium", "webkit") if name in channels), "")
-    if not python_available:
+    if playwright_version == "not installed":
         readiness = "playwright_python_missing"
+    elif import_error:
+        readiness = "playwright_import_failed"
+    elif probe_error:
+        readiness = "playwright_runtime_failed"
     elif not recommended:
         readiness = "eligible_browser_missing"
     else:
@@ -170,7 +189,7 @@ def inspect_browser_environment() -> dict[str, Any]:
         "default_browser_source": default_source,
         "default_browser_eligible": eligible_default,
         "playwright_python": playwright_version,
-        "playwright_probe_error": probe_error,
+        "playwright_probe_error": import_error or probe_error,
         "installed_channels": channels,
         "recommended_channel": recommended,
         "readiness": readiness,
@@ -179,6 +198,12 @@ def inspect_browser_environment() -> dict[str, Any]:
 
 
 def resolve_browser_channel(requested: str, environment: dict[str, Any]) -> str:
+    readiness = str(environment.get("readiness", ""))
+    if readiness == "playwright_python_missing":
+        raise RuntimeError("Playwright Python is not installed. Install the skill dependencies from requirements.txt.")
+    if readiness in {"playwright_import_failed", "playwright_runtime_failed"}:
+        detail = str(environment.get("playwright_probe_error", "unknown runtime error"))
+        raise RuntimeError(f"Playwright is installed but unusable: {detail}")
     if requested != "auto":
         return requested
     channel = str(environment.get("recommended_channel", ""))
