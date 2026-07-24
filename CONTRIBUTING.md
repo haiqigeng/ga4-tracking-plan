@@ -1,48 +1,35 @@
 # Contributing
 
-Keep contributions focused on GA4 web tracking-plan creation and review.
-
-Good changes improve business reasoning, journey coverage, official GA4 event
-selection, ecommerce correctness, parameter availability, data ownership,
-privacy, workbook readability, or deterministic validation.
+Keep contributions focused on the human and implementation utility of GA4 web
+tracking plans.
 
 ## Rules
 
-- Start from an analyst or developer use case.
-- Check the complete event-specific GA4 parameter table against current
-  official Google documentation before proposing custom parameters.
-- Keep detailed rules in `skill/references/03-rules/`.
-- Keep `skill/SKILL.md` concise and update it only when behavior changes.
-- Keep examples generic and free of client data.
-- Keep client-template replacement fail-closed when formulas, protection,
-  tables, validations, comments, or images are present.
-- Do not add another analytics platform, runtime testing, GTM mutation, or
-  unrelated implementation scope.
-- Add tests for new validator, renderer, migration, or catalog behavior.
-- Do not add a runtime utility without an explicit product need and maintainer
-  approval; prefer extending an existing validated contract or rule.
+- Start from a real analyst or developer need.
+- Preserve the single adaptive workflow and single quality standard; do not add
+  small, large, quick, enterprise, or event-count modes.
+- Resolve selected event and parameter semantics from current official Google
+  documentation before designing custom semantics.
+- Keep every event contract exact: its trigger, event-specific parameters,
+  finite values, source paths, and quoted dataLayer example must agree.
+- Keep internal research, confidence, governance, privacy, and agent metadata
+  out of the default visible workbook.
+- Keep examples generic and free of client or credential data.
+- Preserve supplied templates unless a requested semantic change requires an
+  explicitly mapped edit.
+- Add regression tests for validator, renderer, import, diff, or adaptation
+  behavior.
 
 ## Validation
 
 ```powershell
 ruff check .
-python -m compileall -q scripts skill/scripts maintenance/scripts tests
-python -m unittest discover -s tests
-python -m coverage run --source=skill/scripts -m unittest discover -s tests
-python scripts/validate_eval_manifest.py
-python scripts/check_official_catalog.py --offline
-python scripts/inspect_browser_environment.py
+python -m compileall -q scripts skill/scripts skill/tests
+python -m unittest discover -s skill/tests
 python scripts/validate_package.py
+python scripts/inspect_browser_environment.py
 ```
 
-Release assets must be created with `scripts/create_release_package.py` and
-must contain only generic reusable files. Keep the versions in
-`pyproject.toml` and `skill/release.json` synchronized; the release tag must
-match that version.
-
-`validate_eval_manifest.py` checks only evaluation-case structure. A real
-fresh-agent release gate requires clean sessions and a completed result file:
-
-```powershell
-python scripts/validate_fresh_agent_evals.py --results path\to\fresh-agent-results.json
-```
+For a release, keep `pyproject.toml` and `skill/release.json` synchronized.
+Create assets only with `scripts/create_release_package.py`; the tag must match
+the semantic version.

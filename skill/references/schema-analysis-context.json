@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Internal GA4 tracking-plan analysis context",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["target_state", "sources", "coverage_gaps"],
+  "properties": {
+    "target_state": {
+      "enum": ["as_is", "to_be", "hybrid"]
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_type", "reference", "evidence_role", "state", "supports"],
+        "properties": {
+          "source_type": {
+            "enum": [
+              "live_website",
+              "user_input",
+              "business_document",
+              "design_specification",
+              "gtm_container",
+              "datalayer",
+              "technical_specification",
+              "previous_tracking_plan",
+              "analytics_export",
+              "other"
+            ]
+          },
+          "reference": {"type": "string", "minLength": 1},
+          "evidence_role": {
+            "enum": [
+              "live_behavior",
+              "business_requirement",
+              "future_design",
+              "current_implementation",
+              "data_capability",
+              "historical_contract",
+              "data_usage"
+            ]
+          },
+          "state": {"enum": ["as_is", "to_be", "both"]},
+          "supports": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
+          "conflicts": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    },
+    "journey_coverage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["journey", "status"],
+        "properties": {
+          "journey": {"type": "string", "minLength": 1},
+          "status": {"enum": ["observed", "confirmed", "planned", "partial", "blocked"]},
+          "notes": {"type": "string"}
+        }
+      }
+    },
+    "coverage_gaps": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "official_checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["url", "checked_for"],
+        "properties": {
+          "url": {"type": "string", "format": "uri"},
+          "checked_for": {"type": "string", "minLength": 1},
+          "checked_at": {"type": "string", "format": "date-time"}
+        }
+      }
+    }
+  }
+}

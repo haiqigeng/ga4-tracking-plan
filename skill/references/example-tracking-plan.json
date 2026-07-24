@@ -1,0 +1,389 @@
+{
+  "schema_version": "4.0.0",
+  "document": {
+    "title": "Example GA4 tracking plan",
+    "version": "1.0",
+    "date": "2026-07-24",
+    "language": "en",
+    "value_language": "en",
+    "scope": "Product discovery and quote request",
+    "target_state": "to_be"
+  },
+  "data_layer_convention": {
+    "name": "Default web dataLayer",
+    "origin": "default",
+    "event_key": "event",
+    "wrappers": {
+      "page": "page",
+      "event": "event_data",
+      "ecommerce": "ecommerce",
+      "user": "user"
+    },
+    "notes": "Clear event_data or ecommerce before replacing a previously populated object."
+  },
+  "journeys": [
+    {
+      "journey_id": "product_discovery",
+      "name": "Product discovery",
+      "scope": "Product detail pages",
+      "status": "observed",
+      "business_goal": "Understand qualified product interest.",
+      "urls": [
+        "https://example.com/products/{product}"
+      ]
+    },
+    {
+      "journey_id": "quote_request",
+      "name": "Quote request",
+      "scope": "Quote form",
+      "status": "confirmed",
+      "business_goal": "Measure intentional quote starts and accepted leads.",
+      "urls": [
+        "https://example.com/request-a-quote"
+      ]
+    }
+  ],
+  "events": [
+    {
+      "event_name": "core_data",
+      "classification": "context",
+      "journey_ids": [
+        "product_discovery",
+        "quote_request"
+      ],
+      "definition": "Provides the reusable page and user context needed by subsequent measurement.",
+      "trigger": "Push on every full page load and SPA route change after the new page state is available.",
+      "locations": [
+        {
+          "page_type": "all_pages",
+          "url_pattern": "https://example.com/*"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "page_template",
+          "data_layer_path": "page.page_template",
+          "classification": "implementation",
+          "scope": "implementation",
+          "type": "string",
+          "requirement": "required",
+          "definition": "Identifies the stable functional template of the displayed page or route.",
+          "value_rule": "Use the normalized functional page template.",
+          "allowed_values": [
+            "home",
+            "product_detail",
+            "quote_form",
+            "confirmation"
+          ],
+          "example": "product_detail",
+          "source": "Application route metadata.",
+          "destination": "implementation_only"
+        },
+        {
+          "name": "login_status",
+          "data_layer_path": "user.login_status",
+          "classification": "custom",
+          "scope": "user",
+          "type": "string",
+          "requirement": "required",
+          "definition": "Indicates whether the current visitor is authenticated.",
+          "value_rule": "Use one of the exhaustive normalized states.",
+          "allowed_values": [
+            "logged_out",
+            "logged_in"
+          ],
+          "example": "logged_out",
+          "source": "Authentication state.",
+          "destination": "ga4_user_property",
+          "custom_decision": {
+            "business_need": "Compare journeys for authenticated and unauthenticated visitors.",
+            "official_candidate": "No prescribed event parameter represents reusable authentication state.",
+            "why_not_fit": "The value is persistent user context rather than the outcome of the official login event."
+          }
+        }
+      ],
+      "data_layer": {
+        "push": {
+          "page": {
+            "page_template": "product_detail"
+          },
+          "user": {
+            "login_status": "logged_out"
+          }
+        }
+      }
+    },
+    {
+      "event_name": "view_item",
+      "classification": "official_ecommerce",
+      "journey_ids": [
+        "product_discovery"
+      ],
+      "definition": "This event signifies that some content was shown to the user. Use this event to discover the most popular items viewed.",
+      "trigger": "Push once after the primary product detail and selected default variant are rendered.",
+      "locations": [
+        {
+          "page_type": "product_detail",
+          "url_pattern": "https://example.com/products/{product}",
+          "component": "Product detail"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "currency",
+          "data_layer_path": "ecommerce.currency",
+          "classification": "official",
+          "scope": "event",
+          "type": "string",
+          "requirement": "conditional",
+          "condition": "Required when value is sent.",
+          "definition": "Currency of the items associated with the event, in 3-letter ISO 4217 format. * Value metrics on the view_item event to not contribute to revenue * If you set value then currency is required for revenue metrics to be computed accurately.",
+          "value_rule": "Use the ISO 4217 currency code.",
+          "allowed_values": [
+            "EUR"
+          ],
+          "example": "EUR",
+          "source": "Commerce currency configuration.",
+          "destination": "ga4_event_parameter",
+          "official_source": {
+            "url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events#view_item",
+            "section": "view_item parameters",
+            "wording_origin": "exact",
+            "checked_date": "2026-07-24"
+          }
+        },
+        {
+          "name": "value",
+          "data_layer_path": "ecommerce.value",
+          "classification": "official",
+          "scope": "event",
+          "type": "number",
+          "requirement": "optional",
+          "definition": "The monetary value of the event. * Set value to the sum of (price * quantity) for all items in items. Don't include shipping or tax. * value is typically required for meaningful reporting. If you mark the event as a key event then it's recommended you set value. * currency is required if you set value.",
+          "value_rule": "Use the displayed item price for the selected variant.",
+          "example": 129.9,
+          "source": "Selected product offer.",
+          "destination": "ga4_event_parameter",
+          "official_source": {
+            "url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events#view_item",
+            "section": "view_item parameters",
+            "wording_origin": "exact",
+            "checked_date": "2026-07-24"
+          }
+        },
+        {
+          "name": "items",
+          "data_layer_path": "ecommerce.items",
+          "classification": "official",
+          "scope": "event",
+          "type": "array",
+          "requirement": "required",
+          "definition": "The items for the event.",
+          "value_rule": "Send one item object for the displayed product variant.",
+          "example": [
+            {
+              "item_id": "SKU-123",
+              "item_name": "Example window",
+              "item_variant": "120x100",
+              "item_color": "white"
+            }
+          ],
+          "source": "Selected product and variant data.",
+          "destination": "ga4_event_parameter",
+          "official_source": {
+            "url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events#view_item",
+            "section": "view_item parameters",
+            "wording_origin": "exact",
+            "checked_date": "2026-07-24"
+          }
+        },
+        {
+          "name": "item_id",
+          "data_layer_path": "ecommerce.items[].item_id",
+          "classification": "official",
+          "scope": "item",
+          "type": "string",
+          "requirement": "required",
+          "definition": "The ID of the item. *One of item_id or item_name is required.",
+          "value_rule": "Use the stable SKU or product identifier.",
+          "example": "SKU-123",
+          "source": "Product catalog.",
+          "destination": "ga4_item_parameter",
+          "official_source": {
+            "url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events#view_item",
+            "section": "items parameter",
+            "wording_origin": "exact",
+            "checked_date": "2026-07-24"
+          }
+        },
+        {
+          "name": "item_name",
+          "data_layer_path": "ecommerce.items[].item_name",
+          "classification": "official",
+          "scope": "item",
+          "type": "string",
+          "requirement": "required",
+          "definition": "The name of the item. *One of item_id or item_name is required.",
+          "value_rule": "Use the stable catalog product name.",
+          "example": "Example window",
+          "source": "Product catalog.",
+          "destination": "ga4_item_parameter",
+          "official_source": {
+            "url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events#view_item",
+            "section": "items parameter",
+            "wording_origin": "exact",
+            "checked_date": "2026-07-24"
+          }
+        },
+        {
+          "name": "item_variant",
+          "data_layer_path": "ecommerce.items[].item_variant",
+          "classification": "official",
+          "scope": "item",
+          "type": "string",
+          "requirement": "optional",
+          "definition": "The item variant or unique code or description for additional item details/options.",
+          "value_rule": "Use the primary normalized size or variant representation.",
+          "example": "120x100",
+          "source": "Selected variant.",
+          "destination": "ga4_item_parameter",
+          "official_source": {
+            "url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events#view_item",
+            "section": "items parameter",
+            "wording_origin": "exact",
+            "checked_date": "2026-07-24"
+          }
+        },
+        {
+          "name": "item_color",
+          "data_layer_path": "ecommerce.items[].item_color",
+          "classification": "custom",
+          "scope": "item",
+          "type": "string",
+          "requirement": "optional",
+          "definition": "Identifies the normalized color selected for the item.",
+          "value_rule": "Use the normalized catalog color label.",
+          "allowed_values": [
+            "white",
+            "black",
+            "oak"
+          ],
+          "example": "white",
+          "source": "Selected variant color.",
+          "destination": "ga4_item_parameter",
+          "custom_decision": {
+            "business_need": "Analyse color preference independently from size.",
+            "official_candidate": "item_variant",
+            "why_not_fit": "item_variant represents the primary size or variant; it cannot isolate color when both dimensions are selected."
+          }
+        }
+      ],
+      "data_layer": {
+        "clear": [
+          "ecommerce"
+        ],
+        "push": {
+          "event": "view_item",
+          "ecommerce": {
+            "currency": "EUR",
+            "value": 129.9,
+            "items": [
+              {
+                "item_id": "SKU-123",
+                "item_name": "Example window",
+                "item_variant": "120x100",
+                "item_color": "white"
+              }
+            ]
+          }
+        }
+      },
+      "official_source": {
+        "url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events#view_item",
+        "section": "view_item",
+        "wording_origin": "exact",
+        "checked_date": "2026-07-24"
+      }
+    },
+    {
+      "event_name": "begin_quote",
+      "classification": "custom",
+      "journey_ids": [
+        "quote_request"
+      ],
+      "definition": "Indicates that a visitor intentionally started the quote-request journey.",
+      "trigger": "Push once when the visitor enters the first interactive quote step after selecting a quote call to action.",
+      "locations": [
+        {
+          "page_type": "quote_form",
+          "url_pattern": "https://example.com/request-a-quote",
+          "component": "Quote form"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "form_name",
+          "data_layer_path": "event_data.form_name",
+          "classification": "custom",
+          "scope": "event",
+          "type": "string",
+          "requirement": "required",
+          "definition": "Identifies the form whose journey was started.",
+          "value_rule": "Use the stable functional form name.",
+          "allowed_values": [
+            "quote_request"
+          ],
+          "example": "quote_request",
+          "source": "Form configuration.",
+          "destination": "ga4_event_parameter",
+          "custom_decision": {
+            "business_need": "Compare quote starts for reusable form implementations.",
+            "official_candidate": "No prescribed begin_quote parameter identifies the form.",
+            "why_not_fit": "A stable form identifier is required to analyse multiple quote entry points."
+          }
+        },
+        {
+          "name": "project_type",
+          "data_layer_path": "event_data.project_type",
+          "classification": "custom",
+          "scope": "event",
+          "type": "string",
+          "requirement": "conditional",
+          "condition": "Send when the project type is known at journey start.",
+          "definition": "Identifies the normalized project selected for the quote request.",
+          "value_rule": "Use one of the exhaustive website project types.",
+          "allowed_values": [
+            "window",
+            "door",
+            "shutter"
+          ],
+          "example": "window",
+          "source": "Selected project option.",
+          "destination": "ga4_event_parameter",
+          "custom_decision": {
+            "business_need": "Analyse quote starts by requested project.",
+            "official_candidate": "No official begin_quote parameter represents the requested project.",
+            "why_not_fit": "The project is a business-specific quote dimension."
+          }
+        }
+      ],
+      "data_layer": {
+        "clear": [
+          "event_data"
+        ],
+        "push": {
+          "event": "begin_quote",
+          "event_data": {
+            "form_name": "quote_request",
+            "project_type": "window"
+          }
+        }
+      },
+      "custom_decision": {
+        "business_need": "Measure intentional entry into a quote journey before a lead exists.",
+        "official_candidate": "form_start",
+        "why_not_fit": "The business requires a quote-specific funnel start across interfaces that do not all expose a standard form start."
+      }
+    }
+  ]
+}

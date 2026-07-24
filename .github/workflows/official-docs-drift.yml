@@ -1,4 +1,4 @@
-name: Check official GA4 catalog
+name: Check official GA4 semantics
 
 on:
   schedule:
@@ -6,12 +6,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  catalog-drift:
+  official-semantics:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: Compare bundled catalog with official GA4 documentation
-        run: python scripts/check_official_catalog.py
+      - name: Check selected semantics against official GA4 documentation
+        run: python scripts/check_official_sources.py skill/references/example-tracking-plan.json --output official-check.json

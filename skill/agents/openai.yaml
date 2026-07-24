@@ -1,4 +1,4 @@
 interface:
-  display_name: "GA4 Web Analyst"
-  short_description: "Create evidence-led, source-grounded GA4 tracking plans"
-  default_prompt: "Use $ga4-tracking-plan as a web analyst to build a quality-first GA4 specification: decide language, inspect real journeys and finite values, resolve each selected event's current official semantics and parameter table, prefer applicable official parameters when evidence and use justify them, add custom fields only for a documented official gap, preserve client templates strictly, and deliver a readable tracking plan."
+  display_name: "GA4 Tracking Plan"
+  short_description: "Create complete, human-first GA4 dataLayer specifications"
+  default_prompt: "Use $ga4-tracking-plan to investigate the real journeys and available evidence, resolve selected events and parameters from current official GA4 documentation, add custom semantics only for demonstrated gaps, and deliver a lean analyst- and developer-ready tracking plan in the supplied or default XLSX template."

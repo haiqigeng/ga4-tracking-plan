@@ -6,18 +6,18 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BANNED_PARTS = {"deliverables", "generated", "release", "tracking-plan-corpus-analysis", "fresh-agent-evaluation-output", "__pycache__"}
+BANNED_PARTS = {"deliverables", "generated", "release", "__pycache__"}
 PACKAGE_ROOTS = [ROOT / "skill"]
 WRAPPER_NAMES = [
     "adapt_tracking_plan_workbook.py",
     "annotate_screenshot.py",
-    "check_official_catalog.py",
+    "check_official_sources.py",
+    "create_default_template.py",
     "diff_tracking_plans.py",
     "discover_site_journeys.py",
     "discover_site_journeys_playwright.py",
-    "export_tracking_plan_csv.py",
     "generate_tracking_plan_workbook.py",
-    "init_tracking_plan.py",
+    "import_tracking_plan_workbook.py",
     "inspect_browser_environment.py",
     "inspect_tracking_plan_template.py",
     "validate_tracking_plan.py",

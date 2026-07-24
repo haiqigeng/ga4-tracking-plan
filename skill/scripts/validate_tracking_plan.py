@@ -2,539 +2,372 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
-from collections import defaultdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
-from ecommerce_matrix import (
-    OFFICIAL_ITEM_PARAMETERS,
-)
-from tracking_plan_contract import event_journey_ids
-from tracking_plan_validation_catalogs import (
-    CUSTOM_CLASSIFICATIONS,
-    CUSTOM_PARAMETER_CLASSIFICATIONS,
-    GA4_RESERVED_PARAMETER_NAMES,
-    OFFICIAL_ECOMMERCE_PARAMETER_CLASSES,
-    OFFICIAL_PARAMETER_CLASSES,
-    OFFICIAL_SOURCE_DOMAINS,
-    WEAK_NOT_TRACKED_REASONS,
-    WEAK_REPORTING_PURPOSES,
-    WEAK_VALUE_RULES,
-    default_schema_path,
-    load_ga4_catalog,
+from jsonschema import Draft202012Validator, FormatChecker
+from tracking_plan_model import (
+    flatten_push_paths,
+    journey_lookup,
     load_json,
+    path_exists,
 )
-from tracking_plan_validation_common import check_duplicates, check_official_verification, governed_sensitive_implementation_parameter
-from tracking_plan_validation_delivery import check_delivery_rules
-from tracking_plan_validation_event_rules import check_event
-from tracking_plan_validation_events import (
-    check_ga4_name,
-    check_legacy_ua_field,
-    check_pii_name,
-    is_ga4_event,
-    should_lint_ga4_parameter_name,
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_SCHEMA = ROOT / "references" / "schema-tracking-plan.json"
+CATALOG_PATH = ROOT / "references" / "library-ga4-recommended-events.json"
+
+GENERIC_TEXT = re.compile(
+    r"(?:use|utiliser)\s+(?:the|la)\s+(?:official|officielle?)\s+definition|"
+    r"value associated with|valeur associ[eé]e|"
+    r"variable (?:used|utilis[eé]e) (?:for|pour) (?:the )?track|"
+    r"when applicable|lorsque applicable|"
+    r"to confirm|[àa] confirmer|"
+    r"^tbd$",
+    re.I,
 )
-from tracking_plan_validation_governance import check_governance_contract
-from tracking_plan_validation_model import Issue, add_issue
-from tracking_plan_validation_quality import check_quality_contract
-from tracking_plan_validation_screenshot_capture import check_screenshot_capture, check_screenshot_evidence
+
+GENERIC_TRIGGER = re.compile(
+    r"^(?:on click|au clic|on page view|[àa] la vue|when the event occurs|"
+    r"lorsque l['’]événement se produit|when applicable|lorsque applicable)$",
+    re.I,
+)
+
+
+@dataclass
+class Issue:
+    severity: str
+    code: str
+    path: str
+    message: str
+
+
+def issue(issues: list[Issue], severity: str, code: str, path: str, message: str) -> None:
+    issues.append(Issue(severity, code, path, message))
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Validate and lint a GA4 tracking-plan JSON file.")
-    parser.add_argument("plan", type=Path, help="Path to the tracking-plan JSON file.")
-    parser.add_argument(
-        "--schema",
-        type=Path,
-        default=None,
-        help="Optional JSON schema path. Defaults to references/03-rules/schema-tracking-plan.json.",
-    )
-    parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format.")
-    parser.add_argument("--warnings-as-errors", action="store_true", help="Exit non-zero when warnings are present.")
+    parser = argparse.ArgumentParser(description="Validate the lean human-first GA4 tracking-plan model.")
+    parser.add_argument("plan", type=Path)
+    parser.add_argument("--schema", type=Path, default=DEFAULT_SCHEMA)
+    parser.add_argument("--warnings-as-errors", action="store_true")
+    parser.add_argument("--json", action="store_true", dest="as_json")
     return parser.parse_args()
 
 
-def validate_schema(plan: dict[str, Any], schema_path: Path, issues: list[Issue]) -> None:
-    try:
-        from jsonschema import Draft202012Validator
-    except ImportError:
-        add_issue(
-            issues,
-            "warning",
-            "SCHEMA_VALIDATOR_MISSING",
-            "dependencies",
-            "Install requirements.txt to enable JSON Schema validation.",
-        )
-        return
-
-    schema = load_json(schema_path)
-    validator = Draft202012Validator(schema)
-    for error in sorted(validator.iter_errors(plan), key=lambda item: list(item.path)):
-        path = "$" + "".join(f"[{part}]" if isinstance(part, int) else f".{part}" for part in error.path)
-        add_issue(issues, "error", "SCHEMA_VALIDATION", path, error.message)
-
-
-def values_at_keys(value: Any, target_keys: set[str], prefix: str = "$") -> Iterable[tuple[str, Any]]:
-    if isinstance(value, dict):
-        for key, child in value.items():
-            path = f"{prefix}.{key}"
-            if key in target_keys:
-                yield path, child
-            yield from values_at_keys(child, target_keys, path)
-    elif isinstance(value, list):
-        for index, child in enumerate(value):
-            yield from values_at_keys(child, target_keys, f"{prefix}[{index}]")
-
-
-def check_execution_context(plan: dict[str, Any], issues: list[Issue]) -> None:
-    context = plan.get("execution_context", {})
-    if not isinstance(context, dict):
-        return
-    mode = str(context.get("execution_mode", ""))
-    template_policy = context.get("template_policy", {})
-    artifacts = context.get("input_artifact_inventory", [])
-    if not isinstance(template_policy, dict):
-        return
-
-    artifact_types = {
-        str(artifact.get("artifact_type", ""))
-        for artifact in artifacts
-        if isinstance(artifact, dict)
+def load_catalog() -> dict[str, dict[str, Any]]:
+    records = json.loads(CATALOG_PATH.read_text(encoding="utf-8-sig"))
+    return {
+        str(record.get("event")): record
+        for record in records
+        if isinstance(record, dict) and record.get("event")
     }
-    policy_mode = str(template_policy.get("mode", ""))
-    if mode == "client_template_adaptation":
-        if policy_mode not in {"strict_client_template", "approved_structural_extension"}:
-            add_issue(
-                issues,
-                "error",
-                "CLIENT_TEMPLATE_POLICY_MISSING",
-                "$.execution_context.template_policy.mode",
-                "Client-template adaptation must use strict_client_template or approved_structural_extension.",
-            )
-        if not (artifact_types & {"template_workbook", "client_tracking_plan", "tracking_plan_dev_doc", "tracking_plan_review", "event_inventory"}):
-            add_issue(
-                issues,
-                "error",
-                "CLIENT_TEMPLATE_ARTIFACT_MISSING",
-                "$.execution_context.input_artifact_inventory",
-                "Client-template adaptation needs a client template, tracking plan, development document, review plan, or event inventory artifact.",
-            )
-        if not template_policy.get("template_diff_required"):
-            add_issue(
-                issues,
-                "error",
-                "TEMPLATE_ARTIFACT_DIFF_NOT_REQUIRED",
-                "$.execution_context.template_policy.template_diff_required",
-                "Every client-template delivery must require an external artifact-bound fidelity report.",
-            )
-    if mode == "greenfield_best_practice" and policy_mode != "default_skill_template":
-        add_issue(
+
+
+def normalize(value: Any) -> str:
+    return " ".join(str(value or "").split()).strip().casefold()
+
+
+def normalize_type(value: Any) -> str:
+    text = normalize(value)
+    if text.startswith("array"):
+        return "array"
+    if text in {"float", "double"}:
+        return "number"
+    return text
+
+
+def validate_schema(plan: dict[str, Any], schema_path: Path, issues: list[Issue]) -> None:
+    schema = load_json(schema_path)
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
+    for error in sorted(validator.iter_errors(plan), key=lambda item: list(item.absolute_path)):
+        path = "$" + "".join(f"[{part!r}]" if isinstance(part, str) else f"[{part}]" for part in error.absolute_path)
+        issue(issues, "error", "SCHEMA", path, error.message)
+
+
+def check_unique_ids(plan: dict[str, Any], issues: list[Issue]) -> None:
+    journey_ids = [str(item.get("journey_id", "")) for item in plan.get("journeys", []) if isinstance(item, dict)]
+    if len(journey_ids) != len(set(journey_ids)):
+        issue(issues, "error", "DUPLICATE_JOURNEY", "$.journeys", "Journey IDs must be unique.")
+    event_names = [str(item.get("event_name", "")) for item in plan.get("events", []) if isinstance(item, dict)]
+    if len(event_names) != len(set(event_names)):
+        issue(issues, "error", "DUPLICATE_EVENT", "$.events", "Event names must be unique.")
+
+
+def check_human_text(value: Any, path: str, label: str, issues: list[Issue]) -> None:
+    text = " ".join(str(value or "").split()).strip()
+    if not text:
+        issue(issues, "error", f"{label}_MISSING", path, f"{label.replace('_', ' ').title()} is required.")
+    elif GENERIC_TEXT.search(text):
+        issue(issues, "error", f"{label}_GENERIC", path, "Replace generic filler with concrete official or official-like wording.")
+
+
+def check_custom_decision(
+    value: Any,
+    path: str,
+    issues: list[Issue],
+) -> None:
+    if not isinstance(value, dict):
+        return
+    for field in ("business_need", "official_candidate", "why_not_fit"):
+        check_human_text(
+            value.get(field),
+            f"{path}.{field}",
+            f"custom_{field}",
             issues,
-            "warning",
-            "GREENFIELD_TEMPLATE_POLICY",
-            "$.execution_context.template_policy.mode",
-            "Greenfield best-practice mode should normally use default_skill_template.",
         )
-    preservation = template_policy.get("preservation_requirements", [])
-    if policy_mode in {"strict_client_template", "approved_structural_extension"} and not preservation:
-        add_issue(
+
+
+def catalog_parameters(record: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
+    return {
+        (str(parameter.get("name")), str(parameter.get("scope", "event"))): parameter
+        for parameter in record.get("parameters", [])
+        if isinstance(parameter, dict) and parameter.get("name")
+    }
+
+
+def check_official_event(
+    plan: dict[str, Any],
+    event: dict[str, Any],
+    event_index: int,
+    catalog: dict[str, dict[str, Any]],
+    issues: list[Issue],
+) -> None:
+    name = str(event.get("event_name", ""))
+    classification = str(event.get("classification", ""))
+    base = f"$.events[{event_index}]"
+    record = catalog.get(name)
+    if classification == "custom" and record:
+        issue(
             issues,
             "error",
-            "TEMPLATE_PRESERVATION_REQUIREMENTS_MISSING",
-            "$.execution_context.template_policy.preservation_requirements",
-            "Client-template modes need explicit preservation requirements for sheets, columns, order, colors, or protected areas.",
+            "CUSTOM_EVENT_IS_OFFICIAL",
+            f"{base}.classification",
+            f"'{name}' exists in the official recommended-event catalog; classify and assess it as official first.",
         )
-
-
-def check_measurement_alignment(plan: dict[str, Any], issues: list[Issue]) -> None:
-    briefs = [brief for brief in plan.get("measurement_brief", []) if isinstance(brief, dict)]
-    events = [event for event in plan.get("events", []) if isinstance(event, dict)]
-    journey_ids = {str(brief.get("journey_id", "")) for brief in briefs if brief.get("journey_id")}
-    events_by_journey: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    event_names_by_journey: dict[str, set[str]] = defaultdict(set)
-    event_ids_by_journey: dict[str, set[str]] = defaultdict(set)
-
-    for event_index, event in enumerate(events):
-        for journey_id in event_journey_ids(event):
-            events_by_journey[journey_id].append(event)
-            event_names_by_journey[journey_id].add(str(event.get("event_name", "")))
-            event_ids_by_journey[journey_id].add(str(event.get("event_id", "")))
-            if journey_id not in journey_ids:
-                add_issue(
-                    issues,
-                    "error",
-                    "EVENT_JOURNEY_UNKNOWN",
-                    f"$.events[{event_index}].journey_ids",
-                    f"Event references unknown journey_id '{journey_id}'. Add the journey to measurement_brief or correct the event.",
-                )
-
-    for brief_index, brief in enumerate(briefs):
-        journey_id = str(brief.get("journey_id", ""))
-        if not journey_id:
-            continue
-        if not events_by_journey.get(journey_id):
-            add_issue(
-                issues,
-                "error",
-                "JOURNEY_HAS_NO_EVENTS",
-                f"$.measurement_brief[{brief_index}].journey_id",
-                f"Journey '{journey_id}' has no event definitions.",
-            )
-        covered_signals = event_names_by_journey.get(journey_id, set()) | event_ids_by_journey.get(journey_id, set())
-        for signal_index, signal in enumerate(brief.get("success_signals", [])):
-            signal_name = str(signal)
-            if signal_name and signal_name not in covered_signals:
-                add_issue(
-                    issues,
-                    "error",
-                    "SUCCESS_SIGNAL_NOT_COVERED",
-                    f"$.measurement_brief[{brief_index}].success_signals[{signal_index}]",
-                    f"Success signal '{signal_name}' is not covered by an event_name or event_id in journey '{journey_id}'.",
-                )
-
-
-def check_strategy_page_roles(strategy: dict[str, Any], journey_ids: set[str], issues: list[Issue]) -> None:
-    for index, page_role in enumerate(strategy.get("page_roles", [])):
-        if not isinstance(page_role, dict):
-            continue
-        journey_id = str(page_role.get("journey_id", ""))
-        if journey_id and journey_id not in journey_ids:
-            add_issue(
-                issues,
-                "error",
-                "STRATEGY_JOURNEY_UNKNOWN",
-                f"$.measurement_strategy.page_roles[{index}].journey_id",
-                f"Measurement strategy references unknown journey_id '{journey_id}'.",
-            )
-
-
-
-def check_strategy_families(selected_families: list[Any], issues: list[Issue]) -> set[str]:
-    family_ids: set[str] = set()
-    for index, family in enumerate(selected_families):
-        if not isinstance(family, dict):
-            continue
-        if family.get("family_id"):
-            family_ids.add(str(family["family_id"]))
-        reason = str(family.get("reason", "")).strip()
-        if not reason:
-            add_issue(
-                issues,
-                "error",
-                "STRATEGY_EVENT_FAMILY_REASON_WEAK",
-                f"$.measurement_strategy.selected_event_families[{index}].reason",
-                "Selected event families need a concrete business or platform rationale.",
-            )
-
-    return family_ids
-
-
-def check_strategy_events(events: list[Any], family_ids: set[str], acceptance_names: set[str], issues: list[Issue]) -> None:
-    for index, event in enumerate(events):
-        if not isinstance(event, dict):
-            continue
-        family_id = str(event.get("business_event_family", ""))
-        if family_id and family_id not in family_ids:
-            add_issue(
-                issues,
-                "error",
-                "EVENT_FAMILY_UNKNOWN",
-                f"$.events[{index}].business_event_family",
-                f"Event references business_event_family '{family_id}' but it is not listed in measurement_strategy.selected_event_families.",
-            )
-        if event.get("classification") in CUSTOM_CLASSIFICATIONS and str(event.get("event_name", "")) not in acceptance_names:
-            add_issue(
-                issues,
-                "error",
-                "CUSTOM_EVENT_ACCEPTANCE_MISSING",
-                "$.measurement_strategy.custom_event_acceptance",
-                f"Custom event '{event.get('event_name')}' needs a custom_event_acceptance entry with official alternatives and business rationale.",
-            )
-
-
-
-def check_custom_event_acceptance(entries: list[Any], issues: list[Issue]) -> set[str]:
-    names: set[str] = set()
-    for index, item in enumerate(entries):
-        if not isinstance(item, dict):
-            continue
-        if item.get("event_name"):
-            names.add(str(item["event_name"]))
-        reason = str(item.get("business_reason", "")).strip()
-        alternatives = item.get("official_alternatives_considered", [])
-        if not reason or not alternatives:
-            add_issue(
-                issues,
-                "error",
-                "CUSTOM_EVENT_ACCEPTANCE_WEAK",
-                f"$.measurement_strategy.custom_event_acceptance[{index}]",
-                "Custom-event acceptance entries must state a concrete business reason and official alternatives considered.",
-            )
-    return names
-
-
-def check_measurement_strategy(plan: dict[str, Any], issues: list[Issue]) -> None:
-    strategy = plan.get("measurement_strategy", {})
-    if not isinstance(strategy, dict):
+    if classification not in {"official", "official_ecommerce"}:
         return
-    journey_ids = {
-        str(brief.get("journey_id", ""))
-        for brief in plan.get("measurement_brief", [])
-        if isinstance(brief, dict) and brief.get("journey_id")
-    }
-    selected_families = strategy.get("selected_event_families", [])
-    acceptance = strategy.get("custom_event_acceptance", [])
-    check_strategy_page_roles(strategy, journey_ids, issues)
-    family_ids = check_strategy_families(selected_families if isinstance(selected_families, list) else [], issues)
-    acceptance_names = check_custom_event_acceptance(acceptance if isinstance(acceptance, list) else [], issues)
-    events = plan.get("events", [])
-    check_strategy_events(events if isinstance(events, list) else [], family_ids, acceptance_names, issues)
-
-
-def check_covered_journeys(coverage: dict[str, Any], journey_ids: set[str], issues: list[Issue]) -> tuple[set[str], set[str]]:
-    covered_ids: set[str] = set()
-    included_ids: set[str] = set()
-    for index, item in enumerate(coverage.get("journeys_covered", [])):
-        if not isinstance(item, dict):
-            continue
-        journey_id = str(item.get("journey_id", ""))
-        if journey_id:
-            covered_ids.add(journey_id)
-            if item.get("tracking_plan_decision") == "included":
-                included_ids.add(journey_id)
-            if journey_id not in journey_ids:
-                add_issue(issues, "error", "COVERAGE_JOURNEY_UNKNOWN", f"$.website_coverage_map.journeys_covered[{index}].journey_id", f"Coverage map references unknown journey_id '{journey_id}'.")
-        if item.get("tracking_plan_decision") != "included":
-            continue
-        if item.get("coverage_status") in {"blocked", "out_of_scope"}:
-            add_issue(issues, "error", "COVERAGE_INCLUDED_BUT_NOT_COVERED", f"$.website_coverage_map.journeys_covered[{index}].coverage_status", "Included journeys cannot be marked blocked or out_of_scope.")
-        for field in ("representative_urls", "page_templates", "key_interactions", "evidence"):
-            values = item.get(field, [])
-            if not isinstance(values, list) or not any(str(value).strip() for value in values):
-                add_issue(issues, "error", "COVERAGE_INCLUDED_EVIDENCE_MISSING", f"$.website_coverage_map.journeys_covered[{index}].{field}", f"Included journeys need non-empty {field} so analysts and developers can understand coverage.")
-    return covered_ids, included_ids
-
-
-def check_discovered_journeys(coverage: dict[str, Any], journey_ids: set[str], included_ids: set[str], issues: list[Issue]) -> None:
-    gap_text = " ".join(
-        " ".join(str(value) for value in gap.values())
-        for gap in coverage.get("coverage_gaps", [])
-        if isinstance(gap, dict)
-    ).lower()
-    for index, discovered in enumerate(coverage.get("journeys_discovered", [])):
-        if not isinstance(discovered, dict):
-            continue
-        journey_id = str(discovered.get("journey_id", ""))
-        decision = str(discovered.get("decision", ""))
-        path = f"$.website_coverage_map.journeys_discovered[{index}]"
-        if decision == "include_in_plan" and journey_id not in journey_ids:
-            add_issue(issues, "error", "DISCOVERED_JOURNEY_NOT_IN_MEASUREMENT_BRIEF", f"{path}.journey_id", f"Discovered journey '{journey_id}' is marked include_in_plan but is missing from measurement_brief.")
-        if decision == "include_in_plan" and journey_id not in included_ids:
-            add_issue(issues, "error", "DISCOVERED_JOURNEY_NOT_COVERED", f"{path}.journey_id", f"Discovered journey '{journey_id}' is marked include_in_plan but has no included coverage entry.")
-        if decision == "needs_discovery":
-            markers = f"{journey_id} {discovered.get('journey_name', '')}".lower().split()
-            if not any(marker and marker in gap_text for marker in markers):
-                add_issue(issues, "error", "DISCOVERED_JOURNEY_GAP_MISSING", f"{path}.decision", f"Discovered journey '{journey_id}' needs discovery but no matching coverage gap explains the risk.")
-
-
-def check_measurement_brief_coverage(plan: dict[str, Any], covered_ids: set[str], issues: list[Issue]) -> None:
-    for index, brief in enumerate(plan.get("measurement_brief", [])):
-        if not isinstance(brief, dict):
-            continue
-        journey_id = str(brief.get("journey_id", ""))
-        if journey_id and journey_id not in covered_ids:
-            add_issue(issues, "error", "MEASUREMENT_JOURNEY_NOT_IN_COVERAGE_MAP", f"$.measurement_brief[{index}].journey_id", f"Journey '{journey_id}' must have a matching website_coverage_map.journeys_covered entry.")
-
-
-def check_whole_site_coverage(coverage: dict[str, Any], issues: list[Issue]) -> None:
-    if coverage.get("site_scope") != "whole_site":
-        return
-    source_types = {
-        str(source.get("source_type", ""))
-        for source in coverage.get("sources_checked", [])
-        if isinstance(source, dict)
-    }
-    structural_sources = {"sitemap", "robots_txt", "navigation", "url_list", "page_template", "static_html", "playwright_crawl", "browser_exploration", "existing_tracking_plan"}
-    if not source_types & structural_sources:
-        add_issue(issues, "error", "WHOLE_SITE_COVERAGE_SOURCE_MISSING", "$.website_coverage_map.sources_checked", "Whole-site plans need at least one structural source such as sitemap, navigation, URL list, page templates, static HTML, browser exploration, Playwright, or existing tracking files.")
-    if not coverage.get("journeys_discovered"):
-        add_issue(issues, "error", "WHOLE_SITE_DISCOVERED_JOURNEYS_MISSING", "$.website_coverage_map.journeys_discovered", "Whole-site plans must list discovered journeys and include/exclude/needs-discovery decisions.")
-
-
-def check_website_coverage_map(plan: dict[str, Any], issues: list[Issue]) -> None:
-    coverage = plan.get("website_coverage_map", {})
-    if not isinstance(coverage, dict):
-        return
-    journey_ids = {
-        str(brief.get("journey_id", ""))
-        for brief in plan.get("measurement_brief", [])
-        if isinstance(brief, dict) and brief.get("journey_id")
-    }
-    covered_ids, included_ids = check_covered_journeys(coverage, journey_ids, issues)
-    check_discovered_journeys(coverage, journey_ids, included_ids, issues)
-    check_measurement_brief_coverage(plan, covered_ids, issues)
-    check_whole_site_coverage(coverage, issues)
-
-def check_not_tracked_decisions(plan: dict[str, Any], issues: list[Issue]) -> None:
-    not_tracked = plan.get("not_tracked", [])
-    if isinstance(not_tracked, list) and not not_tracked:
-        add_issue(
+    source = event.get("official_source", {})
+    if "google.com" not in str(source.get("url", "")).lower():
+        issue(issues, "error", "OFFICIAL_EVENT_SOURCE", f"{base}.official_source.url", "Use a current official Google source.")
+    if not record:
+        issue(
             issues,
             "warning",
-            "NOT_TRACKED_EMPTY",
-            "$.not_tracked",
-            "Reusable plans should list meaningful interactions intentionally excluded from tracking.",
+            "OFFICIAL_EVENT_NOT_IN_LOCAL_CATALOG",
+            f"{base}.event_name",
+            "The event is not in the bundled recommended-event catalog; verify the supplied official source live.",
         )
-    for index, decision in enumerate(not_tracked if isinstance(not_tracked, list) else []):
-        if not isinstance(decision, dict):
-            continue
-        reason = str(decision.get("reason", "")).strip()
-        if reason.lower().rstrip(".") in WEAK_NOT_TRACKED_REASONS:
-            add_issue(
+        return
+    if source.get("wording_origin") == "exact" and normalize(event.get("definition")) != normalize(record.get("description")):
+        issue(
+            issues,
+            "error",
+            "OFFICIAL_EVENT_WORDING",
+            f"{base}.definition",
+            "Exact official wording must match the selected event's current official definition.",
+        )
+    selected = {(str(item.get("name")), str(item.get("scope", "event"))) for item in event.get("parameters", []) if isinstance(item, dict)}
+    prescribed = catalog_parameters(record)
+    for key, parameter in prescribed.items():
+        required = normalize(parameter.get("required"))
+        if required == "yes" and key not in selected:
+            issue(
                 issues,
                 "error",
-                "NOT_TRACKED_REASON_WEAK",
-                f"$.not_tracked[{index}].reason",
-                "Not-tracked decisions need a useful analyst rationale, such as noise, privacy risk, unavailable data, duplicate signal, or lack of business actionability.",
+                "OFFICIAL_REQUIRED_PARAMETER_MISSING",
+                f"{base}.parameters",
+                f"Required official parameter '{key[0]}' ({key[1]} scope) is missing.",
             )
+    selected_names = {name for name, _scope in selected}
+    if "value" in selected_names and ("currency", "event") in prescribed and ("currency", "event") not in selected:
+        issue(issues, "error", "CURRENCY_REQUIRED_WITH_VALUE", f"{base}.parameters", "Include event-level currency when value is sent.")
+    if ("items", "event") in selected:
+        item_names = {name for name, scope in selected if scope == "item"}
+        if not {"item_id", "item_name"}.intersection(item_names):
+            issue(issues, "error", "ITEM_IDENTITY_MISSING", f"{base}.parameters", "Items require item_id or item_name at item scope.")
 
 
-def check_official_source_inventory(plan: dict[str, Any], events: list[Any], issues: list[Issue]) -> None:
-    source_urls = [
-        str(source.get("url", "")).lower()
-        for source in plan.get("documentation_sources_checked", [])
-        if isinstance(source, dict) and source.get("source_type") == "official"
-    ]
-    has_ga4_events = any(isinstance(event, dict) and is_ga4_event(event) for event in events)
-    if has_ga4_events and not any(
-        any(domain in url for domain in OFFICIAL_SOURCE_DOMAINS["google_measurement"])
-        for url in source_urls
-    ):
-        add_issue(issues, "error", "GA4_OFFICIAL_SOURCE_MISSING", "$.documentation_sources_checked", "GA4 plans must cite at least one official Google Analytics documentation source.")
+def check_parameter(
+    event: dict[str, Any],
+    event_index: int,
+    parameter: dict[str, Any],
+    parameter_index: int,
+    catalog_record: dict[str, Any] | None,
+    issues: list[Issue],
+) -> None:
+    base = f"$.events[{event_index}].parameters[{parameter_index}]"
+    name = str(parameter.get("name", ""))
+    scope = str(parameter.get("scope", "event"))
+    classification = str(parameter.get("classification", ""))
+    path = str(parameter.get("data_layer_path", ""))
+    final_key = path.rsplit(".", 1)[-1].replace("[]", "")
+    if name and final_key and name != final_key:
+        issue(
+            issues,
+            "error",
+            "PARAMETER_PATH_NAME_MISMATCH",
+            f"{base}.data_layer_path",
+            f"The final dataLayer key '{final_key}' must match parameter name '{name}'.",
+        )
+    check_human_text(parameter.get("definition"), f"{base}.definition", "parameter_definition", issues)
+    check_human_text(parameter.get("value_rule"), f"{base}.value_rule", "value_rule", issues)
+    if parameter.get("requirement") == "conditional" and not str(parameter.get("condition", "")).strip():
+        issue(issues, "error", "CONDITION_MISSING", f"{base}.condition", "A conditional parameter needs a separate concrete condition.")
+    allowed = parameter.get("allowed_values")
+    example = parameter.get("example")
+    if isinstance(allowed, list) and allowed and not isinstance(example, (dict, list)) and example not in allowed:
+        issue(issues, "error", "EXAMPLE_OUTSIDE_ALLOWED_VALUES", f"{base}.example", "The example must belong to the exhaustive allowed values.")
+    if not path_exists(event.get("data_layer", {}).get("push", {}), path):
+        issue(
+            issues,
+            "error",
+            "PARAMETER_NOT_IN_DATALAYER",
+            f"{base}.data_layer_path",
+            "Every selected parameter must appear in the event's complete dataLayer example.",
+        )
+    prescribed = catalog_parameters(catalog_record) if catalog_record else {}
+    official = prescribed.get((name, scope))
+    if classification == "official":
+        if catalog_record and not official:
+            issue(
+                issues,
+                "error",
+                "OFFICIAL_PARAMETER_NOT_PRESCRIBED",
+                f"{base}.classification",
+                f"'{name}' is not an official {scope}-scope parameter for this selected event; classify it as custom if justified.",
+            )
+        if official:
+            if normalize_type(parameter.get("type")) != normalize_type(official.get("type")):
+                issue(
+                    issues,
+                    "error",
+                    "OFFICIAL_PARAMETER_TYPE",
+                    f"{base}.type",
+                    f"Use official type '{official.get('type')}'.",
+                )
+            source = parameter.get("official_source", {})
+            if source.get("wording_origin") == "exact" and normalize(parameter.get("definition")) != normalize(official.get("description")):
+                issue(
+                    issues,
+                    "error",
+                    "OFFICIAL_PARAMETER_WORDING",
+                    f"{base}.definition",
+                    "Exact official wording must match the selected event's current parameter-row definition.",
+                )
+    elif classification == "custom" and official:
+        issue(
+            issues,
+            "error",
+            "CUSTOM_PARAMETER_IS_OFFICIAL",
+            f"{base}.classification",
+            f"'{name}' is already an official {scope}-scope parameter for this event.",
+        )
+    if classification == "custom":
+        check_custom_decision(parameter.get("custom_decision"), f"{base}.custom_decision", issues)
+    if classification == "implementation" and parameter.get("destination") != "implementation_only":
+        issue(
+            issues,
+            "error",
+            "IMPLEMENTATION_DESTINATION",
+            f"{base}.destination",
+            "An implementation parameter must remain implementation_only.",
+        )
 
 
-def check_parameter_definition(param: dict[str, Any], index: int, issues: list[Issue]) -> None:
-    name = str(param.get("parameter_name", ""))
-    classification = param.get("classification")
-    governed_sensitive = governed_sensitive_implementation_parameter(param)
-    if not governed_sensitive:
-        check_pii_name(name, f"$.parameters[{index}].parameter_name", issues)
-    check_legacy_ua_field(name, f"$.parameters[{index}].parameter_name", issues)
-    check_official_verification(param.get("official_verification"), "ga4", f"$.parameters[{index}].official_verification", issues, required=classification in OFFICIAL_PARAMETER_CLASSES)
-    if should_lint_ga4_parameter_name(name, param):
-        check_ga4_name(name, f"$.parameters[{index}].parameter_name", "parameter", issues)
-        if name in GA4_RESERVED_PARAMETER_NAMES and classification not in OFFICIAL_PARAMETER_CLASSES:
-            add_issue(issues, "error", "GA4_RESERVED_PARAMETER_NAME", f"$.parameters[{index}].parameter_name", f"'{name}' is reserved/native in GA4 and must not be used as a custom parameter.")
-    check_item_parameter_definition(param, index, issues)
-    if param.get("pii_risk") == "high" and not governed_sensitive:
-        add_issue(issues, "error", "HIGH_PII_RISK", f"$.parameters[{index}].pii_risk", f"Parameter '{name}' has high PII risk.")
-    if param.get("cardinality_risk") == "high" and param.get("register_custom_definition"):
-        add_issue(issues, "warning", "HIGH_CARDINALITY_CUSTOM_DIMENSION", f"$.parameters[{index}]", f"Parameter '{name}' is high-cardinality and marked for custom definition registration.")
-    check_parameter_documentation(param, index, issues)
+def check_event(
+    plan: dict[str, Any],
+    event: dict[str, Any],
+    index: int,
+    catalog: dict[str, dict[str, Any]],
+    issues: list[Issue],
+) -> None:
+    base = f"$.events[{index}]"
+    name = str(event.get("event_name", ""))
+    classification = str(event.get("classification", ""))
+    if classification in {"automatic", "enhanced_measurement"}:
+        issue(issues, "error", "NON_MANUAL_CLASSIFICATION", f"{base}.classification", "The tracking plan contains manually implemented measurement only.")
+    if classification == "custom":
+        check_custom_decision(event.get("custom_decision"), f"{base}.custom_decision", issues)
+    check_human_text(event.get("definition"), f"{base}.definition", "event_definition", issues)
+    trigger = " ".join(str(event.get("trigger", "")).split()).strip()
+    check_human_text(trigger, f"{base}.trigger", "trigger", issues)
+    if GENERIC_TRIGGER.fullmatch(trigger):
+        issue(issues, "error", "TRIGGER_GENERIC", f"{base}.trigger", "State the concrete action or state and firing moment.")
+    known_journeys = journey_lookup(plan)
+    for journey_id in event.get("journey_ids", []):
+        if str(journey_id) not in known_journeys:
+            issue(issues, "error", "UNKNOWN_JOURNEY", f"{base}.journey_ids", f"Unknown journey '{journey_id}'.")
+    push = event.get("data_layer", {}).get("push", {})
+    if classification == "context":
+        if "event" in push:
+            issue(issues, "error", "CONTEXT_HAS_EVENT", f"{base}.data_layer.push.event", "A context push must not create a GTM Custom Event trigger.")
+    elif push.get("event") != name:
+        issue(
+            issues,
+            "error",
+            "EVENT_PUSH_MISMATCH",
+            f"{base}.data_layer.push.event",
+            f'Top-level "event" must equal "{name}".',
+        )
+    paths = [str(item.get("data_layer_path", "")) for item in event.get("parameters", []) if isinstance(item, dict)]
+    if len(paths) != len(set(paths)):
+        issue(issues, "error", "DUPLICATE_PARAMETER_PATH", f"{base}.parameters", "Parameter dataLayer paths must be unique inside an event.")
+    bound_paths = set(paths)
+    unbound = sorted(flatten_push_paths(push) - bound_paths)
+    if unbound:
+        issue(
+            issues,
+            "error",
+            "UNBOUND_DATALAYER_FIELDS",
+            f"{base}.data_layer.push",
+            "Every pushed field must belong to this event specification. Missing bindings: " + ", ".join(unbound),
+        )
+    check_official_event(plan, event, index, catalog, issues)
+    record = catalog.get(name)
+    for parameter_index, parameter in enumerate(event.get("parameters", [])):
+        if isinstance(parameter, dict):
+            check_parameter(event, index, parameter, parameter_index, record, issues)
 
 
-def check_item_parameter_definition(param: dict[str, Any], index: int, issues: list[Issue]) -> None:
-    name = str(param.get("parameter_name", ""))
-    if not name.startswith("items[]."):
-        return
-    classification = param.get("classification")
-    if name in OFFICIAL_ITEM_PARAMETERS:
-        if classification == "custom_item_parameter":
-            add_issue(issues, "warning", "OFFICIAL_ITEM_PARAMETER_MISCLASSIFIED", f"$.parameters[{index}].classification", f"'{name}' is an official GA4 item parameter; classify it as ga4_ecommerce_item_parameter.")
-        return
-    if classification in OFFICIAL_ECOMMERCE_PARAMETER_CLASSES:
-        add_issue(issues, "error", "CUSTOM_ITEM_PARAMETER_MISCLASSIFIED", f"$.parameters[{index}].classification", f"'{name}' is not an official GA4 item parameter; classify it as custom_item_parameter.")
-    elif classification != "custom_item_parameter":
-        add_issue(issues, "warning", "CUSTOM_ITEM_PARAMETER_CLASSIFICATION", f"$.parameters[{index}].classification", f"'{name}' is item-scoped and non-official; use custom_item_parameter.")
-    if param.get("scope") != "item":
-        add_issue(issues, "error", "CUSTOM_ITEM_PARAMETER_SCOPE", f"$.parameters[{index}].scope", f"'{name}' must use item scope.")
-
-
-def check_parameter_documentation(param: dict[str, Any], index: int, issues: list[Issue]) -> None:
-    name = str(param.get("parameter_name", ""))
-    classification = param.get("classification")
-    purpose = str(param.get("reporting_purpose", "")).strip()
-    normalized_purpose = purpose.lower().rstrip(".")
-    if purpose and normalized_purpose in WEAK_REPORTING_PURPOSES:
-        add_issue(issues, "error", "PARAMETER_REPORTING_PURPOSE_WEAK", f"$.parameters[{index}].reporting_purpose", f"Parameter '{name}' needs a concrete reporting or analysis purpose.")
-    rules = str(param.get("value_rules", "")).strip()
-    if classification in CUSTOM_PARAMETER_CLASSIFICATIONS and rules.lower().rstrip(".") in WEAK_VALUE_RULES:
-        add_issue(issues, "error", "CUSTOM_PARAMETER_VALUE_RULES_WEAK", f"$.parameters[{index}].value_rules", f"Custom parameter '{name}' needs concrete value rules or controlled values.")
-    if classification not in CUSTOM_PARAMETER_CLASSIFICATIONS:
-        return
-    if not purpose:
-        add_issue(issues, "error", "CUSTOM_PARAMETER_REPORTING_PURPOSE_MISSING", f"$.parameters[{index}].reporting_purpose", f"Custom parameter '{name}' needs a concrete reporting or analysis purpose.")
-    official_gap = str(param.get("official_gap", "")).strip()
-    if official_gap.lower().rstrip(".") in {"", "none", "not applicable", "custom", "no official parameter", "tbd", "to confirm", "unknown"}:
-        add_issue(issues, "error", "CUSTOM_PARAMETER_OFFICIAL_GAP_MISSING", f"$.parameters[{index}].official_gap", f"Custom parameter '{name}' must identify the official fields reviewed and the specific need they do not answer.")
-    if not str(param.get("source", "")).strip():
-        add_issue(issues, "error", "CUSTOM_PARAMETER_SOURCE_MISSING", f"$.parameters[{index}].source", f"Custom parameter '{name}' needs a concrete website, application, dataLayer, or backend source.")
-    if not isinstance(param.get("register_custom_definition"), bool):
-        add_issue(issues, "error", "CUSTOM_PARAMETER_REGISTRATION_DECISION_MISSING", f"$.parameters[{index}].register_custom_definition", f"Custom parameter '{name}' needs an explicit GA4 custom-definition registration decision.")
-    if param.get("cardinality_risk") not in {"low", "medium", "high"}:
-        add_issue(issues, "error", "CUSTOM_PARAMETER_CARDINALITY_MISSING", f"$.parameters[{index}].cardinality_risk", f"Custom parameter '{name}' needs an explicit cardinality assessment.")
-    if param.get("pii_risk") not in {"low", "medium", "high"}:
-        add_issue(issues, "error", "CUSTOM_PARAMETER_PRIVACY_MISSING", f"$.parameters[{index}].pii_risk", f"Custom parameter '{name}' needs an explicit privacy assessment.")
-
-
-def validate_plan_data(plan: dict[str, Any], schema_path: Path | None = None) -> list[Issue]:
+def validate_plan(plan: dict[str, Any], schema_path: Path = DEFAULT_SCHEMA) -> list[Issue]:
     issues: list[Issue] = []
-    validate_schema(plan, schema_path or default_schema_path(), issues)
-    parameters = plan.get("parameters", [])
-    events = plan.get("events", [])
-    parameter_lookup = {
-        param.get("parameter_name", ""): param
-        for param in parameters
-        if isinstance(param, dict)
-    }
-    check_duplicates(
-        [event.get("event_id", "") for event in events if isinstance(event, dict)],
-        "event_id",
-        "$.events",
-        issues,
-    )
-    check_execution_context(plan, issues)
-    check_measurement_alignment(plan, issues)
-    check_measurement_strategy(plan, issues)
-    check_website_coverage_map(plan, issues)
-    check_not_tracked_decisions(plan, issues)
-    check_screenshot_capture(plan, issues)
-    check_screenshot_evidence(plan, issues)
-    check_delivery_rules(plan, issues)
-    check_governance_contract(plan, issues)
-    check_official_source_inventory(plan, events, issues)
-    for index, param in enumerate(parameters):
-        if isinstance(param, dict):
-            check_parameter_definition(param, index, issues)
-    ga4_catalog = load_ga4_catalog()
-    for index, event in enumerate(events):
+    validate_schema(plan, schema_path, issues)
+    if any(item.code == "SCHEMA" for item in issues):
+        return issues
+    check_unique_ids(plan, issues)
+    catalog = load_catalog()
+    for index, event in enumerate(plan.get("events", [])):
         if isinstance(event, dict):
-            check_event(event, index, parameter_lookup, ga4_catalog, issues)
-    check_quality_contract(plan, issues)
+            check_event(plan, event, index, catalog, issues)
     return issues
 
+
 def render_text(issues: list[Issue]) -> str:
-    if not issues:
-        return "Tracking plan validation passed with no issues."
-    lines = []
-    for issue in issues:
-        lines.append(f"{issue.severity.upper()} {issue.code} {issue.path}: {issue.message}")
-    return "\n".join(lines)
+    return "\n".join(f"{item.severity.upper()} {item.code} {item.path}: {item.message}" for item in issues)
 
 
 def main() -> int:
     args = parse_args()
-    plan = load_json(args.plan)
-    issues = validate_plan_data(plan, args.schema or default_schema_path())
-    if args.format == "json":
-        print(json.dumps([issue.__dict__ for issue in issues], indent=2, ensure_ascii=False))
-    else:
+    try:
+        plan = load_json(args.plan)
+        issues = validate_plan(plan, args.schema)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    if args.as_json:
+        print(json.dumps([asdict(item) for item in issues], indent=2, ensure_ascii=False))
+    elif issues:
         print(render_text(issues))
-    has_error = any(issue.severity == "error" for issue in issues)
-    has_warning = any(issue.severity == "warning" for issue in issues)
-    return 1 if has_error or (args.warnings_as_errors and has_warning) else 0
+    else:
+        print("Tracking plan is valid.")
+    has_error = any(item.severity == "error" for item in issues)
+    has_warning = any(item.severity == "warning" for item in issues)
+    return int(has_error or (args.warnings_as_errors and has_warning))
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

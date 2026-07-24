@@ -17,6 +17,3 @@ dist/
 generated/
 deliverables/
 release/
-tracking-plan-corpus-analysis/
-fresh-agent-results*.json
-fresh-agent-evaluation-output/

@@ -1,0 +1,602 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Human-first GA4 tracking-plan model",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "document",
+    "data_layer_convention",
+    "journeys",
+    "events"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "4.0.0"
+    },
+    "document": {
+      "$ref": "#/$defs/document"
+    },
+    "data_layer_convention": {
+      "$ref": "#/$defs/dataLayerConvention"
+    },
+    "journeys": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/journey"
+      }
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/change"
+      }
+    }
+  },
+  "$defs": {
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "version",
+        "date",
+        "language",
+        "scope",
+        "target_state"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "language": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(?:-[A-Z]{2})?$"
+        },
+        "value_language": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(?:-[A-Z]{2})?$"
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_state": {
+          "enum": [
+            "as_is",
+            "to_be",
+            "hybrid"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "dataLayerConvention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "origin",
+        "event_key",
+        "wrappers"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "origin": {
+          "enum": [
+            "existing",
+            "default"
+          ]
+        },
+        "event_key": {
+          "type": "string",
+          "const": "event"
+        },
+        "wrappers": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "page": {
+              "type": "string",
+              "minLength": 1
+            },
+            "event": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ecommerce": {
+              "type": "string",
+              "minLength": 1
+            },
+            "user": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "journey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "journey_id",
+        "name",
+        "scope",
+        "status"
+      ],
+      "properties": {
+        "journey_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,79}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "observed",
+            "confirmed",
+            "planned",
+            "partial"
+          ]
+        },
+        "business_goal": {
+          "type": "string"
+        },
+        "urls": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "page_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url_pattern": {
+          "type": "string",
+          "minLength": 1
+        },
+        "component": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "anyOf": [
+        {"required": ["page_type"]},
+        {"required": ["url_pattern"]},
+        {"required": ["component"]},
+        {"required": ["state"]}
+      ]
+    },
+    "officialSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url",
+        "section",
+        "wording_origin"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://(?:developers|support)\\.google\\.com/"
+        },
+        "section": {
+          "type": "string",
+          "minLength": 1
+        },
+        "wording_origin": {
+          "enum": [
+            "exact",
+            "faithful_translation"
+          ]
+        },
+        "checked_date": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "customDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "business_need",
+        "official_candidate",
+        "why_not_fit"
+      ],
+      "properties": {
+        "business_need": {
+          "type": "string",
+          "minLength": 1
+        },
+        "official_candidate": {
+          "type": "string",
+          "minLength": 1
+        },
+        "why_not_fit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "data_layer_path",
+        "classification",
+        "scope",
+        "type",
+        "requirement",
+        "definition",
+        "value_rule",
+        "destination"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,39}$"
+        },
+        "data_layer_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "classification": {
+          "enum": [
+            "official",
+            "custom",
+            "implementation"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "event",
+            "item",
+            "user",
+            "implementation"
+          ]
+        },
+        "type": {
+          "enum": [
+            "string",
+            "integer",
+            "number",
+            "boolean",
+            "array",
+            "object"
+          ]
+        },
+        "requirement": {
+          "enum": [
+            "required",
+            "conditional",
+            "optional"
+          ]
+        },
+        "condition": {
+          "type": "string"
+        },
+        "definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allowed_values": {
+          "type": "array",
+          "maxItems": 50,
+          "uniqueItems": true,
+          "items": {
+            "type": [
+              "string",
+              "number",
+              "integer",
+              "boolean"
+            ]
+          }
+        },
+        "example": {
+          "type": [
+            "string",
+            "number",
+            "integer",
+            "boolean",
+            "array",
+            "object",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string"
+        },
+        "destination": {
+          "enum": [
+            "ga4_event_parameter",
+            "ga4_item_parameter",
+            "ga4_user_property",
+            "ga4_user_id",
+            "implementation_only",
+            "other"
+          ]
+        },
+        "official_source": {
+          "$ref": "#/$defs/officialSource"
+        },
+        "custom_decision": {
+          "$ref": "#/$defs/customDecision"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "requirement": {
+                "const": "conditional"
+              }
+            },
+            "required": ["requirement"]
+          },
+          "then": {
+            "required": ["condition"],
+            "properties": {
+              "condition": {
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "const": "official"
+              }
+            },
+            "required": ["classification"]
+          },
+          "then": {
+            "required": ["official_source"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "const": "custom"
+              }
+            },
+            "required": ["classification"]
+          },
+          "then": {
+            "required": ["custom_decision"]
+          }
+        }
+      ]
+    },
+    "dataLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "push"
+      ],
+      "properties": {
+        "clear": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "push": {
+          "type": "object",
+          "minProperties": 1
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_name",
+        "classification",
+        "journey_ids",
+        "definition",
+        "trigger",
+        "locations",
+        "parameters",
+        "data_layer"
+      ],
+      "properties": {
+        "event_name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,39}$"
+        },
+        "classification": {
+          "enum": [
+            "official",
+            "official_ecommerce",
+            "custom",
+            "context"
+          ]
+        },
+        "journey_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trigger": {
+          "type": "string",
+          "minLength": 1
+        },
+        "locations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/location"
+          }
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/parameter"
+          }
+        },
+        "data_layer": {
+          "$ref": "#/$defs/dataLayer"
+        },
+        "business_question": {
+          "type": "string"
+        },
+        "official_source": {
+          "$ref": "#/$defs/officialSource"
+        },
+        "custom_decision": {
+          "$ref": "#/$defs/customDecision"
+        },
+        "screenshots": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "enum": [
+                  "official",
+                  "official_ecommerce"
+                ]
+              }
+            },
+            "required": ["classification"]
+          },
+          "then": {
+            "required": ["official_source"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "const": "custom"
+              }
+            },
+            "required": ["classification"]
+          },
+          "then": {
+            "required": ["custom_decision"]
+          }
+        }
+      ]
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "entity",
+        "key",
+        "summary"
+      ],
+      "properties": {
+        "action": {
+          "enum": [
+            "added",
+            "changed",
+            "deprecated"
+          ]
+        },
+        "entity": {
+          "enum": [
+            "journey",
+            "event",
+            "trigger",
+            "parameter",
+            "value_domain",
+            "data_layer"
+          ]
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "before": {},
+        "after": {}
+      }
+    }
+  }
+}

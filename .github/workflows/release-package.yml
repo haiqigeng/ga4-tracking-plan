@@ -22,9 +22,8 @@ jobs:
       - name: Validate package
         run: |
           ruff check .
-          python -m compileall -q scripts skill/scripts maintenance/scripts tests
-          python -m unittest discover -s tests
-          python scripts/check_official_catalog.py --offline
+          python -m compileall -q scripts skill/scripts skill/tests
+          python -m unittest discover -s skill/tests
           python scripts/validate_package.py
       - name: Build release zip
         run: |
