@@ -70,10 +70,6 @@
           "type": "string",
           "pattern": "^[a-z]{2}(?:-[A-Z]{2})?$"
         },
-        "value_language": {
-          "type": "string",
-          "pattern": "^[a-z]{2}(?:-[A-Z]{2})?$"
-        },
         "scope": {
           "type": "string",
           "minLength": 1
@@ -107,7 +103,8 @@
         "origin": {
           "enum": [
             "existing",
-            "default"
+            "default",
+            "adapted"
           ]
         },
         "event_key": {
@@ -117,6 +114,12 @@
         "wrappers": {
           "type": "object",
           "additionalProperties": false,
+          "required": [
+            "page",
+            "event",
+            "ecommerce",
+            "user"
+          ],
           "properties": {
             "page": {
               "type": "string",
@@ -168,7 +171,8 @@
             "observed",
             "confirmed",
             "planned",
-            "partial"
+            "partial",
+            "blocked"
           ]
         },
         "business_goal": {
@@ -357,6 +361,14 @@
         "source": {
           "type": "string"
         },
+        "value_evidence_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
         "destination": {
           "enum": [
             "ga4_event_parameter",
@@ -508,7 +520,8 @@
           "$ref": "#/$defs/dataLayer"
         },
         "business_question": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "official_source": {
           "$ref": "#/$defs/officialSource"
@@ -528,6 +541,21 @@
         }
       },
       "allOf": [
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "not": {
+                  "const": "context"
+                }
+              }
+            },
+            "required": ["classification"]
+          },
+          "then": {
+            "required": ["business_question"]
+          }
+        },
         {
           "if": {
             "properties": {
@@ -583,7 +611,11 @@
             "trigger",
             "parameter",
             "value_domain",
-            "data_layer"
+            "data_layer",
+            "data_layer_convention",
+            "document",
+            "business_question",
+            "custom_decision"
           ]
         },
         "key": {

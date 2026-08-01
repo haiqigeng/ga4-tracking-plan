@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GA4 tracking-plan evidence drift report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["report_version", "status", "changes", "affected_events", "notes"],
+  "properties": {
+    "report_version": {"const": "1.0.0"},
+    "status": {"enum": ["unchanged", "review_required"]},
+    "changes": {"type": "array", "items": {"type": "object"}},
+    "affected_events": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "notes": {"type": "array", "items": {"type": "string"}}
+  }
+}

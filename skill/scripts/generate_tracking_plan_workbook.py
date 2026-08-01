@@ -17,6 +17,7 @@ from create_default_template import (
     apply_table_row,
     apply_title,
     fill,
+    set_cell_value,
     set_widths,
 )
 from openpyxl import load_workbook
@@ -37,6 +38,7 @@ from tracking_plan_model import (
     scope_label,
     value_rule_text,
     workbook_language,
+    workbook_projection,
 )
 from validate_tracking_plan import render_text, validate_plan
 
@@ -44,10 +46,12 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TEMPLATE = ROOT / "assets" / "default-tracking-plan.xlsx"
 MODEL_SHEET = "__tracking_plan_model"
 MODEL_MARKER = "ga4-tracking-plan/model"
+PROJECTION_SHEET = "__tracking_plan_projection"
+PROJECTION_MARKER = "ga4-tracking-plan/projection"
 MODEL_CELL_LIMIT = 30000
-MATRIX_WIDTHS = [20, 20, 15, 36, 40, 32, 28]
+MATRIX_WIDTHS = [24, 96]
 REFERENCE_WIDTHS = [22, 11, 11, 38, 22, 38, 28]
-EVENT_WIDTHS = [20, 10, 10, 12, 23, 38, 36, 22, 32]
+EVENT_WIDTHS = [20, 11, 11, 13, 42, 40, 24]
 
 
 def parse_args() -> argparse.Namespace:
@@ -99,18 +103,6 @@ def link(cell, sheet_name: str) -> None:
     cell.font = Font(color=TEAL, bold=True, underline="single")
 
 
-def locations_for_matrix(event: dict[str, Any]) -> str:
-    return location_text(event)
-
-
-def variables_for_matrix(plan: dict[str, Any], event: dict[str, Any]) -> str:
-    return "\n".join(
-        f"{parameter.get('name')} ({requirement_label(plan, str(parameter.get('requirement', '')))})"
-        for parameter in event.get("parameters", [])
-        if isinstance(parameter, dict)
-    )
-
-
 def fill_guide(wb, plan: dict[str, Any], event_sheet_names: dict[str, str]) -> None:
     ws = wb["Guide"]
     doc = plan["document"]
@@ -139,9 +131,9 @@ def fill_guide(wb, plan: dict[str, Any], event_sheet_names: dict[str, str]) -> N
         ),
     ]
     for row, (key, value) in enumerate(guide_rows, 4):
-        ws.cell(row, 1, label(plan, key))
-        ws.cell(row, 2, value)
-    ws.cell(14, 1, label(plan, "journeys"))
+        set_cell_value(ws.cell(row, 1), label(plan, key))
+        set_cell_value(ws.cell(row, 2), value)
+    set_cell_value(ws.cell(14, 1), label(plan, "journeys"))
     journey_headers = [
         label(plan, "journey"),
         label(plan, "scope"),
@@ -149,7 +141,7 @@ def fill_guide(wb, plan: dict[str, Any], event_sheet_names: dict[str, str]) -> N
         label(plan, "urls"),
     ]
     for column, header_value in enumerate(journey_headers, 1):
-        ws.cell(15, column, header_value)
+        set_cell_value(ws.cell(15, column), header_value)
     if ws.max_row > 16:
         ws.delete_rows(17, ws.max_row - 16)
     journeys = plan.get("journeys", [])
@@ -157,10 +149,13 @@ def fill_guide(wb, plan: dict[str, Any], event_sheet_names: dict[str, str]) -> N
         row = 16 + offset
         if row > 16:
             copy_row_style(ws, 16, row, 4)
-        ws.cell(row, 1, journey.get("name", ""))
-        ws.cell(row, 2, journey.get("scope", ""))
-        ws.cell(row, 3, journey.get("business_goal", ""))
-        ws.cell(row, 4, "\n".join(str(value) for value in journey.get("urls", [])))
+        set_cell_value(ws.cell(row, 1), journey.get("name", ""))
+        set_cell_value(ws.cell(row, 2), journey.get("scope", ""))
+        set_cell_value(ws.cell(row, 3), journey.get("business_goal", ""))
+        set_cell_value(
+            ws.cell(row, 4),
+            "\n".join(str(value) for value in journey.get("urls", [])),
+        )
     ws.auto_filter.ref = f"A15:D{max(16, 15 + len(journeys))}"
     link(ws.cell(10, 2), "Event Matrix")
     if event_sheet_names:
@@ -175,39 +170,29 @@ def fill_event_matrix(wb, plan: dict[str, Any], event_sheet_names: dict[str, str
         "One row per manually implemented event or context push."
         if workbook_language(plan) == "en"
         else "Une ligne par événement implémenté manuellement ou push de contexte.",
-        7,
+        2,
     )
     headers = [
-        label(plan, "journey"),
         label(plan, "event"),
-        label(plan, "classification"),
         label(plan, "definition"),
-        label(plan, "trigger"),
-        label(plan, "locations"),
-        label(plan, "variables"),
     ]
     for column, header_value in enumerate(headers, 1):
-        ws.cell(4, column, header_value)
+        set_cell_value(ws.cell(4, column), header_value)
     clear_data_rows(ws, 5)
     for index, event in enumerate(plan.get("events", []), 5):
-        apply_table_row(ws, index, 7)
+        apply_table_row(ws, index, 2)
         event_name = str(event.get("event_name", ""))
-        ws.cell(index, 1, " | ".join(event_journey_names(plan, event)))
-        ws.cell(index, 2, event_name)
-        ws.cell(index, 3, classification_label(plan, str(event.get("classification", ""))))
-        ws.cell(index, 4, event.get("definition", ""))
-        ws.cell(index, 5, event.get("trigger", ""))
-        ws.cell(index, 6, locations_for_matrix(event))
-        ws.cell(index, 7, variables_for_matrix(plan, event))
+        set_cell_value(ws.cell(index, 1), event_name)
+        set_cell_value(ws.cell(index, 2), event.get("definition", ""))
         if event_name in event_sheet_names:
-            link(ws.cell(index, 2), event_sheet_names[event_name])
+            link(ws.cell(index, 1), event_sheet_names[event_name])
         ws.row_dimensions[index].height = content_row_height(
-            [ws.cell(index, column).value for column in range(1, 8)],
+            [ws.cell(index, column).value for column in range(1, 3)],
             MATRIX_WIDTHS,
-            minimum=70,
-            maximum=170,
+            minimum=48,
+            maximum=140,
         )
-    ws.auto_filter.ref = f"A4:G{max(5, 4 + len(plan.get('events', [])))}"
+    ws.auto_filter.ref = f"A4:B{max(5, 4 + len(plan.get('events', [])))}"
 
 
 def fill_parameter_reference(wb, plan: dict[str, Any]) -> None:
@@ -230,18 +215,18 @@ def fill_parameter_reference(wb, plan: dict[str, Any]) -> None:
         label(plan, "concerned_events"),
     ]
     for column, header_value in enumerate(headers, 1):
-        ws.cell(4, column, header_value)
+        set_cell_value(ws.cell(4, column), header_value)
     clear_data_rows(ws, 5)
     rows = parameter_reference_rows(plan)
     for index, row in enumerate(rows, 5):
         apply_table_row(ws, index, 7)
-        ws.cell(index, 1, row["name"])
-        ws.cell(index, 2, scope_label(plan, str(row["scope"])))
-        ws.cell(index, 3, row["type"])
-        ws.cell(index, 4, row["definition"])
-        ws.cell(index, 5, row["example"])
-        ws.cell(index, 6, row["values"])
-        ws.cell(index, 7, " | ".join(row["events"]))
+        set_cell_value(ws.cell(index, 1), row["name"])
+        set_cell_value(ws.cell(index, 2), scope_label(plan, str(row["scope"])))
+        set_cell_value(ws.cell(index, 3), row["type"])
+        set_cell_value(ws.cell(index, 4), row["definition"])
+        set_cell_value(ws.cell(index, 5), row["example"])
+        set_cell_value(ws.cell(index, 6), row["values"])
+        set_cell_value(ws.cell(index, 7), " | ".join(row["events"]))
         ws.row_dimensions[index].height = content_row_height(
             [ws.cell(index, column).value for column in range(1, 8)],
             REFERENCE_WIDTHS,
@@ -251,18 +236,18 @@ def fill_parameter_reference(wb, plan: dict[str, Any]) -> None:
     ws.auto_filter.ref = f"A4:G{max(5, 4 + len(rows))}"
 
 
-def add_section(ws, row: int, text: str, columns: int = 9) -> None:
+def add_section(ws, row: int, text: str, columns: int = 7) -> None:
     ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=columns)
-    cell = ws.cell(row, 1, text)
+    cell = set_cell_value(ws.cell(row, 1), text)
     fill(cell, ACCENT)
     cell.font = Font(color=TEAL, bold=True, size=12)
     cell.alignment = Alignment(vertical="center")
     ws.row_dimensions[row].height = 26
 
 
-def add_code_block(ws, row: int, code: str, columns: int = 9) -> None:
+def add_code_block(ws, row: int, code: str, columns: int = 7) -> None:
     ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=columns)
-    cell = ws.cell(row, 1, code)
+    cell = set_cell_value(ws.cell(row, 1), code)
     fill(cell, PALE)
     cell.font = Font(name="Consolas", color=TEXT, size=10)
     cell.alignment = Alignment(wrap_text=True, vertical="top")
@@ -283,7 +268,7 @@ def maybe_add_screenshot(ws, row: int, event: dict[str, Any], screenshot_dir: Pa
             existing.append(candidate)
     if not existing:
         return row
-    add_section(ws, row, "Visual reference", 9)
+    add_section(ws, row, "Visual reference", 7)
     row += 1
     for path in existing:
         image = XLImage(str(path))
@@ -308,7 +293,7 @@ def fill_event_sheet(
         "Authoritative event, parameter, and dataLayer specification."
         if workbook_language(plan) == "en"
         else "Spécification de référence de l'événement, de ses variables et du dataLayer.",
-        9,
+        7,
     )
     values = [
         (label(plan, "event"), event_name),
@@ -320,8 +305,8 @@ def fill_event_sheet(
         (label(plan, "notes"), event.get("notes", "")),
     ]
     for row, (row_label, value) in enumerate(values, 3):
-        ws.cell(row, 1, row_label)
-        ws.cell(row, 2, value)
+        set_cell_value(ws.cell(row, 1), row_label)
+        set_cell_value(ws.cell(row, 2), value)
     if not str(event.get("notes", "")).strip():
         ws.row_dimensions[9].hidden = True
     headers = [
@@ -329,45 +314,44 @@ def fill_event_sheet(
         label(plan, "scope_label"),
         label(plan, "type"),
         label(plan, "requirement"),
-        label(plan, "condition"),
         label(plan, "definition"),
         label(plan, "values"),
         label(plan, "example"),
-        label(plan, "source_path"),
     ]
     for column, header_value in enumerate(headers, 1):
-        ws.cell(11, column, header_value)
+        set_cell_value(ws.cell(11, column), header_value)
     parameters = event.get("parameters", [])
     for offset, parameter in enumerate(parameters):
         row = 12 + offset
         if row > 12:
-            copy_row_style(ws, 12, row, 9)
-        ws.cell(row, 1, parameter.get("name", ""))
-        ws.cell(row, 2, scope_label(plan, str(parameter.get("scope", ""))))
-        ws.cell(row, 3, parameter.get("type", ""))
-        ws.cell(row, 4, requirement_label(plan, str(parameter.get("requirement", ""))))
-        ws.cell(row, 5, parameter.get("condition", ""))
-        ws.cell(row, 6, parameter.get("definition", ""))
-        ws.cell(row, 7, value_rule_text(parameter, plan))
-        ws.cell(row, 8, compact_value(parameter.get("example")))
-        source_text = str(parameter.get("data_layer_path", ""))
-        if parameter.get("source"):
-            source_text += f"\n{parameter.get('source')}"
-        ws.cell(row, 9, source_text)
+            copy_row_style(ws, 12, row, 7)
+        set_cell_value(ws.cell(row, 1), parameter.get("name", ""))
+        set_cell_value(
+            ws.cell(row, 2),
+            scope_label(plan, str(parameter.get("scope", ""))),
+        )
+        set_cell_value(ws.cell(row, 3), parameter.get("type", ""))
+        set_cell_value(
+            ws.cell(row, 4),
+            requirement_label(plan, str(parameter.get("requirement", ""))),
+        )
+        set_cell_value(ws.cell(row, 5), parameter.get("definition", ""))
+        set_cell_value(ws.cell(row, 6), value_rule_text(parameter, plan))
+        set_cell_value(ws.cell(row, 7), compact_value(parameter.get("example")))
         ws.row_dimensions[row].height = content_row_height(
-            [ws.cell(row, column).value for column in range(1, 10)],
+            [ws.cell(row, column).value for column in range(1, 8)],
             EVENT_WIDTHS,
             minimum=64,
             maximum=210,
         )
     if not parameters:
-        for column in range(1, 10):
-            ws.cell(12, column, "")
+        for column in range(1, 8):
+            set_cell_value(ws.cell(12, column), "")
     data_layer_title_row = 13 + max(1, len(parameters))
-    add_section(ws, data_layer_title_row, label(plan, "datalayer"), 9)
-    add_code_block(ws, data_layer_title_row + 1, datalayer_code(event), 9)
+    add_section(ws, data_layer_title_row, label(plan, "datalayer"), 7)
+    add_code_block(ws, data_layer_title_row + 1, datalayer_code(event), 7)
     maybe_add_screenshot(ws, data_layer_title_row + 3, event, screenshot_dir)
-    ws.auto_filter.ref = f"A11:I{11 + max(1, len(parameters))}"
+    ws.auto_filter.ref = f"A11:G{11 + max(1, len(parameters))}"
 
 
 def add_change_log(wb, plan: dict[str, Any], changes: list[dict[str, Any]]) -> None:
@@ -391,19 +375,19 @@ def add_change_log(wb, plan: dict[str, Any], changes: list[dict[str, Any]]) -> N
         label(plan, "event"),
     ]
     for column, header_value in enumerate(headers, 1):
-        ws.cell(4, column, header_value)
+        set_cell_value(ws.cell(4, column), header_value)
     apply_header(ws, 4, 7)
     for index, change in enumerate(changes, 5):
         apply_table_row(ws, index, 7)
         key = str(change.get("key", ""))
         event_name = key.split(":", 1)[0] if ":" in key else ""
-        ws.cell(index, 1, change.get("action", ""))
-        ws.cell(index, 2, change.get("entity", ""))
-        ws.cell(index, 3, key)
-        ws.cell(index, 4, change.get("summary", ""))
-        ws.cell(index, 5, compact_value(change.get("before")))
-        ws.cell(index, 6, compact_value(change.get("after")))
-        ws.cell(index, 7, event_name)
+        set_cell_value(ws.cell(index, 1), change.get("action", ""))
+        set_cell_value(ws.cell(index, 2), change.get("entity", ""))
+        set_cell_value(ws.cell(index, 3), key)
+        set_cell_value(ws.cell(index, 4), change.get("summary", ""))
+        set_cell_value(ws.cell(index, 5), compact_value(change.get("before")))
+        set_cell_value(ws.cell(index, 6), compact_value(change.get("after")))
+        set_cell_value(ws.cell(index, 7), event_name)
         ws.row_dimensions[index].height = 56
     set_widths(ws, [16, 18, 32, 54, 42, 42, 24])
     ws.freeze_panes = "A5"
@@ -423,13 +407,31 @@ def embed_model(wb, plan: dict[str, Any]) -> None:
     """Embed the canonical model for lossless maintenance without exposing machinery."""
     if MODEL_SHEET in wb.sheetnames:
         del wb[MODEL_SHEET]
+    if PROJECTION_SHEET in wb.sheetnames:
+        del wb[PROJECTION_SHEET]
     ws = wb.create_sheet(MODEL_SHEET)
-    ws.cell(1, 1, MODEL_MARKER)
-    ws.cell(1, 2, str(plan.get("schema_version", "")))
+    set_cell_value(ws.cell(1, 1), MODEL_MARKER)
+    set_cell_value(ws.cell(1, 2), str(plan.get("schema_version", "")))
     payload = json.dumps(plan, ensure_ascii=False, separators=(",", ":"))
     for index in range(0, len(payload), MODEL_CELL_LIMIT):
-        ws.cell(2 + index // MODEL_CELL_LIMIT, 1, payload[index : index + MODEL_CELL_LIMIT])
+        set_cell_value(
+            ws.cell(2 + index // MODEL_CELL_LIMIT, 1),
+            payload[index : index + MODEL_CELL_LIMIT],
+        )
     ws.sheet_state = "veryHidden"
+    projection = wb.create_sheet(PROJECTION_SHEET)
+    set_cell_value(projection.cell(1, 1), PROJECTION_MARKER)
+    projected = json.dumps(
+        workbook_projection(wb),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    for index in range(0, len(projected), MODEL_CELL_LIMIT):
+        set_cell_value(
+            projection.cell(2 + index // MODEL_CELL_LIMIT, 1),
+            projected[index : index + MODEL_CELL_LIMIT],
+        )
+    projection.sheet_state = "veryHidden"
 
 
 def build_workbook(
@@ -473,7 +475,7 @@ def main() -> int:
         issues = validate_plan(plan)
         if issues:
             print(render_text(issues), file=sys.stderr)
-        if any(item.severity == "error" for item in issues):
+        if issues:
             return 1
         changes = load_changes(args.changes, plan)
         workbook = build_workbook(

@@ -26,3 +26,7 @@ On purchase, include stable transaction context analysts will repeatedly use
 when the confirmed order stores it. Treat fields not prescribed for purchase,
 such as `shipping_tier` or `payment_type`, as justified custom event
 parameters.
+
+Always include official `customer_type` in the purchase specification as a
+conditional parameter. Use the exhaustive values `new` and `returning`; do not
+send a value when the order cannot be classified confidently.

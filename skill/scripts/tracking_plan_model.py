@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import re
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -14,6 +15,8 @@ BASE_SHEETS = {
     "__EVENT_TEMPLATE",
     "__tracking_plan_model",
 }
+
+INTERNAL_SHEET_PREFIX = "__tracking_plan_"
 
 
 LABELS = {
@@ -167,9 +170,54 @@ def load_json(path: Path) -> dict[str, Any]:
     return value
 
 
+def workbook_projection(workbook) -> dict[str, Any]:
+    """Return the visible cell contract used to detect unmerged human edits."""
+
+    def projected(value: Any) -> Any:
+        if isinstance(value, (date, datetime)):
+            return value.isoformat()
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        return str(value)
+
+    sheets: list[dict[str, Any]] = []
+    for sheet in workbook.worksheets:
+        if sheet.title.startswith(INTERNAL_SHEET_PREFIX):
+            continue
+        cells: list[list[Any]] = []
+        for row in sheet.iter_rows():
+            for cell in row:
+                if cell.value in (None, "") and cell.hyperlink is None:
+                    continue
+                hyperlink = cell.hyperlink.target if cell.hyperlink is not None else None
+                cells.append(
+                    [
+                        cell.coordinate,
+                        projected(cell.value),
+                        str(cell.data_type),
+                        hyperlink,
+                    ]
+                )
+        sheets.append(
+            {
+                "title": sheet.title,
+                "state": sheet.sheet_state,
+                "cells": cells,
+                "merged_cells": sorted(str(item) for item in sheet.merged_cells.ranges),
+            }
+        )
+    return {"projection_version": "1.0.0", "sheets": sheets}
+
+
 def workbook_language(plan: dict[str, Any]) -> str:
     language = str(plan.get("document", {}).get("language", "en")).lower()
-    return "fr" if language.startswith("fr") else "en"
+    if language.startswith("fr"):
+        return "fr"
+    if language.startswith("en"):
+        return "en"
+    raise ValueError(
+        f'Workbook language "{language}" is unsupported. Use an English or French language tag.'
+    )
 
 
 def label(plan: dict[str, Any], key: str) -> str:
@@ -309,7 +357,7 @@ def path_exists(value: Any, path: str) -> bool:
 
 
 def parameter_reference_rows(plan: dict[str, Any]) -> list[dict[str, Any]]:
-    grouped: dict[tuple[Any, ...], dict[str, Any]] = {}
+    grouped: dict[tuple[str, str], dict[str, Any]] = {}
     for event in plan.get("events", []):
         if not isinstance(event, dict):
             continue
@@ -318,12 +366,8 @@ def parameter_reference_rows(plan: dict[str, Any]) -> list[dict[str, Any]]:
             if not isinstance(parameter, dict):
                 continue
             key = (
-                parameter.get("name"),
-                parameter.get("scope"),
-                parameter.get("type"),
-                parameter.get("definition"),
-                value_rule_text(parameter, plan),
-                compact_value(parameter.get("example")),
+                str(parameter.get("name", "")),
+                str(parameter.get("scope", "")),
             )
             if key not in grouped:
                 grouped[key] = {

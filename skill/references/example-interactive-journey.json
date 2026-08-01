@@ -1,0 +1,29 @@
+{
+  "journey_id": "quote_request",
+  "root_url": "https://example.com/",
+  "allow_form_submission": true,
+  "submission_kind": "lead",
+  "actions": [
+    {
+      "action": "goto",
+      "url": "https://example.com/request-a-quote"
+    },
+    {
+      "action": "fill",
+      "selector": "input[name='first_name']",
+      "value_kind": "first_name"
+    },
+    {
+      "action": "fill",
+      "selector": "input[name='email']",
+      "value_kind": "email"
+    },
+    {
+      "action": "submit",
+      "selector": "button[type='submit']",
+      "expected": {
+        "selector_visible": "[data-state='quote-confirmation']"
+      }
+    }
+  ]
+}

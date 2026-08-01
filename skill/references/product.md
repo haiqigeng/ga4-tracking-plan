@@ -43,13 +43,27 @@ specification containing:
 - concrete website trigger;
 - pages, routes, states, or components;
 - event-specific parameters only;
-- parameter scope, type, requirement, condition, definition, values, example,
-  and implementation path;
+- parameter scope, type, requirement, definition, values, and example;
 - one quoted dataLayer example.
+
+The canonical machine event also retains its concrete business question plus
+parameter conditions, classifications, destinations, sources, and dataLayer
+paths for validation and maintenance. Those internal fields are not
+automatically visible workbook columns.
 
 The Event Matrix, Parameter Reference, event tabs, and optional exports are
 derived views of that same event specification. None is a separately authored
 source of truth.
+
+The standard delivery separates audiences without expanding the workbook:
+
+- `tracking-plan.xlsx` for analysts and developers;
+- `plan.json` as the canonical semantic model;
+- `expected-events.json` and `schemas/<event>.schema.json` for implementation
+  and downstream acceptance tooling;
+- `handoff.json` for version, approval, artifact hashes, and upstream evidence;
+- `internal/analysis-context.json` and official, drift, impact, or fidelity
+  evidence for machine checks and analyst maintenance.
 
 ## Internal Work
 
@@ -59,6 +73,8 @@ requests them:
 - evidence status and confidence;
 - source conflicts and assumptions;
 - browser logs and official-source checks;
+- business-value hypotheses, journey-variant notes, and event business
+  questions;
 - ownership and confirmation responsibility;
 - GA4 registration decisions;
 - privacy, consent, and cardinality review;
@@ -68,7 +84,8 @@ requests them:
 
 The result is ready when:
 
-1. Meaningful in-scope journeys are covered or their unresolved boundary is
+1. Meaningful in-scope journeys, material variants, failures, empty states,
+   and post-conversion states are covered or their unresolved boundary is
    stated without fabricated site behavior.
 2. Official semantics are current and correctly applied.
 3. Custom semantics have a concrete official gap and business need.
@@ -79,6 +96,19 @@ The result is ready when:
 7. A developer can implement the dataLayer without inventing missing
    semantics.
 8. The workbook contains no unnecessary reading barriers.
+9. Every non-context event supports a concrete internal business question, and
+   overlapping purposes or triggers have been reconciled across the plan.
+10. Parameter meaning, scope, type, destination, and journey-level commerce or
+   outcome logic are coherent across events.
+11. Page and user context share one core context push, and any authenticated
+   User-ID is mapped as a GA4 configuration setting rather than an event
+   parameter or user property.
+12. Material journey coverage and finite website values are backed by the
+    validated analysis context; sample caps and blocked states are explicit.
+13. The rendered workbook, event schemas, expected-events contract, official
+    check, and hash-stamped handoff all validate as one delivery.
+14. Visible workbook edits cannot be silently overridden by an older embedded
+    model, and supplied-template content outside mapped regions is unchanged.
 
 ## Non-Goals
 

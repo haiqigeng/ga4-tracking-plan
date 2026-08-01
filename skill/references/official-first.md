@@ -12,6 +12,12 @@ For every meaningful action:
 5. Create a custom event only when the official model cannot represent the
    meaningful business or diagnostic action.
 
+Record that concrete purpose in the machine event as `business_question` for
+every non-context event, whether official or custom. It must state the analysis
+or decision the event supports, not restate the event name or trigger. Context
+pushes are exempt. Keep this field internal; do not add it to the Event Matrix
+or event tabs.
+
 The tracking plan contains manually implemented measurement only. Do not add
 automatic events, enhanced-measurement events, native/no-push decisions, or
 instructions about enabling native collection.
@@ -95,6 +101,14 @@ Show normalized values in the selected workbook language unless they are
 official codes, technical identifiers, numbers, booleans, or authoritative raw
 values.
 
+Every project-specific finite list must reference the exact analysis-context
+value domain used to exhaust it; that domain points to rendered website,
+business, or technical evidence. An official parameter does not make its
+website-specific values official: for example, `currency` is an official
+parameter, while the site's supported currency list is website evidence. A
+genuinely prescribed official enum, specifically the documented
+`customer_type` values, does not need a project value-domain reference.
+
 Do not exhaust:
 
 - item IDs or names;
@@ -131,6 +145,9 @@ Use a precise generation, normalization, or source rule instead.
   to the confirmed order. `shipping_tier` and `payment_type` are custom on
   `purchase` when used there because they are not prescribed purchase
   parameters.
+- Include official `customer_type` on `purchase` as conditional. Use only
+  `new` or `returning` when the confirmed transaction can be classified
+  reliably; omit the value when classification is uncertain.
 
 ## User And Context Data
 
@@ -142,6 +159,12 @@ For each field, distinguish:
 - mapped as an ordinary GA4 event or item parameter;
 - mapped as a GA4 user property or User-ID setting;
 - implementation-only or intended for another destination.
+
+When an authenticated journey exists, include `user_id` in the core user
+context and map it only to the official GA4 User-ID configuration setting.
+Never map `user_id` as a user property, event parameter, or custom dimension.
+Do not send it before the user has signed in; send the stable first-party
+identifier while signed in and clear it with `null` after sign-out.
 
 Do not silently remove a website field from the data model. Conversely, do not
 describe dataLayer presence as permission to send it to GA4. Keep legal

@@ -7,10 +7,18 @@ import sys
 from pathlib import Path
 from typing import Any, Callable
 
+from create_default_template import set_cell_value
 from generate_tracking_plan_workbook import embed_model
 from inspect_tracking_plan_template import sha256
 from openpyxl import load_workbook
+from openpyxl.utils import quote_sheetname
 from openpyxl.utils.cell import column_index_from_string, coordinate_from_string
+from template_fidelity import (
+    add_package_fidelity,
+    authorized_template_changes,
+    compare_template_fidelity,
+    workbook_fidelity_snapshot,
+)
 from tracking_plan_model import (
     classification_label,
     compact_value,
@@ -20,6 +28,7 @@ from tracking_plan_model import (
     location_text,
     parameter_reference_rows,
     requirement_label,
+    safe_sheet_title,
     scope_label,
     value_rule_text,
 )
@@ -34,6 +43,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("template", type=Path)
     parser.add_argument("--mapping", type=Path, required=True)
     parser.add_argument("--output", "-o", type=Path, required=True)
+    parser.add_argument(
+        "--fidelity-report",
+        type=Path,
+        help="Optional JSON output for the mandatory supplied-template fidelity gate.",
+    )
     return parser.parse_args()
 
 
@@ -52,10 +66,22 @@ def _copy_row_style(sheet, source_row: int, target_row: int, columns: set[int]) 
 def _existing_data_end(sheet, start_row: int, columns: set[int]) -> int:
     last = start_row - 1
     for row in range(start_row, min(sheet.max_row, start_row + 5000) + 1):
-        populated = any(sheet.cell(row, column).value not in (None, "") for column in columns)
-        if populated:
+        populated_count = sum(
+            sheet.cell(row, column).value not in (None, "") for column in columns
+        )
+        if populated_count:
             last = row
-        else:
+            continue
+        lookahead_end = min(sheet.max_row, row + 3)
+        table_like_ahead = any(
+            sum(
+                sheet.cell(candidate, column).value not in (None, "")
+                for column in columns
+            )
+            >= 2
+            for candidate in range(row + 1, lookahead_end + 1)
+        )
+        if not table_like_ahead:
             break
     return last
 
@@ -75,15 +101,15 @@ def _fill_region(
     end_row = _existing_data_end(sheet, start_row, mapped_columns)
     for row in range(start_row, end_row + 1):
         for column in mapped_columns:
-            sheet.cell(row, column).value = None
+            cell = sheet.cell(row, column)
+            cell.value = None
+            cell.hyperlink = None
     for offset, item in enumerate(rows):
         row = start_row + offset
-        if offset and row > sheet.max_row:
-            _copy_row_style(sheet, start_row, row, mapped_columns)
-        elif offset:
+        if offset:
             _copy_row_style(sheet, start_row, row, mapped_columns)
         for field, column in columns.items():
-            sheet.cell(row, column, value_for(item, field))
+            set_cell_value(sheet.cell(row, column), value_for(item, field))
     if sheet.auto_filter.ref:
         start_column = min(mapped_columns)
         end_column = max(mapped_columns)
@@ -153,7 +179,10 @@ def _fill_event_tab(
     }
     for field, value in direct_values.items():
         if field in field_labels:
-            sheet[_coordinate_right(str(field_labels[field]))] = value
+            set_cell_value(
+                sheet[_coordinate_right(str(field_labels[field]))],
+                value,
+            )
 
     parameter_region = mapping.get("parameter_region") or {}
     if parameter_region:
@@ -178,36 +207,116 @@ def _fill_event_tab(
 
         _fill_region(workbook, parameter_region, rows, parameter_value)
     if mapping.get("data_layer_cell"):
-        sheet[str(mapping["data_layer_cell"])] = datalayer_code(event)
+        set_cell_value(
+            sheet[str(mapping["data_layer_cell"])],
+            datalayer_code(event),
+        )
 
 
 def _event_tab_assignments(
     workbook,
     mappings: list[dict[str, Any]],
     events: list[dict[str, Any]],
-) -> tuple[list[tuple[dict[str, Any], dict[str, Any]]], list[str]]:
+) -> tuple[
+    list[tuple[dict[str, Any], dict[str, Any], str]],
+    list[str],
+    list[tuple[dict[str, Any], str]],
+]:
     by_name = {str(event.get("event_name", "")): event for event in events}
-    assignments: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    assignments: list[tuple[dict[str, Any], dict[str, Any], str]] = []
     assigned: set[str] = set()
-    blank_mappings: list[dict[str, Any]] = []
+    reusable_mappings: list[tuple[dict[str, Any], str]] = []
+    non_reusable_mappings: list[tuple[dict[str, Any], str]] = []
     for mapping in mappings:
         sheet = workbook[str(mapping["sheet"])]
         existing = str(sheet[str(mapping["event_name_cell"])].value or "").strip()
         if existing in by_name:
-            assignments.append((mapping, by_name[existing]))
+            assignments.append((mapping, by_name[existing], existing))
             assigned.add(existing)
-        elif not existing:
-            blank_mappings.append(mapping)
+        elif not existing or mapping.get("reusable") is True:
+            reusable_mappings.append((mapping, existing))
+        else:
+            non_reusable_mappings.append((mapping, existing))
     remaining = [event for event in events if str(event.get("event_name", "")) not in assigned]
-    for mapping, event in zip(blank_mappings, remaining):
-        assignments.append((mapping, event))
+    reused_count = 0
+    for (mapping, existing), event in zip(reusable_mappings, remaining):
+        assignments.append((mapping, event, existing))
         assigned.add(str(event.get("event_name", "")))
+        reused_count += 1
     missing = [
         str(event.get("event_name", ""))
         for event in events
         if str(event.get("event_name", "")) not in assigned
     ]
-    return assignments, missing
+    return assignments, missing, [
+        *reusable_mappings[reused_count:],
+        *non_reusable_mappings,
+    ]
+
+
+def _clear_event_tab(workbook, mapping: dict[str, Any]) -> None:
+    sheet = workbook[str(mapping["sheet"])]
+    field_labels = mapping.get("field_labels", {})
+    for field in (
+        "event",
+        "journey",
+        "classification",
+        "definition",
+        "trigger",
+        "locations",
+        "notes",
+    ):
+        coordinate = field_labels.get(field)
+        if not coordinate:
+            continue
+        value_cell = sheet[_coordinate_right(str(coordinate))]
+        value_cell.value = None
+        value_cell.hyperlink = None
+    parameter_region = mapping.get("parameter_region") or {}
+    if parameter_region:
+        _fill_region(workbook, parameter_region, [], lambda _item, _field: "")
+    if mapping.get("data_layer_cell"):
+        cell = sheet[str(mapping["data_layer_cell"])]
+        cell.value = None
+        cell.hyperlink = None
+    sheet.sheet_state = "hidden"
+
+
+def _clear_hyperlinks_to_sheets(workbook, sheet_names: set[str]) -> None:
+    if not sheet_names:
+        return
+    prefixes = {
+        prefix
+        for name in sheet_names
+        for prefix in (f"#{quote_sheetname(name)}!", f"#{name}!")
+    }
+    for sheet in workbook.worksheets:
+        for row in sheet.iter_rows():
+            for cell in row:
+                hyperlink = cell.hyperlink
+                target = str(getattr(hyperlink, "target", "") or "") if hyperlink else ""
+                if target and any(target.startswith(prefix) for prefix in prefixes):
+                    cell.hyperlink = None
+
+
+def _link_event_matrix(
+    workbook,
+    region: dict[str, Any],
+    events: list[dict[str, Any]],
+    event_sheets: dict[str, str],
+) -> None:
+    event_column = (region.get("columns") or {}).get("event")
+    if not event_column:
+        return
+    sheet = workbook[str(region["sheet"])]
+    start_row = int(region["data_start_row"])
+    for offset, event in enumerate(events):
+        event_name = str(event.get("event_name", ""))
+        target = event_sheets.get(event_name)
+        if target:
+            sheet.cell(start_row + offset, int(event_column)).hyperlink = (
+                f"#{quote_sheetname(target)}!A1"
+            )
 
 
 def adapt(
@@ -228,6 +337,8 @@ def adapt(
         keep_links=True,
         keep_vba=template.suffix.lower() == ".xlsm",
     )
+    fidelity_before = workbook_fidelity_snapshot(workbook)
+    fidelity_authorized = authorized_template_changes(workbook, mapping, plan)
     regions = mapping.get("regions", {})
     event_matrix = regions.get("event_matrix") or {}
     parameter_reference = regions.get("parameter_reference") or {}
@@ -273,20 +384,60 @@ def adapt(
             lambda item, field: _event_matrix_value(plan, item, field),
         )
 
-    assignments, missing = _event_tab_assignments(workbook, event_tabs, events)
-    for event_mapping, event in assignments:
+    assignments, missing, unused = _event_tab_assignments(
+        workbook,
+        event_tabs,
+        events,
+    )
+    obsolete_sheet_names: set[str] = set()
+    event_sheets: dict[str, str] = {}
+    for event_mapping, event, previous_event_name in assignments:
+        original_sheet_name = str(event_mapping["sheet"])
         _fill_event_tab(workbook, plan, event_mapping, event)
+        sheet = workbook[original_sheet_name]
+        sheet.sheet_state = "visible"
+        event_name = str(event.get("event_name", ""))
+        if (
+            previous_event_name
+            and previous_event_name != event_name
+            and sheet.title.casefold() == previous_event_name.casefold()
+        ):
+            used = [name for name in workbook.sheetnames if name != sheet.title]
+            new_title = safe_sheet_title(event_name, used)
+            obsolete_sheet_names.add(sheet.title)
+            sheet.title = new_title
+        event_sheets[event_name] = sheet.title
+    for event_mapping, previous_event_name in unused:
+        if not previous_event_name:
+            continue
+        obsolete_sheet_names.add(str(event_mapping["sheet"]))
+        _clear_event_tab(workbook, event_mapping)
     if missing and not data_layer_table:
         raise ValueError(
             "The template has no mapped event tab for: "
             + ", ".join(missing)
             + ". Do not add sheets without explicit template approval."
         )
-    if (
-        "__tracking_plan_model" in workbook.sheetnames
-        or mapping.get("policy", {}).get("embed_internal_model") is True
-    ):
-        embed_model(workbook, plan)
+    _clear_hyperlinks_to_sheets(workbook, obsolete_sheet_names)
+    _link_event_matrix(workbook, event_matrix, events, event_sheets)
+    embed_model(workbook, plan)
+    fidelity_report = compare_template_fidelity(
+        fidelity_before,
+        workbook_fidelity_snapshot(workbook),
+        fidelity_authorized,
+    )
+    if fidelity_report["violations"]:
+        first = ", ".join(
+            f'{item.get("kind")}:{item.get("sheet", item.get("sheet_index", ""))}'
+            + (f'!{item.get("coordinate")}' if item.get("coordinate") else "")
+            for item in fidelity_report["violations"][:12]
+        )
+        raise ValueError(
+            "Supplied-template fidelity gate failed for unmapped content: " + first
+        )
+    workbook._ga4_template_fidelity_report = fidelity_report
+    workbook._ga4_template_fidelity_before = fidelity_before
+    workbook._ga4_template_fidelity_authorized = fidelity_authorized
     return workbook
 
 
@@ -297,12 +448,49 @@ def main() -> int:
         issues = validate_plan(plan)
         if issues:
             print(render_text(issues), file=sys.stderr)
-        if any(item.severity == "error" for item in issues):
+        if issues:
             return 1
         mapping = load_json(args.mapping)
         workbook = adapt(plan, args.template, mapping)
+        if args.template.suffix.lower() == ".xlsm" and args.output.suffix.lower() != ".xlsm":
+            raise ValueError("An XLSM supplied template must be delivered as XLSM.")
         args.output.parent.mkdir(parents=True, exist_ok=True)
         workbook.save(args.output)
+        reopened = load_workbook(
+            args.output,
+            data_only=False,
+            read_only=False,
+            keep_links=True,
+            keep_vba=args.output.suffix.lower() == ".xlsm",
+        )
+        final_fidelity = compare_template_fidelity(
+            workbook._ga4_template_fidelity_before,
+            workbook_fidelity_snapshot(reopened),
+            workbook._ga4_template_fidelity_authorized,
+        )
+        final_fidelity = add_package_fidelity(
+            final_fidelity,
+            args.template,
+            args.output,
+        )
+        if final_fidelity["violations"]:
+            raise ValueError(
+                "Saved supplied-template fidelity gate failed: "
+                + ", ".join(
+                    str(item.get("kind")) for item in final_fidelity["violations"][:12]
+                )
+            )
+        if args.fidelity_report:
+            args.fidelity_report.parent.mkdir(parents=True, exist_ok=True)
+            args.fidelity_report.write_text(
+                json.dumps(
+                    final_fidelity,
+                    indent=2,
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as error:
         print(str(error), file=sys.stderr)
         return 2

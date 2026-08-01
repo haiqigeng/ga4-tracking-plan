@@ -1,0 +1,115 @@
+{
+  "target_state": "to_be",
+  "scope_claim": "journey_subset",
+  "sources": [
+    {
+      "source_id": "live_site",
+      "source_type": "live_website",
+      "reference": "https://example.com/",
+      "evidence_role": "live_behavior",
+      "state": "as_is",
+      "supports": [
+        "product_discovery",
+        "page_templates",
+        "item_colors",
+        "currencies"
+      ]
+    },
+    {
+      "source_id": "business_brief",
+      "source_type": "user_input",
+      "reference": "Example project brief",
+      "evidence_role": "business_requirement",
+      "state": "to_be",
+      "supports": [
+        "quote_request",
+        "form_names",
+        "project_types",
+        "login_statuses"
+      ]
+    }
+  ],
+  "journey_coverage": [
+    {
+      "journey_id": "product_discovery",
+      "material": true,
+      "status": "observed",
+      "evidence_refs": ["live_site"],
+      "entry_points": ["https://example.com/products/example-window"],
+      "states_covered": ["entry", "progression"],
+      "variants": ["product detail"]
+    },
+    {
+      "journey_id": "quote_request",
+      "material": true,
+      "status": "confirmed",
+      "evidence_refs": ["business_brief"],
+      "entry_points": ["https://example.com/request-a-quote"],
+      "states_covered": ["entry", "progression", "success", "failure"],
+      "variants": ["standard quote form"]
+    }
+  ],
+  "coverage_gaps": [],
+  "value_domains": [
+    {
+      "domain_id": "page_templates",
+      "parameter_name": "page_template",
+      "scope": "implementation",
+      "kind": "finite",
+      "complete": true,
+      "values": ["home", "product_detail", "quote_form", "confirmation"],
+      "evidence_refs": ["live_site"]
+    },
+    {
+      "domain_id": "login_statuses",
+      "parameter_name": "login_status",
+      "scope": "user",
+      "kind": "finite",
+      "complete": true,
+      "values": ["logged_out", "logged_in"],
+      "evidence_refs": ["business_brief"]
+    },
+    {
+      "domain_id": "currencies",
+      "parameter_name": "currency",
+      "scope": "event",
+      "event_names": ["view_item"],
+      "kind": "finite",
+      "complete": true,
+      "values": ["EUR"],
+      "evidence_refs": ["live_site"]
+    },
+    {
+      "domain_id": "item_colors",
+      "parameter_name": "item_color",
+      "scope": "item",
+      "event_names": ["view_item"],
+      "kind": "finite",
+      "complete": true,
+      "values": ["white", "black", "oak"],
+      "evidence_refs": ["live_site"]
+    },
+    {
+      "domain_id": "form_names",
+      "parameter_name": "form_name",
+      "scope": "event",
+      "event_names": ["begin_quote"],
+      "kind": "finite",
+      "complete": true,
+      "values": ["quote_request"],
+      "evidence_refs": ["business_brief"]
+    },
+    {
+      "domain_id": "project_types",
+      "parameter_name": "project_type",
+      "scope": "event",
+      "event_names": ["begin_quote"],
+      "kind": "finite",
+      "complete": true,
+      "values": ["window", "door", "shutter"],
+      "evidence_refs": ["business_brief"]
+    }
+  ],
+  "assumptions": [],
+  "official_checks": []
+}

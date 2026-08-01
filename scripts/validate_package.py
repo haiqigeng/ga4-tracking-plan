@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import subprocess
@@ -15,13 +16,13 @@ from jsonschema import Draft202012Validator
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skill"
 REFERENCES = SKILL / "references"
-SCHEMA = REFERENCES / "schema-tracking-plan.json"
 EXAMPLE = REFERENCES / "example-tracking-plan.json"
 ASSET = SKILL / "assets" / "default-tracking-plan.xlsx"
 
 REQUIRED_SKILL_FILES = {
     "SKILL.md",
     "release.json",
+    "requirements.txt",
     "agents/openai.yaml",
     "assets/default-tracking-plan.xlsx",
     "references/product.md",
@@ -30,20 +31,39 @@ REQUIRED_SKILL_FILES = {
     "references/workbook-contract.md",
     "references/schema-tracking-plan.json",
     "references/schema-analysis-context.json",
+    "references/schema-change-request.json",
+    "references/schema-delivery-handoff.json",
+    "references/schema-drift-report.json",
+    "references/schema-expected-events.json",
+    "references/schema-impact-report.json",
+    "references/schema-interactive-journey.json",
     "references/example-tracking-plan.json",
+    "references/example-analysis-context.json",
+    "references/example-change-request.json",
+    "references/example-interactive-journey.json",
     "references/library-ga4-recommended-events.json",
+    "scripts/analyze_tracking_plan_change_impact.py",
+    "scripts/build_tracking_plan_delivery.py",
+    "scripts/capture_interactive_journey.py",
     "scripts/check_official_sources.py",
+    "scripts/detect_tracking_plan_drift.py",
     "scripts/generate_tracking_plan_workbook.py",
     "scripts/import_tracking_plan_workbook.py",
+    "scripts/validate_analysis_context.py",
     "scripts/validate_tracking_plan.py",
+    "scripts/validate_tracking_plan_workbook.py",
     "tests/test_skill.py",
 }
 
 ROOT_WRAPPERS = {
     "adapt_tracking_plan_workbook.py",
+    "analyze_tracking_plan_change_impact.py",
     "annotate_screenshot.py",
+    "build_tracking_plan_delivery.py",
+    "capture_interactive_journey.py",
     "check_official_sources.py",
     "create_default_template.py",
+    "detect_tracking_plan_drift.py",
     "diff_tracking_plans.py",
     "discover_site_journeys.py",
     "discover_site_journeys_playwright.py",
@@ -51,7 +71,9 @@ ROOT_WRAPPERS = {
     "import_tracking_plan_workbook.py",
     "inspect_browser_environment.py",
     "inspect_tracking_plan_template.py",
+    "validate_analysis_context.py",
     "validate_tracking_plan.py",
+    "validate_tracking_plan_workbook.py",
 }
 
 BANNED_PACKAGE_PARTS = {
@@ -157,19 +179,36 @@ def check_metadata() -> None:
         fail("agents/openai.yaml does not invoke the skill")
 
 
-def check_schema_and_example() -> None:
-    schema = load_json(SCHEMA)
-    example = load_json(EXAMPLE)
-    Draft202012Validator.check_schema(schema)
-    errors = sorted(
-        Draft202012Validator(schema).iter_errors(example),
-        key=lambda item: list(item.path),
-    )
-    if errors:
-        fail(
-            "Generic example does not match the schema:\n"
-            + "\n".join(error.message for error in errors)
+def check_schemas_and_examples() -> None:
+    schemas = {
+        path.name: load_json(path)
+        for path in sorted(REFERENCES.glob("schema-*.json"))
+    }
+    for name, schema in schemas.items():
+        try:
+            Draft202012Validator.check_schema(schema)
+        except Exception as error:
+            raise RuntimeError(f"Invalid JSON Schema {name}: {error}") from error
+
+    example_pairs = {
+        "example-tracking-plan.json": "schema-tracking-plan.json",
+        "example-analysis-context.json": "schema-analysis-context.json",
+        "example-change-request.json": "schema-change-request.json",
+        "example-interactive-journey.json": "schema-interactive-journey.json",
+    }
+    for example_name, schema_name in example_pairs.items():
+        example = load_json(REFERENCES / example_name)
+        errors = sorted(
+            Draft202012Validator(schemas[schema_name]).iter_errors(example),
+            key=lambda item: list(item.path),
         )
+        if errors:
+            fail(
+                f"{example_name} does not match {schema_name}:\n"
+                + "\n".join(error.message for error in errors)
+            )
+
+    schema = schemas["schema-tracking-plan.json"]
 
     parameter = schema["$defs"]["parameter"]["properties"]
     if parameter["requirement"]["enum"] != [
@@ -200,6 +239,18 @@ def check_schema_and_example() -> None:
             "--warnings-as-errors",
         ],
         "Example semantic validation",
+    )
+    run(
+        [
+            sys.executable,
+            "-B",
+            "scripts/validate_analysis_context.py",
+            str(REFERENCES / "example-analysis-context.json"),
+            "--plan",
+            str(EXAMPLE),
+            "--delivery",
+        ],
+        "Example analysis-context validation",
     )
 
 
@@ -234,6 +285,61 @@ def check_workbook_round_trip() -> None:
             fail("Generated workbook does not round-trip to the exact model")
 
 
+def check_delivery_bundle() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        output = Path(raw) / "delivery"
+        run(
+            [
+                sys.executable,
+                "-B",
+                "scripts/build_tracking_plan_delivery.py",
+                str(EXAMPLE),
+                str(REFERENCES / "example-analysis-context.json"),
+                "--output-dir",
+                str(output),
+                "--official-offline",
+            ],
+            "Atomic delivery build",
+        )
+
+        required = {
+            "plan.json",
+            "tracking-plan.xlsx",
+            "handoff.json",
+            "expected-events.json",
+            "internal/analysis-context.json",
+            "internal/official-check.json",
+            "contracts/tracking-plan.schema.json",
+            "contracts/analysis-context.schema.json",
+            "contracts/expected-events.schema.json",
+            "contracts/delivery-handoff.schema.json",
+        }
+        present = {
+            path.relative_to(output).as_posix()
+            for path in output.rglob("*")
+            if path.is_file()
+        }
+        missing = sorted(required - present)
+        if missing:
+            fail("Atomic delivery is missing: " + ", ".join(missing))
+        if not any(name.startswith("schemas/") for name in present):
+            fail("Atomic delivery contains no per-event dataLayer schemas")
+
+        handoff = load_json(output / "handoff.json")
+        expected_events = load_json(output / "expected-events.json")
+        Draft202012Validator(load_json(REFERENCES / "schema-delivery-handoff.json")).validate(handoff)
+        Draft202012Validator(load_json(REFERENCES / "schema-expected-events.json")).validate(expected_events)
+        if handoff["skill"]["version"] != load_json(SKILL / "release.json")["version"]:
+            fail("Delivery handoff contains the wrong skill version")
+        for artifact in handoff["artifacts"]:
+            artifact_path = output / artifact["path"]
+            if not artifact_path.is_file():
+                fail(f"Handoff references a missing artifact: {artifact['path']}")
+            digest = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+            if digest != artifact["sha256"]:
+                fail(f"Handoff hash mismatch: {artifact['path']}")
+
+
 def check_release_package() -> None:
     with tempfile.TemporaryDirectory() as raw:
         output = Path(raw) / "package.zip"
@@ -262,7 +368,13 @@ def check_release_package() -> None:
         required = {
             "skill/SKILL.md",
             "skill/assets/default-tracking-plan.xlsx",
+            "skill/references/schema-delivery-handoff.json",
+            "skill/references/example-analysis-context.json",
+            "skill/scripts/build_tracking_plan_delivery.py",
+            "skill/scripts/capture_interactive_journey.py",
             "skill/tests/test_skill.py",
+            "scripts/build_tracking_plan_delivery.py",
+            "scripts/capture_interactive_journey.py",
             "scripts/validate_tracking_plan.py",
             "scripts/check_installed_skill_sync.py",
             "README.md",
@@ -320,8 +432,9 @@ def check_repository_cleanliness() -> None:
 CHECKS = [
     check_required_files,
     check_metadata,
-    check_schema_and_example,
+    check_schemas_and_examples,
     check_workbook_round_trip,
+    check_delivery_bundle,
     check_release_package,
     check_repository_cleanliness,
 ]

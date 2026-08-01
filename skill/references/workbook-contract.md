@@ -20,7 +20,8 @@ When no template is supplied, use `assets/default-tracking-plan.xlsx`. It has:
 
 - `Guide`: concise document information, project-specific dataLayer
   convention, and links for analysts and developers;
-- `Event Matrix`: one row per event or context push;
+- `Event Matrix`: one row per event or context push, with only its technical
+  name and definition;
 - `Parameter Reference`: the deduplicated dictionary of parameters actually
   used;
 - one detailed tab per event, cloned from the hidden event template;
@@ -33,18 +34,15 @@ generic consent tutorials.
 
 ## Event Matrix
 
-Show:
+Show only:
 
-- journey;
 - event;
-- official, official ecommerce, custom, or context classification;
-- definition;
-- website-specific trigger;
-- pages, routes, or components;
-- event-specific variables with their requirement.
+- definition.
 
-Do not show inherited variables, evidence status, confidence, availability,
-ownership, privacy, registration, or implementation progress.
+Do not show journey, classification, trigger, locations, variables, inherited
+context, evidence status, confidence, availability, ownership, privacy,
+registration, or implementation progress. Those semantics remain in the
+canonical model and the event specification where useful.
 
 ## Parameter Reference
 
@@ -82,16 +80,29 @@ Each event tab contains:
    - scope;
    - type;
    - requirement;
-   - separate condition;
    - definition;
    - values or rule;
    - example;
-   - dataLayer path or implementation source;
 6. one complete dataLayer example with quoted keys;
 7. only event-specific implementation notes.
 
+Keep parameter conditions, source logic, destinations, classifications, and
+dataLayer paths in the hidden canonical model. They drive validation and
+maintenance but are not visible columns in the default workbook. A supplied
+template may retain them when it explicitly provides legitimate locations.
+
 The event tab, Event Matrix, and Parameter Reference are derived from the same
 event object and must never be maintained independently.
+
+Generated and adapted workbooks contain a very-hidden canonical model and a
+very-hidden visible projection. These are maintenance safeguards, not human
+content. If visible cells change, import must either reconcile supported
+event-tab edits into canonical JSON or stop with exact conflicts. Event names,
+journey membership, locations, parameter identity or scope, wrapper structure,
+and dataLayer keys are structural and must be changed in canonical JSON.
+
+Internal `business_question` values justify the event model during design and
+coherence review. Do not expose them as a default workbook column or section.
 
 ## Language
 
@@ -114,7 +125,8 @@ Always deliver the complete updated workbook as the current source of truth.
 
 At normal zoom, verify that:
 
-- analysts can scan journeys and events without horizontal obstruction;
+- analysts can scan the event list and definitions without horizontal
+  obstruction;
 - developers can move directly from an event to its parameter table and
   dataLayer example;
 - long definitions and code wrap without hiding content;

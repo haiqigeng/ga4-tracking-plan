@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GA4 tracking-plan delivery handoff manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["handoff_version", "generated_at", "skill", "plan", "approval", "upstream_evidence", "artifacts"],
+  "properties": {
+    "handoff_version": {"const": "1.0.0"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"const": "ga4-tracking-plan"},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "version", "schema_version", "target_state", "language", "scope", "canonical_sha256", "target_sites"],
+      "properties": {
+        "title": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1},
+        "schema_version": {"type": "string", "minLength": 1},
+        "target_state": {"enum": ["as_is", "to_be", "hybrid"]},
+        "language": {"type": "string", "minLength": 2},
+        "scope": {"type": "string", "minLength": 1},
+        "canonical_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "target_sites": {"type": "array", "uniqueItems": true, "items": {"type": "string", "format": "uri"}}
+      }
+    },
+    "upstream_evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_id", "source_type", "reference", "evidence_role", "state"],
+        "properties": {
+          "source_id": {"type": "string", "minLength": 1},
+          "source_type": {"type": "string", "minLength": 1},
+          "reference": {"type": "string", "minLength": 1},
+          "evidence_role": {"type": "string", "minLength": 1},
+          "state": {"enum": ["as_is", "to_be", "both"]},
+          "sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": {"enum": ["draft", "reviewed", "approved"]},
+        "approved_by": {"type": "string", "minLength": 1}
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "role", "bytes", "sha256"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "role": {"type": "string", "minLength": 1},
+          "bytes": {"type": "integer", "minimum": 1},
+          "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+        }
+      }
+    }
+  }
+}

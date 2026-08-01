@@ -5,7 +5,6 @@
     "version": "1.0",
     "date": "2026-07-24",
     "language": "en",
-    "value_language": "en",
     "scope": "Product discovery and quote request",
     "target_state": "to_be"
   },
@@ -52,7 +51,7 @@
         "quote_request"
       ],
       "definition": "Provides the reusable page and user context needed by subsequent measurement.",
-      "trigger": "Push on every full page load and SPA route change after the new page state is available.",
+      "trigger": "Push on every full page load and SPA route change after page and user state are available, and refresh the same context after an authentication-state change.",
       "locations": [
         {
           "page_type": "all_pages",
@@ -75,6 +74,9 @@
             "quote_form",
             "confirmation"
           ],
+          "value_evidence_refs": [
+            "page_templates"
+          ],
           "example": "product_detail",
           "source": "Application route metadata.",
           "destination": "implementation_only"
@@ -92,13 +94,36 @@
             "logged_out",
             "logged_in"
           ],
-          "example": "logged_out",
+          "value_evidence_refs": [
+            "login_statuses"
+          ],
+          "example": "logged_in",
           "source": "Authentication state.",
           "destination": "ga4_user_property",
           "custom_decision": {
             "business_need": "Compare journeys for authenticated and unauthenticated visitors.",
             "official_candidate": "No prescribed event parameter represents reusable authentication state.",
             "why_not_fit": "The value is persistent user context rather than the outcome of the official login event."
+          }
+        },
+        {
+          "name": "user_id",
+          "data_layer_path": "user.user_id",
+          "classification": "implementation",
+          "scope": "user",
+          "type": "string",
+          "requirement": "conditional",
+          "condition": "Send after authentication when a stable first-party User-ID is available; do not send before first sign-in and clear the GA4 setting with null after sign-out.",
+          "definition": "Identifies the stable first-party account identifier mapped to the official GA4 User-ID configuration setting.",
+          "value_rule": "Use the stable opaque account identifier; never use an email address or register the value as a custom dimension.",
+          "example": "customer_12345",
+          "source": "Authenticated account state.",
+          "destination": "ga4_user_id",
+          "official_source": {
+            "url": "https://developers.google.com/analytics/devguides/collection/ga4/user-id",
+            "section": "Send user IDs",
+            "wording_origin": "faithful_translation",
+            "checked_date": "2026-07-31"
           }
         }
       ],
@@ -108,7 +133,8 @@
             "page_template": "product_detail"
           },
           "user": {
-            "login_status": "logged_out"
+            "login_status": "logged_in",
+            "user_id": "customer_12345"
           }
         }
       }
@@ -119,6 +145,7 @@
       "journey_ids": [
         "product_discovery"
       ],
+      "business_question": "Which products and selected variants attract consideration before later commerce actions?",
       "definition": "This event signifies that some content was shown to the user. Use this event to discover the most popular items viewed.",
       "trigger": "Push once after the primary product detail and selected default variant are rendered.",
       "locations": [
@@ -141,6 +168,9 @@
           "value_rule": "Use the ISO 4217 currency code.",
           "allowed_values": [
             "EUR"
+          ],
+          "value_evidence_refs": [
+            "currencies"
           ],
           "example": "EUR",
           "source": "Commerce currency configuration.",
@@ -268,6 +298,9 @@
             "black",
             "oak"
           ],
+          "value_evidence_refs": [
+            "item_colors"
+          ],
           "example": "white",
           "source": "Selected variant color.",
           "destination": "ga4_item_parameter",
@@ -311,6 +344,7 @@
       "journey_ids": [
         "quote_request"
       ],
+      "business_question": "How many visitors intentionally enter the quote journey, and for which project types?",
       "definition": "Indicates that a visitor intentionally started the quote-request journey.",
       "trigger": "Push once when the visitor enters the first interactive quote step after selecting a quote call to action.",
       "locations": [
@@ -332,6 +366,9 @@
           "value_rule": "Use the stable functional form name.",
           "allowed_values": [
             "quote_request"
+          ],
+          "value_evidence_refs": [
+            "form_names"
           ],
           "example": "quote_request",
           "source": "Form configuration.",
@@ -356,6 +393,9 @@
             "window",
             "door",
             "shutter"
+          ],
+          "value_evidence_refs": [
+            "project_types"
           ],
           "example": "window",
           "source": "Selected project option.",

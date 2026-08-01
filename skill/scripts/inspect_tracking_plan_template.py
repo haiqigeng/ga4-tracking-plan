@@ -150,9 +150,7 @@ def classify_regions(
         fields = set(candidate["columns"])
         if not data_layer_table and {"event", "datalayer"} <= fields:
             data_layer_table = candidate
-        if not event_matrix and "event" in fields and len(
-            fields & {"journey", "definition", "trigger", "locations", "variables"}
-        ) >= 2:
+        if not event_matrix and {"event", "definition"} <= fields:
             event_matrix = candidate
         if not parameter_reference and "variable" in fields and len(
             fields & {"scope", "type", "definition", "values", "example", "concerned_events"}
@@ -204,6 +202,8 @@ def event_tab_candidate(sheet) -> dict[str, Any] | None:
     return {
         "sheet": sheet.title,
         "event_name_cell": value_cell,
+        "existing_event_name": str(sheet[value_cell].value or "").strip(),
+        "reusable": not bool(str(sheet[value_cell].value or "").strip()),
         "field_labels": field_cells,
         "parameter_region": parameter_region,
         "data_layer_cell": data_layer_cell,
@@ -253,8 +253,8 @@ def inspect(path: Path) -> dict[str, Any]:
             "event_tabs": event_tabs,
         },
         "policy": {
-            "allow_new_sheets": False,
             "preserve_unmapped_content": True,
+            "embed_internal_model": True,
         },
         "review_required": review,
     }

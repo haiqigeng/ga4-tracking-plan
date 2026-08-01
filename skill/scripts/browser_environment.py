@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 
 SUPPORTED_CHANNELS = {"chromium", "chrome", "msedge", "firefox", "webkit"}
+ROOT = Path(__file__).resolve().parents[1]
+REQUIREMENTS = ROOT / "requirements.txt"
 
 
 def normalize_browser(value: str) -> str:
@@ -151,18 +153,46 @@ def bundled_channels() -> tuple[dict[str, str], str]:
         if version != "not installed":
             return {}, f"Playwright Python {version} is not importable."
         return {}, "Playwright Python is not installed."
-    try:
-        sync_playwright = load_playwright_sync_api()
-
-        with sync_playwright() as playwright:
-            candidates = {
-                "chromium": Path(playwright.chromium.executable_path),
-                "firefox": Path(playwright.firefox.executable_path),
-                "webkit": Path(playwright.webkit.executable_path),
-            }
-            return {name: str(path) for name, path in candidates.items() if path.is_file()}, ""
-    except Exception as error:
-        return {}, f"{type(error).__name__}: {error}"
+    configured = os.getenv("PLAYWRIGHT_BROWSERS_PATH")
+    if configured and configured != "0":
+        cache_root = Path(configured)
+    elif platform.system() == "Windows":
+        cache_root = Path(os.getenv("LOCALAPPDATA", "")) / "ms-playwright"
+    elif platform.system() == "Darwin":
+        cache_root = Path.home() / "Library" / "Caches" / "ms-playwright"
+    else:
+        cache_root = Path.home() / ".cache" / "ms-playwright"
+    patterns = {
+        "chromium": (
+            "chromium-*/chrome-win*/chrome.exe",
+            "chromium-*/chrome-linux*/chrome",
+            "chromium-*/chrome-mac*/Chromium.app/Contents/MacOS/Chromium",
+        ),
+        "firefox": (
+            "firefox-*/firefox/firefox.exe",
+            "firefox-*/firefox/firefox",
+            "firefox-*/firefox/Nightly.app/Contents/MacOS/firefox",
+        ),
+        "webkit": (
+            "webkit-*/Playwright.exe",
+            "webkit-*/pw_run.sh",
+            "webkit-*/MiniBrowser.app/Contents/MacOS/MiniBrowser",
+        ),
+    }
+    result: dict[str, str] = {}
+    for channel, channel_patterns in patterns.items():
+        executable = next(
+            (
+                path
+                for pattern in channel_patterns
+                for path in cache_root.glob(pattern)
+                if path.is_file()
+            ),
+            None,
+        )
+        if executable:
+            result[channel] = str(executable)
+    return result, ""
 
 
 def inspect_browser_environment() -> dict[str, Any]:
@@ -200,7 +230,10 @@ def inspect_browser_environment() -> dict[str, Any]:
 def resolve_browser_channel(requested: str, environment: dict[str, Any]) -> str:
     readiness = str(environment.get("readiness", ""))
     if readiness == "playwright_python_missing":
-        raise RuntimeError("Playwright Python is not installed. Install the skill dependencies from requirements.txt.")
+        raise RuntimeError(
+            "Playwright Python is not installed. Install the skill dependencies "
+            f'with `python -m pip install -r "{REQUIREMENTS}"`.'
+        )
     if readiness in {"playwright_import_failed", "playwright_runtime_failed"}:
         detail = str(environment.get("playwright_probe_error", "unknown runtime error"))
         raise RuntimeError(f"Playwright is installed but unusable: {detail}")

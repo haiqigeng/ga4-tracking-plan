@@ -10,9 +10,13 @@ BANNED_PARTS = {"deliverables", "generated", "release", "__pycache__"}
 PACKAGE_ROOTS = [ROOT / "skill"]
 WRAPPER_NAMES = [
     "adapt_tracking_plan_workbook.py",
+    "analyze_tracking_plan_change_impact.py",
     "annotate_screenshot.py",
+    "build_tracking_plan_delivery.py",
+    "capture_interactive_journey.py",
     "check_official_sources.py",
     "create_default_template.py",
+    "detect_tracking_plan_drift.py",
     "diff_tracking_plans.py",
     "discover_site_journeys.py",
     "discover_site_journeys_playwright.py",
@@ -20,7 +24,9 @@ WRAPPER_NAMES = [
     "import_tracking_plan_workbook.py",
     "inspect_browser_environment.py",
     "inspect_tracking_plan_template.py",
+    "validate_analysis_context.py",
     "validate_tracking_plan.py",
+    "validate_tracking_plan_workbook.py",
 ]
 PACKAGE_FILES = [
     ROOT / "requirements.txt",

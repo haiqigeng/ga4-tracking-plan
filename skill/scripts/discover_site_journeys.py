@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
+import time
 from dataclasses import asdict, dataclass
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 from urllib.request import Request, urlopen
+from urllib.robotparser import RobotFileParser
 from xml.etree import ElementTree
 
 USER_AGENT = "ga4-tracking-plan-site-discovery/1.0"
@@ -81,7 +84,11 @@ def fetch_text(url: str) -> str:
 
 
 def same_host(url: str, root: str) -> bool:
-    return urlparse(url).netloc.lower() == urlparse(root).netloc.lower()
+    def normalized_host(value: str) -> str:
+        host = (urlparse(value).hostname or "").lower()
+        return host[4:] if host.startswith("www.") else host
+
+    return normalized_host(url) == normalized_host(root)
 
 
 def canonical_url(url: str) -> str:
@@ -97,24 +104,36 @@ def canonical_url(url: str) -> str:
     return urlunparse((parsed.scheme.lower(), parsed.netloc.lower(), path, parsed.params, query, ""))
 
 
-def discover_robots(root_url: str, errors: list[SourceError]) -> tuple[str, list[str]]:
+def discover_robots(
+    root_url: str,
+    errors: list[SourceError],
+) -> tuple[str, list[str], RobotFileParser | None]:
     robots_url = urljoin(root_url, "/robots.txt")
     try:
         text = fetch_text(robots_url)
     except Exception as error:
         errors.append(SourceError("robots_txt", robots_url, str(error)))
-        return robots_url, []
+        return robots_url, [], None
+    rules = RobotFileParser()
+    rules.set_url(robots_url)
+    rules.parse(text.splitlines())
     sitemaps = []
     for line in text.splitlines():
         if line.lower().startswith("sitemap:"):
             sitemaps.append(line.split(":", 1)[1].strip())
-    return robots_url, sitemaps
+    return robots_url, sitemaps, rules
 
 
-def parse_sitemap(url: str, limit: int, errors: list[SourceError], seen: set[str] | None = None) -> list[str]:
+def parse_sitemap(
+    url: str,
+    limit: int,
+    errors: list[SourceError],
+    seen: set[str] | None = None,
+    delay_seconds: float = 0.0,
+) -> list[str]:
     seen = seen or set()
     url = canonical_url(url)
-    if url in seen or len(seen) >= limit:
+    if url in seen or len(seen) >= 100 or limit <= 0:
         return []
     seen.add(url)
     try:
@@ -122,6 +141,8 @@ def parse_sitemap(url: str, limit: int, errors: list[SourceError], seen: set[str
     except Exception as error:
         errors.append(SourceError("sitemap", url, str(error)))
         return []
+    if delay_seconds:
+        time.sleep(delay_seconds)
     try:
         root = ElementTree.fromstring(text)
     except ElementTree.ParseError as error:
@@ -131,7 +152,15 @@ def parse_sitemap(url: str, limit: int, errors: list[SourceError], seen: set[str
     if root.tag.rsplit("}", 1)[-1].lower() == "sitemapindex":
         urls: list[str] = []
         for child in locations:
-            urls.extend(parse_sitemap(child, limit - len(urls), errors, seen))
+            urls.extend(
+                parse_sitemap(
+                    child,
+                    limit - len(urls),
+                    errors,
+                    seen,
+                    delay_seconds,
+                )
+            )
             if len(urls) >= limit:
                 break
         return urls[:limit]
@@ -148,6 +177,16 @@ def infer_template(url: str) -> str:
         return "cart"
     if any(token in path for token in ["account", "compte", "login", "connexion"]):
         return "account"
+    if any(token in path for token in ["devis", "quote", "estimate", "estimation", "mon-projet", "simulation"]):
+        return "lead_form"
+    if any(token in path for token in ["rendez-vous", "appointment", "booking", "reservation"]):
+        return "appointment"
+    if any(token in path for token in ["catalogue", "catalog", "brochure"]):
+        return "catalogue"
+    if any(token in path for token in ["magasin", "store", "agence", "showroom"]):
+        return "store_locator"
+    if any(token in path for token in ["configurateur", "configurator", "personnaliser", "customize"]):
+        return "configurator"
     if any(token in path for token in ["contact", "help", "aide", "faq", "service-client"]):
         return "support_or_contact"
     if any(token in path for token in ["search", "recherche"]):
@@ -168,6 +207,11 @@ def infer_journey(template: str) -> str:
         "cart": "cart",
         "checkout": "checkout",
         "account": "account",
+        "lead_form": "lead_generation",
+        "appointment": "appointment_booking",
+        "catalogue": "catalogue_request",
+        "store_locator": "store_discovery",
+        "configurator": "configuration",
         "support_or_contact": "support_contact",
     }
     return mapping.get(template, "content_navigation")
@@ -184,6 +228,7 @@ def parse_page(url: str) -> dict[str, Any]:
     return {
         "url": url,
         "template": infer_template(url),
+        "content_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
         "links": links[:100],
         "forms": parser.forms[:25],
         "buttons": parser.buttons[:50],
@@ -231,6 +276,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("url", help="Website root URL, for example https://www.example.com/")
     parser.add_argument("--output", "-o", type=Path, required=True, help="Output JSON path.")
     parser.add_argument("--limit", type=int, default=50, help="Maximum sitemap/page URLs to inspect.")
+    parser.add_argument(
+        "--delay-ms",
+        type=int,
+        default=250,
+        help="Politeness delay between requests in milliseconds.",
+    )
     return parser.parse_args()
 
 
@@ -248,11 +299,22 @@ def main() -> int:
     args = parse_args()
     root_url = canonical_url(args.url if "://" in args.url else f"https://{args.url}")
     errors: list[SourceError] = []
-    robots_url, robots_sitemaps = discover_robots(root_url, errors)
+    robots_url, robots_sitemaps, robots_rules = discover_robots(
+        root_url,
+        errors,
+    )
+    delay_seconds = max(0, args.delay_ms) / 1000
     sitemap_candidates = robots_sitemaps or [urljoin(root_url, "/sitemap.xml")]
     sitemap_urls: list[str] = []
     for sitemap in sitemap_candidates:
-        sitemap_urls.extend(parse_sitemap(sitemap, args.limit, errors))
+        sitemap_urls.extend(
+            parse_sitemap(
+                sitemap,
+                args.limit,
+                errors,
+                delay_seconds=delay_seconds,
+            )
+        )
         if sitemap_urls:
             break
     seed_urls = [root_url, *[url for url in sitemap_urls if same_host(url, root_url)]]
@@ -262,8 +324,19 @@ def main() -> int:
         if url in seen:
             continue
         seen.add(url)
+        if robots_rules is not None and not robots_rules.can_fetch(USER_AGENT, url):
+            errors.append(
+                SourceError(
+                    "robots_disallow",
+                    url,
+                    "Skipped because robots.txt disallows this crawler.",
+                )
+            )
+            continue
         page = parse_page(url)
         pages.append(page)
+        if delay_seconds:
+            time.sleep(delay_seconds)
         if page.get("fetch_error"):
             errors.append(SourceError("page", url, str(page["fetch_error"])))
         if len(pages) >= args.limit:

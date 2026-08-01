@@ -1,8 +1,8 @@
 # GA4 Tracking Plan
 
-[![Latest release](https://img.shields.io/github/v/release/haiqigeng/ga4-tracking-plan)](https://github.com/haiqigeng/ga4-tracking-plan/releases/latest)
-[![Validate skill](https://github.com/haiqigeng/ga4-tracking-plan/actions/workflows/validate-skill.yml/badge.svg)](https://github.com/haiqigeng/ga4-tracking-plan/actions/workflows/validate-skill.yml)
-[![License](https://img.shields.io/github/license/haiqigeng/ga4-tracking-plan)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/HQ-Guillaume/ga4-tracking-plan)](https://github.com/HQ-Guillaume/ga4-tracking-plan/releases/latest)
+[![Validate skill](https://github.com/HQ-Guillaume/ga4-tracking-plan/actions/workflows/validate-skill.yml/badge.svg)](https://github.com/HQ-Guillaume/ga4-tracking-plan/actions/workflows/validate-skill.yml)
+[![License](https://img.shields.io/github/license/HQ-Guillaume/ga4-tracking-plan)](LICENSE)
 
 A utility-first web-analyst skill for creating, reviewing, adapting, and
 maintaining complete GA4 tracking plans from real website journeys and the
@@ -27,6 +27,9 @@ large, quick, enterprise, or event-count mode.
 
 ## What It Does
 
+- builds a prioritized candidate universe from supplied entry points,
+  sitemaps, and rendered links, and never equates a page cap with complete
+  journey coverage;
 - explores rendered public and safely accessible gated journeys;
 - uses synthetic information for safe form, signup, login, and funnel
   investigation unless the user opts out;
@@ -37,11 +40,18 @@ large, quick, enterprise, or event-count mode.
   documentation;
 - adds custom events or parameters only after documenting the official gap;
 - exhausts stable website value domains of up to 50 values;
+- maintains a validated internal analysis context for evidence roles,
+  conflicts, journey coverage, gaps, and finite-value provenance;
 - specifies exact website triggers, event-specific parameters, source paths,
   and quoted dataLayer pushes;
 - adapts a supplied workbook semantically or uses the integrated default XLSX
   template;
-- imports, compares, and consolidates previous plans for maintenance work.
+- delivers the workbook atomically with canonical JSON, expected events,
+  exact per-event JSON Schemas, official-source verification, hashes, and
+  approval state;
+- imports, reconciles, compares, and consolidates previous plans, and reports
+  evidence drift or targeted business-change impact without silently mutating
+  the plan.
 
 ## Human Output Contract
 
@@ -121,32 +131,42 @@ skills directory and load `SKILL.md` as the entry point.
 
 ## Common Commands
 
+Discover rendered candidates and execute an explicitly bounded synthetic
+journey:
+
+```powershell
+python scripts/discover_site_journeys_playwright.py https://www.example.com/ --output discovery.json
+python scripts/capture_interactive_journey.py interactive-journey.json --output journey-evidence.json
+```
+
 Validate selected semantics against current official Google sources:
 
 ```powershell
 python scripts/check_official_sources.py plan.json --output official-check.json
 ```
 
-Validate and render:
+Validate the evidence checkpoint and build the complete delivery atomically:
 
 ```powershell
-python scripts/validate_tracking_plan.py plan.json
-python scripts/generate_tracking_plan_workbook.py plan.json --output tracking-plan.xlsx
+python scripts/validate_analysis_context.py analysis-context.json --plan plan.json --delivery
+python scripts/build_tracking_plan_delivery.py plan.json analysis-context.json --output-dir delivery
 ```
 
 Inspect and adapt a supplied workbook:
 
 ```powershell
 python scripts/inspect_tracking_plan_template.py client-template.xlsx --output template-map.json
-python scripts/adapt_tracking_plan_workbook.py plan.json client-template.xlsx --mapping template-map.json --output tracking-plan.xlsx
+python scripts/build_tracking_plan_delivery.py plan.json analysis-context.json --template client-template.xlsx --mapping template-map.json --output-dir delivery
 ```
 
 Maintain an existing plan:
 
 ```powershell
 python scripts/import_tracking_plan_workbook.py previous-plan.xlsx --output previous-plan.json
+python scripts/import_tracking_plan_workbook.py edited-plan.xlsx --reconcile-visible-edits --output reconciled-plan.json
 python scripts/diff_tracking_plans.py previous-plan.json updated-plan.json --output changes.json
-python scripts/generate_tracking_plan_workbook.py updated-plan.json --changes changes.json --output updated-tracking-plan.xlsx
+python scripts/detect_tracking_plan_drift.py previous-analysis-context.json analysis-context.json updated-plan.json --output drift-report.json
+python scripts/analyze_tracking_plan_change_impact.py updated-plan.json change-request.json --analysis-context analysis-context.json --output impact-report.json
 ```
 
 Inspect local browser readiness:
@@ -176,9 +196,9 @@ python scripts/validate_package.py
 git diff --check
 ```
 
-The package validator checks metadata and schema consistency, the generic
-example, strict semantic validation, exact XLSX round-trip behavior, release
-contents, and repository cleanliness.
+The package validator checks metadata and every machine schema/example, strict
+semantic and evidence-context validation, exact XLSX round-trip behavior, an
+atomic offline delivery build, release contents, and repository cleanliness.
 
 ## Boundaries
 
@@ -192,11 +212,16 @@ The skill does not:
 
 ## Versioning
 
-Version `2.0.0` introduces schema `4.0.0` and replaces the governance-heavy
-workbook architecture with one event-centered semantic model and a lean,
-human-first default workbook. Future minor releases may add compatible
-capabilities; patch releases fix documentation, validation, rendering, or
-packaging defects.
+Version `2.3.0` keeps schema `4.0.0` and the lean, event-centered workbook while
+adding evidence-gated journey coverage, safe rendered interaction capture,
+finite-value provenance, atomic human-and-machine delivery contracts, strict
+supplied-template fidelity, visible-edit reconciliation, semantic drift
+detection, and targeted change-impact analysis. Versions `2.1.0` and `2.2.0`
+were local development iterations and were not public GitHub releases;
+`2.3.0` is the next public release after `2.0.0`.
+
+Compatible capabilities are released as minor versions. Patch releases fix
+documentation, validation, rendering, or packaging defects.
 
 ## Privacy And Safety
 

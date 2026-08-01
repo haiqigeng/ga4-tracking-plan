@@ -13,6 +13,11 @@ question beyond a typed page view.
 Inventory relevant user and account fields exposed to the implementation.
 Separate dataLayer presence from GA4 destination mapping.
 
+When authentication exists, include `user.user_id` in the same core context
+push as page and other user state. Map it only to the official GA4 User-ID
+configuration setting. Never treat it as a custom user property or event
+parameter.
+
 ## Navigation
 
 Do not create one event per link. Consolidate interactions that share meaning,

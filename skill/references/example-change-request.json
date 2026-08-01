@@ -1,0 +1,17 @@
+{
+  "request_version": "1.0.0",
+  "change_id": "add_solar_project_type",
+  "description": "Add solar as a supported quote project type.",
+  "change_type": "value_domain",
+  "selectors": {
+    "value_domain_ids": ["project_types"],
+    "parameters": [
+      {
+        "name": "project_type",
+        "scope": "event",
+        "event_names": ["begin_quote"],
+        "added_values": ["solar"]
+      }
+    ]
+  }
+}

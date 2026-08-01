@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GA4 tracking-plan business change impact report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["report_version", "change_id", "description", "affected_journeys", "affected_events", "affected_parameters", "artifacts_to_regenerate", "recette_scenarios", "unresolved_selectors"],
+  "properties": {
+    "report_version": {"const": "1.0.0"},
+    "change_id": {"type": "string"},
+    "description": {"type": "string"},
+    "affected_journeys": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "affected_events": {"type": "array", "items": {"type": "object"}},
+    "affected_parameters": {"type": "array", "items": {"type": "object"}},
+    "artifacts_to_regenerate": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "recette_scenarios": {"type": "array", "items": {"type": "object"}},
+    "unresolved_selectors": {"type": "array", "items": {"type": "string"}}
+  }
+}

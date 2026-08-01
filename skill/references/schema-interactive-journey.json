@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/ga4-tracking-plan/schema-interactive-journey.json",
+  "title": "Safe interactive website journey evidence specification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["journey_id", "root_url", "actions"],
+  "properties": {
+    "journey_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+    "root_url": {"type": "string", "format": "uri", "pattern": "^https?://"},
+    "allow_form_submission": {"type": "boolean", "default": false},
+    "submission_kind": {
+      "type": "string",
+      "enum": ["lead", "authentication", "search", "other_non_transactional"]
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action"],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["goto", "accept_privacy", "click", "fill", "select", "check", "wait", "submit"]
+          },
+          "url": {"type": "string", "format": "uri", "pattern": "^https?://"},
+          "selector": {"type": "string", "minLength": 1},
+          "value_kind": {
+            "type": "string",
+            "enum": ["first_name", "last_name", "email", "phone", "postal_code", "city", "address", "text", "integer"]
+          },
+          "select_value": {"type": "string"},
+          "milliseconds": {"type": "integer", "minimum": 0, "maximum": 10000},
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "url_contains": {"type": "string"},
+              "selector_visible": {"type": "string"},
+              "text_visible": {"type": "string"}
+            },
+            "minProperties": 1
+          }
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"action": {"const": "goto"}}, "required": ["action"]},
+            "then": {"required": ["url"]}
+          },
+          {
+            "if": {"properties": {"action": {"enum": ["click", "select", "check", "submit"]}}, "required": ["action"]},
+            "then": {"required": ["selector"]}
+          },
+          {
+            "if": {"properties": {"action": {"const": "fill"}}, "required": ["action"]},
+            "then": {"required": ["selector", "value_kind"]}
+          },
+          {
+            "if": {"properties": {"action": {"const": "select"}}, "required": ["action"]},
+            "then": {"required": ["select_value"]}
+          },
+          {
+            "if": {"properties": {"action": {"const": "wait"}}, "required": ["action"]},
+            "then": {"required": ["milliseconds"]}
+          }
+        ]
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "actions": {"contains": {"properties": {"action": {"const": "submit"}}, "required": ["action"]}}
+        }
+      },
+      "then": {
+        "required": ["allow_form_submission", "submission_kind"],
+        "properties": {"allow_form_submission": {"const": true}}
+      }
+    }
+  ]
+}

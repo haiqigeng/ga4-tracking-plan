@@ -21,12 +21,14 @@ DEFAULT_SCHEMA = ROOT / "references" / "schema-tracking-plan.json"
 CATALOG_PATH = ROOT / "references" / "library-ga4-recommended-events.json"
 
 GENERIC_TEXT = re.compile(
+    r"^\s*(?:"
     r"(?:use|utiliser)\s+(?:the|la)\s+(?:official|officielle?)\s+definition|"
-    r"value associated with|valeur associ[eé]e|"
-    r"variable (?:used|utilis[eé]e) (?:for|pour) (?:the )?track|"
+    r"value associated with(?: the event)?|valeur associ[eé]e(?: [àa] l['’]événement)?|"
+    r"variable (?:used|utilis[eé]e) (?:for|pour) (?:the )?track(?:ing)?|"
     r"when applicable|lorsque applicable|"
     r"to confirm|[àa] confirmer|"
-    r"^tbd$",
+    r"tbd"
+    r")\s*[.!]?\s*$",
     re.I,
 )
 
@@ -35,6 +37,97 @@ GENERIC_TRIGGER = re.compile(
     r"lorsque l['’]événement se produit|when applicable|lorsque applicable)$",
     re.I,
 )
+
+SUPPORTED_WORKBOOK_LANGUAGES = {"en", "fr"}
+RESERVED_WEB_EVENT_NAMES = {
+    "ad_impression",
+    "app_remove",
+    "app_store_refund",
+    "app_store_subscription_cancel",
+    "app_store_subscription_renew",
+    "click",
+    "error",
+    "file_download",
+    "first_open",
+    "first_visit",
+    "form_start",
+    "form_submit",
+    "in_app_purchase",
+    "page_view",
+    "scroll",
+    "session_start",
+    "user_engagement",
+    "view_complete",
+    "video_progress",
+    "video_start",
+    "view_search_results",
+}
+RESERVED_PARAMETER_PREFIXES = ("_", "firebase_", "ga_", "google_", "gtag.")
+RESERVED_EVENT_PARAMETER_NAMES = {
+    "cid",
+    "currency",
+    "customer_id",
+    "customerid",
+    "dclid",
+    "gclid",
+    "session_id",
+    "sessionid",
+    "sfmc_id",
+    "sid",
+    "srsltid",
+    "uid",
+    "user_id",
+    "userid",
+}
+RESERVED_USER_PROPERTY_NAMES = {
+    "cid",
+    "customer_id",
+    "customerid",
+    "first_open_after_install",
+    "first_open_time",
+    "first_visit_time",
+    "google_allow_ad_personalization_signals",
+    "last_advertising_id_reset",
+    "last_deep_link_referrer",
+    "last_gclid",
+    "lifetime_user_engagement",
+    "non_personalized_ads",
+    "session_id",
+    "session_number",
+    "sessionid",
+    "sfmc_id",
+    "sid",
+    "uid",
+    "user_id",
+    "userid",
+}
+RESERVED_ITEM_PARAMETER_NAMES = {
+    "affiliation",
+    "cid",
+    "creative_name",
+    "currency",
+    "customer_id",
+    "customerid",
+    "item_brand",
+    "item_category",
+    "item_category2",
+    "item_category3",
+    "item_category4",
+    "item_category5",
+    "item_id",
+    "item_list_id",
+    "item_list_name",
+    "item_name",
+    "item_variant",
+    "promotion_id",
+    "promotion_name",
+    "session_id",
+    "sessionid",
+    "sid",
+    "uid",
+    "user_id",
+    "userid",
+}
 
 
 @dataclass
@@ -75,6 +168,8 @@ def normalize_type(value: Any) -> str:
     text = normalize(value)
     if text.startswith("array"):
         return "array"
+    if text.startswith("string"):
+        return "string"
     if text in {"float", "double"}:
         return "number"
     return text
@@ -97,12 +192,26 @@ def check_unique_ids(plan: dict[str, Any], issues: list[Issue]) -> None:
         issue(issues, "error", "DUPLICATE_EVENT", "$.events", "Event names must be unique.")
 
 
+def check_document(plan: dict[str, Any], issues: list[Issue]) -> None:
+    language = str(plan.get("document", {}).get("language", "")).lower()
+    base_language = language.split("-", 1)[0]
+    if base_language not in SUPPORTED_WORKBOOK_LANGUAGES:
+        issue(
+            issues,
+            "error",
+            "UNSUPPORTED_WORKBOOK_LANGUAGE",
+            "$.document.language",
+            "The default workbook currently supports English and French language tags only.",
+        )
+
+
 def check_human_text(value: Any, path: str, label: str, issues: list[Issue]) -> None:
     text = " ".join(str(value or "").split()).strip()
+    code_label = label.upper()
     if not text:
-        issue(issues, "error", f"{label}_MISSING", path, f"{label.replace('_', ' ').title()} is required.")
+        issue(issues, "error", f"{code_label}_MISSING", path, f"{label.replace('_', ' ').title()} is required.")
     elif GENERIC_TEXT.search(text):
-        issue(issues, "error", f"{label}_GENERIC", path, "Replace generic filler with concrete official or official-like wording.")
+        issue(issues, "error", f"{code_label}_GENERIC", path, "Replace generic filler with concrete official or official-like wording.")
 
 
 def check_custom_decision(
@@ -139,6 +248,17 @@ def check_official_event(
     name = str(event.get("event_name", ""))
     classification = str(event.get("classification", ""))
     base = f"$.events[{event_index}]"
+    if name in RESERVED_WEB_EVENT_NAMES:
+        issue(
+            issues,
+            "error",
+            "RESERVED_OR_AUTOMATIC_EVENT",
+            f"{base}.event_name",
+            (
+                f"'{name}' is reserved or belongs to automatic/enhanced web "
+                "measurement and must not appear as a manual tracking-plan row."
+            ),
+        )
     record = catalog.get(name)
     if classification == "custom" and record:
         issue(
@@ -189,6 +309,45 @@ def check_official_event(
         item_names = {name for name, scope in selected if scope == "item"}
         if not {"item_id", "item_name"}.intersection(item_names):
             issue(issues, "error", "ITEM_IDENTITY_MISSING", f"{base}.parameters", "Items require item_id or item_name at item scope.")
+    if name == "purchase":
+        customer_type = next(
+            (
+                parameter
+                for parameter in event.get("parameters", [])
+                if isinstance(parameter, dict)
+                and parameter.get("name") == "customer_type"
+                and parameter.get("scope") == "event"
+            ),
+            None,
+        )
+        if customer_type is None:
+            issue(
+                issues,
+                "error",
+                "PURCHASE_CUSTOMER_TYPE_MISSING",
+                f"{base}.parameters",
+                (
+                    "Include official customer_type as a conditional purchase "
+                    "parameter, using new or returning only when classification is reliable."
+                ),
+            )
+        else:
+            if customer_type.get("requirement") != "conditional":
+                issue(
+                    issues,
+                    "error",
+                    "PURCHASE_CUSTOMER_TYPE_REQUIREMENT",
+                    f"{base}.parameters",
+                    "customer_type must be conditional because uncertain orders must omit it.",
+                )
+            if customer_type.get("allowed_values") != ["new", "returning"]:
+                issue(
+                    issues,
+                    "error",
+                    "PURCHASE_CUSTOMER_TYPE_VALUES",
+                    f"{base}.parameters",
+                    "customer_type must exhaust the official values in this order: new, returning.",
+                )
 
 
 def check_parameter(
@@ -204,6 +363,45 @@ def check_parameter(
     scope = str(parameter.get("scope", "event"))
     classification = str(parameter.get("classification", ""))
     path = str(parameter.get("data_layer_path", ""))
+    destination = str(parameter.get("destination", ""))
+    expected_scope = {
+        "ga4_event_parameter": "event",
+        "ga4_item_parameter": "item",
+        "ga4_user_property": "user",
+        "ga4_user_id": "user",
+    }.get(destination)
+    if expected_scope and scope != expected_scope:
+        issue(
+            issues,
+            "error",
+            "SCOPE_DESTINATION_MISMATCH",
+            f"{base}.destination",
+            f"Destination {destination} requires {expected_scope} scope, not {scope}.",
+        )
+    if name == "user_id":
+        if (
+            destination != "ga4_user_id"
+            or scope != "user"
+            or classification != "implementation"
+        ):
+            issue(
+                issues,
+                "error",
+                "USER_ID_DESTINATION",
+                base,
+                (
+                    "user_id must be user-scope implementation context mapped "
+                    "only to the GA4 User-ID configuration setting."
+                ),
+            )
+    elif destination == "ga4_user_id":
+        issue(
+            issues,
+            "error",
+            "USER_ID_NAME",
+            f"{base}.name",
+            "Only the reserved user_id field can use the ga4_user_id destination.",
+        )
     final_key = path.rsplit(".", 1)[-1].replace("[]", "")
     if name and final_key and name != final_key:
         issue(
@@ -218,7 +416,66 @@ def check_parameter(
     if parameter.get("requirement") == "conditional" and not str(parameter.get("condition", "")).strip():
         issue(issues, "error", "CONDITION_MISSING", f"{base}.condition", "A conditional parameter needs a separate concrete condition.")
     allowed = parameter.get("allowed_values")
+    value_refs = parameter.get("value_evidence_refs", [])
     example = parameter.get("example")
+    if (
+        allowed
+        and not value_refs
+        and not (
+            classification == "official"
+            and name == "customer_type"
+            and allowed == ["new", "returning"]
+        )
+    ):
+        issue(
+            issues,
+            "error",
+            "FINITE_VALUE_EVIDENCE_MISSING",
+            f"{base}.value_evidence_refs",
+            "A finite value domain must reference its project evidence record unless it is the prescribed customer_type enum.",
+        )
+    if destination == "ga4_user_property":
+        if len(name) > 24:
+            issue(
+                issues,
+                "error",
+                "USER_PROPERTY_NAME_LIMIT",
+                f"{base}.name",
+                "GA4 user property names must not exceed 24 characters.",
+            )
+        if isinstance(example, str) and len(example) > 36:
+            issue(
+                issues,
+                "error",
+                "USER_PROPERTY_VALUE_LIMIT",
+                f"{base}.example",
+                "GA4 user property values must not exceed 36 characters.",
+            )
+    if destination == "ga4_user_id" and isinstance(example, str) and len(example) > 256:
+        issue(
+            issues,
+            "error",
+            "USER_ID_VALUE_LIMIT",
+            f"{base}.example",
+            "GA4 User-ID values must not exceed 256 characters.",
+        )
+    if (
+        destination in {"ga4_event_parameter", "ga4_item_parameter"}
+        and isinstance(example, str)
+    ):
+        value_limit = {
+            "page_title": 300,
+            "page_referrer": 420,
+            "page_location": 1000,
+        }.get(name, 100)
+        if len(example) > value_limit:
+            issue(
+                issues,
+                "error",
+                "PARAMETER_VALUE_LIMIT",
+                f"{base}.example",
+                f"GA4 limits the example value for {name} to {value_limit} characters.",
+            )
     if isinstance(allowed, list) and allowed and not isinstance(example, (dict, list)) and example not in allowed:
         issue(issues, "error", "EXAMPLE_OUTSIDE_ALLOWED_VALUES", f"{base}.example", "The example must belong to the exhaustive allowed values.")
     if not path_exists(event.get("data_layer", {}).get("push", {}), path):
@@ -268,13 +525,36 @@ def check_parameter(
         )
     if classification == "custom":
         check_custom_decision(parameter.get("custom_decision"), f"{base}.custom_decision", issues)
-    if classification == "implementation" and parameter.get("destination") != "implementation_only":
+        reserved_names = {
+            "event": RESERVED_EVENT_PARAMETER_NAMES,
+            "item": RESERVED_ITEM_PARAMETER_NAMES,
+            "user": RESERVED_USER_PROPERTY_NAMES,
+        }.get(scope, set())
+        if name in reserved_names or name.startswith(RESERVED_PARAMETER_PREFIXES):
+            issue(
+                issues,
+                "error",
+                "CUSTOM_PARAMETER_RESERVED_NAME",
+                f"{base}.name",
+                (
+                    f"'{name}' is reserved for GA4 at {scope} scope. Use the "
+                    "official field and destination or choose a non-reserved custom name."
+                ),
+            )
+    if classification == "implementation" and destination not in {
+        "implementation_only",
+        "ga4_user_id",
+        "other",
+    }:
         issue(
             issues,
             "error",
             "IMPLEMENTATION_DESTINATION",
             f"{base}.destination",
-            "An implementation parameter must remain implementation_only.",
+            (
+                "An implementation parameter must remain implementation-only, "
+                "map to the official User-ID setting, or target another explicit destination."
+            ),
         )
 
 
@@ -313,9 +593,59 @@ def check_event(
             f"{base}.data_layer.push.event",
             f'Top-level "event" must equal "{name}".',
         )
-    paths = [str(item.get("data_layer_path", "")) for item in event.get("parameters", []) if isinstance(item, dict)]
+    parameters = [
+        item
+        for item in event.get("parameters", [])
+        if isinstance(item, dict)
+    ]
+    paths = [str(item.get("data_layer_path", "")) for item in parameters]
     if len(paths) != len(set(paths)):
         issue(issues, "error", "DUPLICATE_PARAMETER_PATH", f"{base}.parameters", "Parameter dataLayer paths must be unique inside an event.")
+    parameter_keys = [
+        (str(item.get("name", "")), str(item.get("scope", "")))
+        for item in parameters
+    ]
+    if len(parameter_keys) != len(set(parameter_keys)):
+        issue(
+            issues,
+            "error",
+            "DUPLICATE_PARAMETER_NAME_SCOPE",
+            f"{base}.parameters",
+            "Parameter name and scope pairs must be unique inside an event.",
+        )
+    ga4_event_parameter_count = sum(
+        item.get("scope") == "event"
+        and item.get("destination") == "ga4_event_parameter"
+        for item in parameters
+    )
+    if ga4_event_parameter_count > 25:
+        issue(
+            issues,
+            "error",
+            "EVENT_PARAMETER_COLLECTION_LIMIT",
+            f"{base}.parameters",
+            (
+                f"The event sends {ga4_event_parameter_count} event parameters; "
+                "GA4 collects at most 25 per event."
+            ),
+        )
+    custom_item_parameter_count = sum(
+        item.get("scope") == "item"
+        and item.get("classification") == "custom"
+        and item.get("destination") == "ga4_item_parameter"
+        for item in parameters
+    )
+    if custom_item_parameter_count > 27:
+        issue(
+            issues,
+            "error",
+            "ITEM_PARAMETER_COLLECTION_LIMIT",
+            f"{base}.parameters",
+            (
+                f"The event sends {custom_item_parameter_count} custom item "
+                "parameters; GA4 collects at most 27 per ecommerce event."
+            ),
+        )
     bound_paths = set(paths)
     unbound = sorted(flatten_push_paths(push) - bound_paths)
     if unbound:
@@ -333,16 +663,438 @@ def check_event(
             check_parameter(event, index, parameter, parameter_index, record, issues)
 
 
+def check_datalayer_convention(
+    plan: dict[str, Any],
+    issues: list[Issue],
+) -> None:
+    convention = plan.get("data_layer_convention", {})
+    wrappers = convention.get("wrappers", {})
+    if not isinstance(wrappers, dict):
+        return
+    event_key = str(convention.get("event_key", "event"))
+    declared_wrappers = {
+        str(value)
+        for value in wrappers.values()
+        if isinstance(value, str) and value
+    }
+    page_wrapper = str(wrappers.get("page", ""))
+    event_wrapper = str(wrappers.get("event", ""))
+    ecommerce_wrapper = str(wrappers.get("ecommerce", ""))
+    user_wrapper = str(wrappers.get("user", ""))
+
+    for event_index, event in enumerate(plan.get("events", [])):
+        if not isinstance(event, dict):
+            continue
+        base = f"$.events[{event_index}]"
+        classification = str(event.get("classification", ""))
+        push = event.get("data_layer", {}).get("push", {})
+        if not isinstance(push, dict):
+            continue
+        unknown_top_level = sorted(
+            str(key)
+            for key in push
+            if str(key) != event_key and str(key) not in declared_wrappers
+        )
+        if unknown_top_level:
+            issue(
+                issues,
+                "error",
+                "UNDECLARED_DATALAYER_WRAPPER",
+                f"{base}.data_layer.push",
+                "Top-level push keys are not declared by the dataLayer convention: "
+                + ", ".join(unknown_top_level),
+            )
+        clear_values = event.get("data_layer", {}).get("clear", [])
+        invalid_clear = sorted(
+            str(value)
+            for value in clear_values
+            if str(value) not in declared_wrappers
+        )
+        if invalid_clear:
+            issue(
+                issues,
+                "error",
+                "UNDECLARED_DATALAYER_CLEAR",
+                f"{base}.data_layer.clear",
+                "Only declared wrappers may be cleared: " + ", ".join(invalid_clear),
+            )
+
+        event_parameter_destinations = {
+            "ga4_event_parameter",
+            "ga4_item_parameter",
+        }
+        has_ecommerce_payload = any(
+            isinstance(parameter, dict)
+            and parameter.get("destination") in event_parameter_destinations
+            for parameter in event.get("parameters", [])
+        )
+        if (
+            classification == "official_ecommerce"
+            and has_ecommerce_payload
+            and ecommerce_wrapper not in push
+        ):
+            issue(
+                issues,
+                "error",
+                "ECOMMERCE_WRAPPER_MISSING",
+                f"{base}.data_layer.push",
+                (
+                    f"Official ecommerce event '{event.get('event_name')}' must place "
+                    f"its GA4 ecommerce payload under '{ecommerce_wrapper}'."
+                ),
+            )
+
+        for parameter_index, parameter in enumerate(event.get("parameters", [])):
+            if not isinstance(parameter, dict):
+                continue
+            path = str(parameter.get("data_layer_path", ""))
+            prefix = path.split(".", 1)[0].replace("[]", "")
+            destination = str(parameter.get("destination", ""))
+            expected_wrapper = ""
+            if destination in {"ga4_user_property", "ga4_user_id"}:
+                expected_wrapper = user_wrapper
+            elif destination in event_parameter_destinations:
+                expected_wrapper = (
+                    ecommerce_wrapper
+                    if classification == "official_ecommerce"
+                    else event_wrapper
+                )
+            elif destination == "implementation_only":
+                if prefix not in declared_wrappers:
+                    expected_wrapper = page_wrapper
+            if expected_wrapper and prefix != expected_wrapper:
+                issue(
+                    issues,
+                    "error",
+                    "DATALAYER_WRAPPER_MISMATCH",
+                    f"{base}.parameters[{parameter_index}].data_layer_path",
+                    (
+                        f"Parameter '{parameter.get('name')}' must use wrapper "
+                        f"'{expected_wrapper}' for destination '{destination}', not '{prefix}'."
+                    ),
+                )
+
+
+def check_plan_event_coherence(
+    plan: dict[str, Any],
+    issues: list[Issue],
+) -> None:
+    """Check objective event-purpose and exact-trigger coherence signals."""
+    candidates: list[tuple[int, str, str, set[str]]] = []
+    for event_index, event in enumerate(plan.get("events", [])):
+        if not isinstance(event, dict) or event.get("classification") == "context":
+            continue
+        base = f"$.events[{event_index}]"
+        business_question = " ".join(
+            str(event.get("business_question", "")).split()
+        ).strip()
+        if business_question:
+            check_human_text(
+                business_question,
+                f"{base}.business_question",
+                "business_question",
+                issues,
+            )
+        else:
+            issue(
+                issues,
+                "error",
+                "EVENT_PURPOSE_MISSING",
+                f"{base}.business_question",
+                (
+                    "Record the concrete analysis question or decision this "
+                    "non-context event supports. Keep it internal to the "
+                    "canonical model."
+                ),
+            )
+        trigger = normalize(event.get("trigger"))
+        journeys = {
+            str(journey_id)
+            for journey_id in event.get("journey_ids", [])
+            if str(journey_id)
+        }
+        if trigger:
+            candidates.append(
+                (event_index, str(event.get("event_name", "")), trigger, journeys)
+            )
+
+    for left_index, left_name, left_trigger, left_journeys in candidates:
+        for right_index, right_name, right_trigger, right_journeys in candidates:
+            if right_index <= left_index:
+                continue
+            shared_journeys = sorted(left_journeys & right_journeys)
+            if left_trigger != right_trigger or not shared_journeys:
+                continue
+            issue(
+                issues,
+                "warning",
+                "POTENTIAL_DUPLICATE_EVENT_TRIGGER",
+                f"$.events[{right_index}].trigger",
+                (
+                    f"Events '{left_name}' and '{right_name}' use the same "
+                    "trigger in shared journey(s): "
+                    f"{', '.join(shared_journeys)}. Reconcile them or retain "
+                    "both only when their purposes and semantics are distinct."
+                ),
+            )
+
+
+def check_core_context_and_user_id(
+    plan: dict[str, Any],
+    issues: list[Issue],
+) -> None:
+    page_contexts: set[int] = set()
+    user_contexts: set[int] = set()
+    user_id_occurrences: list[tuple[int, dict[str, Any]]] = []
+    event_names: set[str] = set()
+    for event_index, event in enumerate(plan.get("events", [])):
+        if not isinstance(event, dict):
+            continue
+        event_names.add(str(event.get("event_name", "")))
+        if event.get("classification") != "context":
+            for parameter in event.get("parameters", []):
+                if (
+                    isinstance(parameter, dict)
+                    and parameter.get("destination") == "ga4_user_id"
+                ):
+                    user_id_occurrences.append((event_index, parameter))
+            continue
+        paths = {
+            str(parameter.get("data_layer_path", ""))
+            for parameter in event.get("parameters", [])
+            if isinstance(parameter, dict)
+        }
+        if any(path.startswith("page.") for path in paths):
+            page_contexts.add(event_index)
+        if any(path.startswith("user.") for path in paths):
+            user_contexts.add(event_index)
+        for parameter in event.get("parameters", []):
+            if (
+                isinstance(parameter, dict)
+                and parameter.get("destination") == "ga4_user_id"
+            ):
+                user_id_occurrences.append((event_index, parameter))
+
+    if page_contexts and user_contexts and len(page_contexts | user_contexts) > 1:
+        issue(
+            issues,
+            "error",
+            "CORE_CONTEXT_SPLIT",
+            "$.events",
+            (
+                "Reusable page and user state must share one core context push, "
+                "not separate page-context and user-context events."
+            ),
+        )
+
+    authentication_exists = bool(event_names & {"login", "sign_up"})
+    if authentication_exists and not user_id_occurrences:
+        issue(
+            issues,
+            "error",
+            "AUTHENTICATION_USER_ID_MISSING",
+            "$.events",
+            (
+                "Authenticated journeys require user.user_id in the core "
+                "context, mapped to the GA4 User-ID configuration setting."
+            ),
+        )
+    for event_index, parameter in user_id_occurrences:
+        event = plan.get("events", [])[event_index]
+        if not isinstance(event, dict) or event.get("classification") != "context":
+            issue(
+                issues,
+                "error",
+                "USER_ID_NOT_IN_CONTEXT",
+                f"$.events[{event_index}]",
+                "user_id belongs in the core context push, not an event push.",
+            )
+            continue
+        if parameter.get("data_layer_path") != "user.user_id":
+            issue(
+                issues,
+                "error",
+                "USER_ID_PATH",
+                f"$.events[{event_index}].parameters",
+                "Use user.user_id as the canonical dataLayer path.",
+            )
+        if event_index not in page_contexts:
+            issue(
+                issues,
+                "error",
+                "USER_ID_CORE_CONTEXT",
+                f"$.events[{event_index}]",
+                "The User-ID setting must share the core push with page context.",
+            )
+        source_url = str(parameter.get("official_source", {}).get("url", ""))
+        if "/analytics/devguides/collection/ga4/user-id" not in source_url:
+            issue(
+                issues,
+                "error",
+                "USER_ID_OFFICIAL_SOURCE",
+                f"$.events[{event_index}].parameters",
+                "Resolve User-ID handling from the current official GA4 User-ID documentation.",
+            )
+
+
+def check_plan_parameter_consistency_and_budgets(
+    plan: dict[str, Any],
+    issues: list[Issue],
+) -> None:
+    semantics: dict[tuple[str, str], dict[str, Any]] = {}
+    custom_event_definitions: set[str] = set()
+    custom_item_definitions: set[str] = set()
+    user_properties: set[str] = set()
+    for event_index, event in enumerate(plan.get("events", [])):
+        if not isinstance(event, dict):
+            continue
+        for parameter in event.get("parameters", []):
+            if not isinstance(parameter, dict):
+                continue
+            name = str(parameter.get("name", ""))
+            scope = str(parameter.get("scope", ""))
+            parameter_type = str(parameter.get("type", ""))
+            destination = str(parameter.get("destination", ""))
+            key = (name, scope)
+            signature = {
+                "type": parameter_type,
+                "destination": destination,
+                "classification": str(parameter.get("classification", "")),
+                "definition": normalize(parameter.get("definition")),
+                "value_rule": normalize(parameter.get("value_rule")),
+                "allowed_values": {
+                    json.dumps(value, ensure_ascii=False, sort_keys=True)
+                    for value in parameter.get("allowed_values", [])
+                },
+            }
+            previous = semantics.get(key)
+            if previous is None:
+                semantics[key] = signature
+            else:
+                if (
+                    previous["type"] != signature["type"]
+                    or previous["destination"] != signature["destination"]
+                ):
+                    issue(
+                        issues,
+                        "error",
+                        "PARAMETER_SEMANTIC_CONFLICT",
+                        f"$.events[{event_index}].parameters",
+                        (
+                            f"Parameter {name} at {scope} scope has inconsistent "
+                            "type or destination across events."
+                        ),
+                    )
+                if previous["classification"] != signature["classification"]:
+                    issue(
+                        issues,
+                        "warning",
+                        "PARAMETER_CLASSIFICATION_VARIATION",
+                        f"$.events[{event_index}].parameters",
+                        (
+                            f"Parameter {name} at {scope} scope changes classification "
+                            "across events; confirm it remains one semantic concept."
+                        ),
+                    )
+                if previous["value_rule"] != signature["value_rule"]:
+                    issue(
+                        issues,
+                        "warning",
+                        "PARAMETER_VALUE_RULE_VARIATION",
+                        f"$.events[{event_index}].parameters",
+                        (
+                            f"Parameter {name} at {scope} scope uses different value "
+                            "rules across events. Use one compatible rule or a different name."
+                        ),
+                    )
+                if (
+                    previous["allowed_values"]
+                    and signature["allowed_values"]
+                    and previous["allowed_values"] != signature["allowed_values"]
+                ):
+                    issue(
+                        issues,
+                        "error",
+                        "PARAMETER_VALUE_DOMAIN_CONFLICT",
+                        f"$.events[{event_index}].parameters",
+                        (
+                            f"Parameter {name} at {scope} scope has incompatible "
+                            "exhaustive value domains across events."
+                        ),
+                    )
+                if (
+                    previous["classification"] != "official"
+                    and signature["classification"] != "official"
+                    and previous["definition"] != signature["definition"]
+                ):
+                    issue(
+                        issues,
+                        "error",
+                        "PARAMETER_DEFINITION_CONFLICT",
+                        f"$.events[{event_index}].parameters",
+                        (
+                            f"Parameter {name} at {scope} scope has incompatible "
+                            "definitions across events."
+                        ),
+                    )
+            if destination == "ga4_user_property":
+                user_properties.add(name)
+            if parameter.get("classification") == "custom":
+                if destination == "ga4_event_parameter":
+                    custom_event_definitions.add(name)
+                elif destination == "ga4_item_parameter":
+                    custom_item_definitions.add(name)
+
+    if len(user_properties) > 25:
+        issue(
+            issues,
+            "error",
+            "USER_PROPERTY_COLLECTION_LIMIT",
+            "$.events",
+            (
+                f"The plan defines {len(user_properties)} user properties; "
+                "a standard GA4 property collects at most 25."
+            ),
+        )
+    if len(custom_event_definitions) > 50:
+        issue(
+            issues,
+            "warning",
+            "EVENT_CUSTOM_DEFINITION_BUDGET",
+            "$.events",
+            (
+                f"The plan contains {len(custom_event_definitions)} distinct "
+                "custom event parameters, above the standard 50 event-scoped "
+                "custom-dimension budget."
+            ),
+        )
+    if len(custom_item_definitions) > 10:
+        issue(
+            issues,
+            "warning",
+            "ITEM_CUSTOM_DEFINITION_BUDGET",
+            "$.events",
+            (
+                f"The plan contains {len(custom_item_definitions)} distinct "
+                "custom item parameters, above the standard 10 item-scoped "
+                "custom-dimension budget."
+            ),
+        )
+
+
 def validate_plan(plan: dict[str, Any], schema_path: Path = DEFAULT_SCHEMA) -> list[Issue]:
     issues: list[Issue] = []
     validate_schema(plan, schema_path, issues)
-    if any(item.code == "SCHEMA" for item in issues):
-        return issues
+    check_document(plan, issues)
     check_unique_ids(plan, issues)
     catalog = load_catalog()
     for index, event in enumerate(plan.get("events", [])):
         if isinstance(event, dict):
             check_event(plan, event, index, catalog, issues)
+    check_datalayer_convention(plan, issues)
+    check_plan_event_coherence(plan, issues)
+    check_core_context_and_user_id(plan, issues)
+    check_plan_parameter_consistency_and_budgets(plan, issues)
     return issues
 
 
