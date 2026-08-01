@@ -1,8 +1,8 @@
 # GA4 Tracking Plan
 
-[![Latest release](https://img.shields.io/github/v/release/HQ-Guillaume/ga4-tracking-plan)](https://github.com/HQ-Guillaume/ga4-tracking-plan/releases/latest)
-[![Validate skill](https://github.com/HQ-Guillaume/ga4-tracking-plan/actions/workflows/validate-skill.yml/badge.svg)](https://github.com/HQ-Guillaume/ga4-tracking-plan/actions/workflows/validate-skill.yml)
-[![License](https://img.shields.io/github/license/HQ-Guillaume/ga4-tracking-plan)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/haiqigeng/ga4-tracking-plan)](https://github.com/haiqigeng/ga4-tracking-plan/releases/latest)
+[![Validate skill](https://github.com/haiqigeng/ga4-tracking-plan/actions/workflows/validate-skill.yml/badge.svg)](https://github.com/haiqigeng/ga4-tracking-plan/actions/workflows/validate-skill.yml)
+[![License](https://img.shields.io/github/license/haiqigeng/ga4-tracking-plan)](LICENSE)
 
 A utility-first web-analyst skill for creating, reviewing, adapting, and
 maintaining complete GA4 tracking plans from real website journeys and the
