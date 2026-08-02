@@ -14,13 +14,13 @@ from import_tracking_plan_workbook import (
 from openpyxl import load_workbook
 from tracking_plan_model import (
     classification_label,
-    compact_value,
     datalayer_code,
     event_journey_names,
     label,
     load_json,
     location_text,
     parameter_reference_rows,
+    possible_values_or_example,
     requirement_label,
     scope_label,
     value_rule_text,
@@ -64,42 +64,40 @@ def validate_workbook(path: Path, plan: dict[str, Any]) -> list[str]:
     if any(_value(matrix, 4, column) for column in range(3, matrix.max_column + 1)):
         errors.append("Event Matrix contains an unapproved visible column after Definition.")
     events = [event for event in plan.get("events", []) if isinstance(event, dict)]
-    observed_matrix = [
-        (_value(matrix, row, 1), _value(matrix, row, 2))
-        for row in range(5, 5 + len(events))
-    ]
-    expected_matrix = [
-        (str(event.get("event_name", "")), str(event.get("definition", "")).strip())
-        for event in events
-    ]
+    observed_matrix = [(_value(matrix, row, 1), _value(matrix, row, 2)) for row in range(5, 5 + len(events))]
+    expected_matrix = [(str(event.get("event_name", "")), str(event.get("definition", "")).strip()) for event in events]
     if observed_matrix != expected_matrix:
         errors.append("Event Matrix rows differ from the canonical events and definitions.")
 
     reference = workbook[reference_name]
+    expected_reference_headers = [
+        label(plan, "variable"),
+        label(plan, "scope_label"),
+        label(plan, "type"),
+        label(plan, "definition"),
+        label(plan, "rule"),
+        label(plan, "possible_values_or_examples"),
+    ]
+    if [_value(reference, 4, column) for column in range(1, 7)] != expected_reference_headers:
+        errors.append("Parameter Reference headers do not match the lean six-column contract.")
+    if any(_value(reference, 4, column) for column in range(7, reference.max_column + 1)):
+        errors.append("Parameter Reference contains an unapproved visible column after possible values or examples.")
     expected_reference = [
         (
             str(row["name"]),
             scope_label(plan, str(row["scope"])),
             str(row["type"]),
             str(row["definition"]),
-            str(row["example"]),
-            str(row["values"]),
-            " | ".join(row["events"]),
+            str(row["rule"]),
+            str(row["possible_values_or_example"]),
         )
         for row in parameter_reference_rows(plan)
     ]
-    observed_reference = [
-        tuple(_value(reference, row, column) for column in range(1, 8))
-        for row in range(5, 5 + len(expected_reference))
-    ]
+    observed_reference = [tuple(_value(reference, row, column) for column in range(1, 7)) for row in range(5, 5 + len(expected_reference))]
     if observed_reference != expected_reference:
         errors.append("Parameter Reference does not exactly project the canonical parameter semantics.")
 
-    event_sheets = {
-        _value(sheet, 3, 2): sheet
-        for sheet in workbook.worksheets
-        if _value(sheet, 3, 1) == label(plan, "event") and _value(sheet, 3, 2)
-    }
+    event_sheets = {_value(sheet, 3, 2): sheet for sheet in workbook.worksheets if _value(sheet, 3, 1) == label(plan, "event") and _value(sheet, 3, 2)}
     if set(event_sheets) != {str(event.get("event_name")) for event in events}:
         errors.append("Visible event tabs do not match the canonical event set.")
         return errors
@@ -115,15 +113,9 @@ def validate_workbook(path: Path, plan: dict[str, Any]) -> list[str]:
             location_text(event),
             str(event.get("notes", "")),
         ]
-        if [_value(sheet, row, 2) for row in range(3, 10)] != [
-            value.strip() for value in expected_fields
-        ]:
+        if [_value(sheet, row, 2) for row in range(3, 10)] != [value.strip() for value in expected_fields]:
             errors.append(f'Event-tab header fields differ for "{event_name}".')
-        parameters = [
-            parameter
-            for parameter in event.get("parameters", [])
-            if isinstance(parameter, dict)
-        ]
+        parameters = [parameter for parameter in event.get("parameters", []) if isinstance(parameter, dict)]
         expected_parameters = [
             (
                 str(parameter.get("name", "")),
@@ -132,14 +124,11 @@ def validate_workbook(path: Path, plan: dict[str, Any]) -> list[str]:
                 requirement_label(plan, str(parameter.get("requirement", ""))),
                 str(parameter.get("definition", "")),
                 value_rule_text(parameter, plan),
-                compact_value(parameter.get("example")),
+                possible_values_or_example(parameter),
             )
             for parameter in parameters
         ]
-        observed_parameters = [
-            tuple(_value(sheet, row, column) for column in range(1, 8))
-            for row in range(12, 12 + len(parameters))
-        ]
+        observed_parameters = [tuple(_value(sheet, row, column) for column in range(1, 8)) for row in range(12, 12 + len(parameters))]
         if observed_parameters != expected_parameters:
             errors.append(f'Parameter rows differ for "{event_name}".')
         code_row = 14 + max(1, len(parameters))
@@ -149,9 +138,7 @@ def validate_workbook(path: Path, plan: dict[str, Any]) -> list[str]:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Validate the rendered human workbook against canonical semantics."
-    )
+    parser = argparse.ArgumentParser(description="Validate the rendered human workbook against canonical semantics.")
     parser.add_argument("workbook", type=Path)
     parser.add_argument("--plan", type=Path, required=True)
     return parser.parse_args()

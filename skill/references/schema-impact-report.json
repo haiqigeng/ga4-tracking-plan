@@ -3,12 +3,24 @@
   "title": "GA4 tracking-plan business change impact report",
   "type": "object",
   "additionalProperties": false,
-  "required": ["report_version", "change_id", "description", "affected_journeys", "affected_events", "affected_parameters", "artifacts_to_regenerate", "recette_scenarios", "unresolved_selectors"],
+  "required": ["report_version", "change_id", "description", "inference", "affected_journeys", "affected_opportunities", "affected_events", "affected_parameters", "artifacts_to_regenerate", "recette_scenarios", "unresolved_selectors"],
   "properties": {
-    "report_version": {"const": "1.0.0"},
+    "report_version": {"const": "2.0.0"},
     "change_id": {"type": "string"},
     "description": {"type": "string"},
+    "inference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["used", "description_tokens", "confidence", "matches"],
+      "properties": {
+        "used": {"type": "boolean"},
+        "description_tokens": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "confidence": {"enum": ["none", "low", "medium", "high"]},
+        "matches": {"type": "array", "items": {"type": "object"}}
+      }
+    },
     "affected_journeys": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "affected_opportunities": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
     "affected_events": {"type": "array", "items": {"type": "object"}},
     "affected_parameters": {"type": "array", "items": {"type": "object"}},
     "artifacts_to_regenerate": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},

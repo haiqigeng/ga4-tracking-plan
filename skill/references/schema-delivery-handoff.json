@@ -3,7 +3,7 @@
   "title": "GA4 tracking-plan delivery handoff manifest",
   "type": "object",
   "additionalProperties": false,
-  "required": ["handoff_version", "generated_at", "skill", "plan", "approval", "upstream_evidence", "artifacts"],
+  "required": ["handoff_version", "generated_at", "skill", "plan", "approval", "discovery_reports", "upstream_evidence", "artifacts"],
   "properties": {
     "handoff_version": {"const": "1.0.0"},
     "generated_at": {"type": "string", "format": "date-time"},
@@ -45,6 +45,22 @@
           "evidence_role": {"type": "string", "minLength": 1},
           "state": {"enum": ["as_is", "to_be", "both"]},
           "sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}
+        }
+      }
+    },
+    "discovery_reports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["report_id", "source_id", "sha256", "outcome", "hint_ids", "journey_ids"],
+        "properties": {
+          "report_id": {"type": "string", "minLength": 1},
+          "source_id": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "outcome": {"enum": ["completed", "partial", "blocked"]},
+          "hint_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+          "journey_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
         }
       }
     },

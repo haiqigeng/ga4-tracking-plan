@@ -31,10 +31,7 @@ COLLECT_HOST_PATTERN = re.compile(r"(?:google-analytics\.com|analytics\.google\.
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=(
-            "Execute a bounded, synthetic, non-transactional browser journey and capture "
-            "action-window dataLayer and GA4 request evidence."
-        )
+        description=("Execute a bounded, synthetic, non-transactional browser journey and capture action-window dataLayer and GA4 request evidence.")
     )
     parser.add_argument("spec", type=Path)
     parser.add_argument("--output", "-o", type=Path, required=True)
@@ -57,10 +54,7 @@ def load_and_validate_spec(path: Path) -> dict[str, Any]:
         key=lambda error: list(error.absolute_path),
     )
     if errors:
-        rendered = "\n".join(
-            f"- {'/'.join(str(part) for part in error.absolute_path) or '<root>'}: {error.message}"
-            for error in errors
-        )
+        rendered = "\n".join(f"- {'/'.join(str(part) for part in error.absolute_path) or '<root>'}: {error.message}" for error in errors)
         raise ValueError(f"Interactive journey specification is invalid:\n{rendered}")
     if any(action.get("action") == "submit" for action in spec["actions"]):
         if spec.get("submission_kind") not in {
@@ -90,9 +84,7 @@ def synthetic_value(kind: str) -> str:
 
 def _safe_measurement_request(url: str) -> dict[str, Any] | None:
     parsed = urlparse(url)
-    if not COLLECT_HOST_PATTERN.search(parsed.hostname or "") or not parsed.path.endswith(
-        "/collect"
-    ):
+    if not COLLECT_HOST_PATTERN.search(parsed.hostname or "") or not parsed.path.endswith("/collect"):
         return None
     query = parse_qs(parsed.query)
     return {
@@ -100,9 +92,7 @@ def _safe_measurement_request(url: str) -> dict[str, Any] | None:
         "path": parsed.path,
         "measurement_id": (query.get("tid") or [None])[0],
         "event_name": (query.get("en") or [None])[0],
-        "parameter_names": sorted(
-            key for key in query if key.startswith(("ep.", "epn.", "up.", "upn."))
-        ),
+        "parameter_names": sorted(key for key in query if key.startswith(("ep.", "epn.", "up.", "upn."))),
     }
 
 
@@ -118,14 +108,10 @@ def _expected_result(page: Any, expected: dict[str, Any] | None) -> dict[str, An
             passed = page.locator(str(expected["selector_visible"])).first.is_visible(timeout=1500)
         except Exception:
             passed = False
-        checks.append(
-            {"check": "selector_visible", "value": expected["selector_visible"], "passed": passed}
-        )
+        checks.append({"check": "selector_visible", "value": expected["selector_visible"], "passed": passed})
     if expected.get("text_visible"):
         try:
-            passed = page.get_by_text(str(expected["text_visible"]), exact=False).first.is_visible(
-                timeout=1500
-            )
+            passed = page.get_by_text(str(expected["text_visible"]), exact=False).first.is_visible(timeout=1500)
         except Exception:
             passed = False
         checks.append({"check": "text_visible", "value": expected["text_visible"], "passed": passed})
@@ -138,28 +124,14 @@ def _expected_result(page: Any, expected: dict[str, Any] | None) -> dict[str, An
 
 def _guard_click(locator: Any, *, allow_submit: bool, explicit_submit: bool) -> None:
     tag = str(locator.evaluate("element => element.tagName.toLowerCase()"))
-    element_type = str(
-        locator.evaluate("element => (element.getAttribute('type') || '').toLowerCase()")
-    )
-    label = str(
-        locator.evaluate(
-            "element => (element.innerText || element.value || element.getAttribute('aria-label') || '').trim()"
-        )
-    )
-    form_action = str(
-        locator.evaluate(
-            "element => element.form ? (element.form.action || document.location.href) : ''"
-        )
-    )
-    is_submit = tag == "input" and element_type == "submit" or (
-        tag == "button" and element_type in {"", "submit"}
-    )
+    element_type = str(locator.evaluate("element => (element.getAttribute('type') || '').toLowerCase()"))
+    label = str(locator.evaluate("element => (element.innerText || element.value || element.getAttribute('aria-label') || '').trim()"))
+    form_action = str(locator.evaluate("element => element.form ? (element.form.action || document.location.href) : ''"))
+    is_submit = tag == "input" and element_type == "submit" or (tag == "button" and element_type in {"", "submit"})
     if TRANSACTION_PATTERN.search(f"{label} {form_action}"):
         raise ValueError("Purchase/payment confirmation is never allowed by this helper.")
     if is_submit and (not explicit_submit or not allow_submit):
-        raise ValueError(
-            "A form-submit control must use action=submit and allow_form_submission=true."
-        )
+        raise ValueError("A form-submit control must use action=submit and allow_form_submission=true.")
 
 
 CAPTURE_INIT_SCRIPT = r"""
@@ -280,21 +252,13 @@ def run(spec: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
         browser.close()
 
     blocked = any(item["status"] == "blocked" for item in results)
-    failed_expectation = any(
-        item["status"] == "failed_expectation" for item in results
-    )
+    failed_expectation = any(item["status"] == "failed_expectation" for item in results)
     return {
         "journey_id": spec["journey_id"],
         "root_url": root_url,
         "outcome": "blocked" if blocked else ("partial" if failed_expectation else "completed"),
         "browser": {"requested": args.browser, "selected_channel": channel},
-        "used_synthetic_value_kinds": sorted(
-            {
-                str(action["value_kind"])
-                for action in spec["actions"]
-                if action.get("value_kind")
-            }
-        ),
+        "used_synthetic_value_kinds": sorted({str(action["value_kind"]) for action in spec["actions"] if action.get("value_kind")}),
         "privacy_acceptance_default": True,
         "form_submission_authorized": bool(spec.get("allow_form_submission")),
         "submission_kind": spec.get("submission_kind"),

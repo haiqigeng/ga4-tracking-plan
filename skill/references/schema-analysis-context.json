@@ -6,9 +6,12 @@
   "required": [
     "target_state",
     "scope_claim",
+    "language_decision",
     "sources",
+    "discovery_reports",
     "journey_coverage",
     "coverage_gaps",
+    "measurement_opportunities",
     "value_domains"
   ],
   "properties": {
@@ -17,6 +20,33 @@
     },
     "scope_claim": {
       "enum": ["whole_site", "journey_subset"]
+    },
+    "language_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "language",
+        "basis",
+        "evidence_refs",
+        "observed_website_languages",
+        "reasoning"
+      ],
+      "properties": {
+        "language": {"type": "string", "pattern": "^[a-z]{2}(?:-[A-Z]{2})?$"},
+        "basis": {"enum": ["user", "template", "team", "audience", "website"]},
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "observed_website_languages": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z]{2}(?:-[A-Z]{2})?$"}
+        },
+        "reasoning": {"type": "string", "minLength": 1}
+      }
     },
     "sources": {
       "type": "array",
@@ -77,6 +107,46 @@
         }
       }
     },
+    "discovery_reports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "report_id",
+          "source_id",
+          "reference",
+          "sha256",
+          "outcome",
+          "hint_ids",
+          "journey_ids",
+          "variant_ids"
+        ],
+        "properties": {
+          "report_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,119}$"},
+          "source_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "reference": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "outcome": {"enum": ["completed", "partial", "blocked"]},
+          "hint_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"}
+          },
+          "journey_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"}
+          },
+          "variant_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"}
+          }
+        }
+      }
+    },
     "journey_coverage": {
       "type": "array",
       "minItems": 1,
@@ -89,7 +159,8 @@
           "status",
           "evidence_refs",
           "entry_points",
-          "states_covered"
+          "states_covered",
+          "opportunity_ids"
         ],
         "properties": {
           "journey_id": {
@@ -123,9 +194,49 @@
               ]
             }
           },
+          "opportunity_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{1,79}$"
+            }
+          },
           "variants": {
             "type": "array",
             "items": {"type": "string", "minLength": 1}
+          },
+          "variant_coverage": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "variant_id",
+                "material",
+                "status",
+                "evidence_refs",
+                "entry_points",
+                "states_covered"
+              ],
+              "properties": {
+                "variant_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+                "material": {"type": "boolean"},
+                "status": {"enum": ["observed", "confirmed", "planned", "partial", "blocked"]},
+                "evidence_refs": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {"type": "string", "minLength": 1}
+                },
+                "entry_points": {"type": "array", "items": {"type": "string", "minLength": 1}},
+                "states_covered": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {"enum": ["entry", "progression", "success", "failure", "empty", "post_conversion"]}
+                },
+                "notes": {"type": "string"}
+              }
+            }
           },
           "notes": {"type": "string"}
         }
@@ -143,6 +254,7 @@
             "pattern": "^[a-z][a-z0-9_]{1,79}$"
           },
           "journey_id": {"type": "string", "minLength": 1},
+          "variant_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
           "material": {"type": "boolean"},
           "resolution": {
             "enum": ["confirmed_elsewhere", "excluded", "blocked", "unresolved"]
@@ -156,6 +268,99 @@
         }
       }
     },
+    "measurement_opportunities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "opportunity_id",
+          "journey_id",
+          "name",
+          "category",
+          "material",
+          "evidence_status",
+          "evidence_refs",
+          "business_question",
+          "official_candidate",
+          "official_fit",
+          "decision",
+          "decision_reason",
+          "event_names",
+          "discovery_hint_ids"
+        ],
+        "properties": {
+          "opportunity_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{1,79}$"
+          },
+          "journey_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{1,79}$"
+          },
+          "variant_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{1,79}$"
+          },
+          "name": {"type": "string", "minLength": 1},
+          "category": {
+            "enum": ["outcome", "progression", "diagnostic", "interaction", "context"]
+          },
+          "material": {"type": "boolean"},
+          "evidence_status": {
+            "enum": ["observed", "confirmed", "planned", "blocked"]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "business_question": {"type": "string", "minLength": 1},
+          "official_candidate": {"type": "string", "minLength": 1},
+          "official_fit": {"enum": ["fit", "gap", "not_applicable"]},
+          "decision": {"enum": ["measure", "exclude", "unresolved"]},
+          "decision_reason": {"type": "string", "minLength": 1},
+          "event_names": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{1,39}$"
+            }
+          },
+          "discovery_hint_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{1,79}$"
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {"decision": {"const": "measure"}},
+              "required": ["decision"]
+            },
+            "then": {
+              "properties": {"event_names": {"minItems": 1}}
+            }
+          },
+          {
+            "if": {
+              "properties": {"decision": {"const": "exclude"}},
+              "required": ["decision"]
+            },
+            "then": {
+              "properties": {"event_names": {"maxItems": 0}}
+            }
+          }
+        ]
+      }
+    },
     "value_domains": {
       "type": "array",
       "items": {
@@ -166,6 +371,7 @@
           "parameter_name",
           "scope",
           "kind",
+          "normalization",
           "evidence_refs"
         ],
         "properties": {
@@ -184,14 +390,58 @@
             "items": {"type": "string", "minLength": 1}
           },
           "kind": {"enum": ["finite", "dynamic"]},
-          "complete": {"type": "boolean"},
+          "normalization": {
+            "enum": [
+              "controlled_semantic",
+              "official_enum",
+              "technical_identifier",
+              "authoritative_raw",
+              "numeric",
+              "boolean",
+              "structured"
+            ]
+          },
+          "value_language": {
+            "type": "string",
+            "pattern": "^[a-z]{2}(?:-[A-Z]{2})?$"
+          },
+          "complete": {"const": true},
           "values": {
             "type": "array",
+            "minItems": 1,
             "maxItems": 50,
             "uniqueItems": true,
             "items": {"type": ["string", "number", "integer", "boolean"]}
           },
+          "value_labels": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["value", "label", "language"],
+              "properties": {
+                "value": {"type": ["string", "number", "integer", "boolean"]},
+                "label": {"type": "string", "minLength": 1},
+                "language": {"type": "string", "pattern": "^[a-z]{2}(?:-[A-Z]{2})?$"}
+              }
+            }
+          },
+          "label_generation_rule": {"type": "string", "minLength": 1},
           "rule": {"type": "string", "minLength": 1},
+          "dynamic_reason": {
+            "enum": [
+              "free_text",
+              "identifier",
+              "url",
+              "changing_inventory",
+              "over_50",
+              "structured",
+              "not_observable"
+            ]
+          },
+          "observed_value_count": {"type": "integer", "minimum": 0},
           "evidence_refs": {
             "type": "array",
             "minItems": 1,
@@ -212,7 +462,37 @@
               "properties": {"kind": {"const": "dynamic"}},
               "required": ["kind"]
             },
-            "then": {"required": ["rule"]}
+            "then": {"required": ["rule", "dynamic_reason"]}
+          },
+          {
+            "if": {
+              "properties": {
+                "normalization": {"const": "controlled_semantic"},
+                "kind": {"const": "finite"}
+              },
+              "required": ["normalization", "kind"]
+            },
+            "then": {"required": ["value_language", "value_labels"]}
+          },
+          {
+            "if": {
+              "properties": {
+                "normalization": {"const": "controlled_semantic"},
+                "kind": {"const": "dynamic"}
+              },
+              "required": ["normalization", "kind"]
+            },
+            "then": {"required": ["value_language", "label_generation_rule"]}
+          },
+          {
+            "if": {
+              "properties": {"dynamic_reason": {"const": "over_50"}},
+              "required": ["dynamic_reason"]
+            },
+            "then": {
+              "required": ["observed_value_count"],
+              "properties": {"observed_value_count": {"minimum": 51}}
+            }
           }
         ]
       }

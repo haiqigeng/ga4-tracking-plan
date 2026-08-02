@@ -53,6 +53,14 @@ their disposition, and finite or dynamic value domains. Validate this context
 against the canonical plan before delivery. This checkpoint is resumable
 internal evidence, not another visible workbook sheet.
 
+For rendered discovery, preserve the original `schema-discovery-report.json`
+artifact and generate the initial checkpoint with
+`build_analysis_context_seed.py`. Keep its report hash, hint inventory, and
+journey and variant inventories exact. Resolve each seeded opportunity in
+place; never rebuild a smaller manual list. The seed defaults to `as_is`
+because live discovery proves current behavior, not an intended future state.
+Pass an explicit target state when the plan is future or hybrid.
+
 ## 3. Explore The Real Journeys
 
 Actively discover an interactive Playwright MCP or browser. Rendered
@@ -89,12 +97,21 @@ and sitemap caps, candidate count, unvisited high-priority URLs, and an
 observed/partial/blocked ledger. A cap or material unvisited candidate prevents
 a completeness claim.
 
-For controlled gated evidence, use an explicit interaction recipe. Accept the
-privacy statement by default, fill only declared synthetic value kinds, and
-capture dataLayer pushes and GA4 request names for each action window. Require
-explicit authorization before submitting a non-transactional lead,
-authentication, or search form. Never submit a purchase or payment
-confirmation. This is discovery evidence, not runtime certification.
+Rendered discovery generates and executes bounded recipes for every distinct
+material safe form variant by default. It accepts the privacy statement, fills synthetic value
+kinds, advances multi-step non-financial lead, authentication, catalogue,
+newsletter, contact, and search flows, and captures dataLayer pushes plus GA4
+request names for each action window. It stops at CAPTCHA, paid order, payment,
+contract, appointment confirmation, fulfilment, deletion, or another
+consequential boundary. Use a manually authored recipe only when the generated
+one cannot express a material safe journey. This is discovery evidence, not
+runtime certification.
+
+Keep hint identity contextual. The same filter pattern on a product listing
+and a catalogue interface represents two separate candidates, even if the
+underlying heuristic key is identical. Structural heuristics remain
+non-material candidates until a business question promotes them; journey
+outcomes and material funnel progressions remain material decisions.
 
 Do not automatically turn a blocked capability into a visible event
 recommendation. Include an unobserved journey only when user, business,
@@ -133,11 +150,19 @@ is exempt because it carries reusable implementation state rather than
 representing a user action or business outcome. If two events fire at the same
 moment, keep both only when their distinct purposes and semantics are clear.
 
+Build the `measurement_opportunities` ledger before selecting events. Every
+material journey references at least one opportunity. Resolve each material
+opportunity as measured or deliberately excluded, and map every measured
+opportunity to its canonical event names. Use
+`references/discovery-and-coverage.md` for the closure test.
+
 ## 5. Design Events And Parameters
 
-Follow `official-first.md`. Resolve the selected official event and its complete
-parameter table before custom design. Keep every event's parameter contract
-specific to that event.
+Follow `official-first.md`. For every measured opportunity, evaluate the
+official event model and resolve the selected official event's complete
+parameter table before custom design. When no official event fits, proceed to
+the justified custom design; do not drop the opportunity. Keep every event's
+parameter contract specific to that event.
 
 ## 6. Specify The dataLayer
 
@@ -174,6 +199,8 @@ specifications. Check:
 - event/parameter scope and requiredness;
 - dataLayer parity;
 - finite values;
+- the evidence-backed workbook-language decision and localized controlled
+  value labels;
 - one combined page-and-user core context;
 - official User-ID destination handling;
 - `customer_type` on `purchase`;
@@ -199,7 +226,7 @@ builder writes only after every gate passes and emits:
 - current official-source verification;
 - shared versioned contract schemas;
 - a handoff with approval state, plan and artifact hashes, language, target
-  sites, and upstream evidence;
+  sites, upstream evidence, and bound discovery inventories;
 - internal analysis context plus applicable semantic diff, drift, impact, and
   template-fidelity reports.
 
@@ -229,12 +256,14 @@ Mappings are bound to the inspected workbook SHA-256. Reuse a mapping only
 when the template hash still matches. Never repurpose a populated event tab
 for another event unless the mapping explicitly marks it reusable.
 
-When a previous analysis context exists, detect source, journey coverage,
-coverage-gap, and finite-domain drift, then identify potentially affected
-events. For a declared business change, resolve its journey, event, parameter,
-or value-domain selectors into affected workbook tabs, canonical semantics,
-event schemas, expected events, and downstream recette scenarios. Neither
-utility changes or approves the plan automatically.
+When a previous analysis context exists, compare source, journey coverage,
+opportunity decisions, coverage gaps, finite domains, rendered structure
+hashes, forms, controls, discovery hints, languages, and safe-interaction
+outcomes. Map the differences back to affected journeys, opportunities, and
+events. For a declared business change, use explicit selectors when supplied;
+otherwise infer candidates from the bilingual semantic description and block
+when nothing matches. Neither utility changes or approves the plan
+automatically.
 
 ## 9. Screenshots
 

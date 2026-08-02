@@ -15,9 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Map a business change to affected tracking-plan semantics and downstream contracts."
-    )
+    parser = argparse.ArgumentParser(description="Map a business change to affected tracking-plan semantics and downstream contracts.")
     parser.add_argument("plan", type=Path)
     parser.add_argument("change_request", type=Path)
     parser.add_argument("--analysis-context", type=Path)

@@ -33,6 +33,7 @@ from tracking_plan_model import (
     load_json,
     location_text,
     parameter_reference_rows,
+    possible_values_or_example,
     requirement_label,
     safe_sheet_title,
     scope_label,
@@ -50,8 +51,8 @@ PROJECTION_SHEET = "__tracking_plan_projection"
 PROJECTION_MARKER = "ga4-tracking-plan/projection"
 MODEL_CELL_LIMIT = 30000
 MATRIX_WIDTHS = [24, 96]
-REFERENCE_WIDTHS = [22, 11, 11, 38, 22, 38, 28]
-EVENT_WIDTHS = [20, 11, 11, 13, 42, 40, 24]
+REFERENCE_WIDTHS = [22, 11, 11, 42, 42, 32]
+EVENT_WIDTHS = [20, 11, 11, 13, 42, 42, 32]
 
 
 def parse_args() -> argparse.Namespace:
@@ -113,7 +114,7 @@ def fill_guide(wb, plan: dict[str, Any], event_sheet_names: dict[str, str]) -> N
         "Human contract for analyst review, maintenance, and dataLayer implementation."
         if language == "en"
         else "Contrat humain pour la revue, la maintenance et l'implémentation dataLayer.",
-        7,
+        6,
     )
     guide_rows = [
         ("document", doc["title"]),
@@ -210,30 +211,28 @@ def fill_parameter_reference(wb, plan: dict[str, Any]) -> None:
         label(plan, "scope_label"),
         label(plan, "type"),
         label(plan, "definition"),
-        label(plan, "example"),
-        label(plan, "values"),
-        label(plan, "concerned_events"),
+        label(plan, "rule"),
+        label(plan, "possible_values_or_examples"),
     ]
     for column, header_value in enumerate(headers, 1):
         set_cell_value(ws.cell(4, column), header_value)
     clear_data_rows(ws, 5)
     rows = parameter_reference_rows(plan)
     for index, row in enumerate(rows, 5):
-        apply_table_row(ws, index, 7)
+        apply_table_row(ws, index, 6)
         set_cell_value(ws.cell(index, 1), row["name"])
         set_cell_value(ws.cell(index, 2), scope_label(plan, str(row["scope"])))
         set_cell_value(ws.cell(index, 3), row["type"])
         set_cell_value(ws.cell(index, 4), row["definition"])
-        set_cell_value(ws.cell(index, 5), row["example"])
-        set_cell_value(ws.cell(index, 6), row["values"])
-        set_cell_value(ws.cell(index, 7), " | ".join(row["events"]))
+        set_cell_value(ws.cell(index, 5), row["rule"])
+        set_cell_value(ws.cell(index, 6), row["possible_values_or_example"])
         ws.row_dimensions[index].height = content_row_height(
-            [ws.cell(index, column).value for column in range(1, 8)],
+            [ws.cell(index, column).value for column in range(1, 7)],
             REFERENCE_WIDTHS,
             minimum=60,
             maximum=190,
         )
-    ws.auto_filter.ref = f"A4:G{max(5, 4 + len(rows))}"
+    ws.auto_filter.ref = f"A4:F{max(5, 4 + len(rows))}"
 
 
 def add_section(ws, row: int, text: str, columns: int = 7) -> None:
@@ -307,6 +306,7 @@ def fill_event_sheet(
     for row, (row_label, value) in enumerate(values, 3):
         set_cell_value(ws.cell(row, 1), row_label)
         set_cell_value(ws.cell(row, 2), value)
+    ws.row_dimensions[4].hidden = True
     if not str(event.get("notes", "")).strip():
         ws.row_dimensions[9].hidden = True
     headers = [
@@ -315,8 +315,8 @@ def fill_event_sheet(
         label(plan, "type"),
         label(plan, "requirement"),
         label(plan, "definition"),
-        label(plan, "values"),
-        label(plan, "example"),
+        label(plan, "rule"),
+        label(plan, "possible_values_or_examples"),
     ]
     for column, header_value in enumerate(headers, 1):
         set_cell_value(ws.cell(11, column), header_value)
@@ -337,7 +337,7 @@ def fill_event_sheet(
         )
         set_cell_value(ws.cell(row, 5), parameter.get("definition", ""))
         set_cell_value(ws.cell(row, 6), value_rule_text(parameter, plan))
-        set_cell_value(ws.cell(row, 7), compact_value(parameter.get("example")))
+        set_cell_value(ws.cell(row, 7), possible_values_or_example(parameter))
         ws.row_dimensions[row].height = content_row_height(
             [ws.cell(row, column).value for column in range(1, 8)],
             EVENT_WIDTHS,

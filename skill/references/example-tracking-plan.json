@@ -1,9 +1,9 @@
 {
-  "schema_version": "4.0.0",
+  "schema_version": "5.0.0",
   "document": {
     "title": "Example GA4 tracking plan",
     "version": "1.0",
-    "date": "2026-07-24",
+    "date": "2026-08-01",
     "language": "en",
     "scope": "Product discovery and quote request",
     "target_state": "to_be"
@@ -79,7 +79,9 @@
           ],
           "example": "product_detail",
           "source": "Application route metadata.",
-          "destination": "implementation_only"
+          "destination": "implementation_only",
+          "value_mode": "controlled_semantic",
+          "value_language": "en"
         },
         {
           "name": "login_status",
@@ -104,7 +106,9 @@
             "business_need": "Compare journeys for authenticated and unauthenticated visitors.",
             "official_candidate": "No prescribed event parameter represents reusable authentication state.",
             "why_not_fit": "The value is persistent user context rather than the outcome of the official login event."
-          }
+          },
+          "value_mode": "controlled_semantic",
+          "value_language": "en"
         },
         {
           "name": "user_id",
@@ -123,8 +127,13 @@
             "url": "https://developers.google.com/analytics/devguides/collection/ga4/user-id",
             "section": "Send user IDs",
             "wording_origin": "faithful_translation",
-            "checked_date": "2026-07-31"
-          }
+            "checked_date": "2026-08-01",
+            "official_text": "The user_id parameter is a configuration parameter, not a custom user property or standard event parameter."
+          },
+          "value_mode": "technical_identifier",
+          "value_evidence_refs": [
+            "user_ids"
+          ]
         }
       ],
       "data_layer": {
@@ -179,8 +188,10 @@
             "url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events#view_item",
             "section": "view_item parameters",
             "wording_origin": "exact",
-            "checked_date": "2026-07-24"
-          }
+            "checked_date": "2026-08-01",
+            "official_text": "Currency of the items associated with the event, in 3-letter ISO 4217 format. * Value metrics on the view_item event to not contribute to revenue * If you set value then currency is required for revenue metrics to be computed accurately."
+          },
+          "value_mode": "technical_identifier"
         },
         {
           "name": "value",
@@ -190,7 +201,7 @@
           "type": "number",
           "requirement": "optional",
           "definition": "The monetary value of the event. * Set value to the sum of (price * quantity) for all items in items. Don't include shipping or tax. * value is typically required for meaningful reporting. If you mark the event as a key event then it's recommended you set value. * currency is required if you set value.",
-          "value_rule": "Use the displayed item price for the selected variant.",
+          "value_rule": "Set value to the sum of price * quantity for all items; exclude shipping and tax.",
           "example": 129.9,
           "source": "Selected product offer.",
           "destination": "ga4_event_parameter",
@@ -198,8 +209,13 @@
             "url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events#view_item",
             "section": "view_item parameters",
             "wording_origin": "exact",
-            "checked_date": "2026-07-24"
-          }
+            "checked_date": "2026-08-01",
+            "official_text": "The monetary value of the event. * Set value to the sum of (price * quantity) for all items in items. Don't include shipping or tax. * value is typically required for meaningful reporting. If you mark the event as a key event then it's recommended you set value. * currency is required if you set value."
+          },
+          "value_mode": "numeric",
+          "value_evidence_refs": [
+            "item_values"
+          ]
         },
         {
           "name": "items",
@@ -224,8 +240,13 @@
             "url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events#view_item",
             "section": "view_item parameters",
             "wording_origin": "exact",
-            "checked_date": "2026-07-24"
-          }
+            "checked_date": "2026-08-01",
+            "official_text": "The items for the event."
+          },
+          "value_mode": "structured",
+          "value_evidence_refs": [
+            "item_arrays"
+          ]
         },
         {
           "name": "item_id",
@@ -243,8 +264,13 @@
             "url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events#view_item",
             "section": "items parameter",
             "wording_origin": "exact",
-            "checked_date": "2026-07-24"
-          }
+            "checked_date": "2026-08-01",
+            "official_text": "The ID of the item. *One of item_id or item_name is required."
+          },
+          "value_mode": "technical_identifier",
+          "value_evidence_refs": [
+            "item_ids"
+          ]
         },
         {
           "name": "item_name",
@@ -262,8 +288,13 @@
             "url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events#view_item",
             "section": "items parameter",
             "wording_origin": "exact",
-            "checked_date": "2026-07-24"
-          }
+            "checked_date": "2026-08-01",
+            "official_text": "The name of the item. *One of item_id or item_name is required."
+          },
+          "value_mode": "authoritative_raw",
+          "value_evidence_refs": [
+            "item_names"
+          ]
         },
         {
           "name": "item_variant",
@@ -281,8 +312,13 @@
             "url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events#view_item",
             "section": "items parameter",
             "wording_origin": "exact",
-            "checked_date": "2026-07-24"
-          }
+            "checked_date": "2026-08-01",
+            "official_text": "The item variant or unique code or description for additional item details/options."
+          },
+          "value_mode": "authoritative_raw",
+          "value_evidence_refs": [
+            "item_variants"
+          ]
         },
         {
           "name": "item_color",
@@ -308,7 +344,9 @@
             "business_need": "Analyse color preference independently from size.",
             "official_candidate": "item_variant",
             "why_not_fit": "item_variant represents the primary size or variant; it cannot isolate color when both dimensions are selected."
-          }
+          },
+          "value_mode": "controlled_semantic",
+          "value_language": "en"
         }
       ],
       "data_layer": {
@@ -335,8 +373,12 @@
         "url": "https://developers.google.com/analytics/devguides/collection/ga4/reference/events#view_item",
         "section": "view_item",
         "wording_origin": "exact",
-        "checked_date": "2026-07-24"
-      }
+        "checked_date": "2026-08-01",
+        "official_text": "This event signifies that some content was shown to the user. Use this event to discover the most popular items viewed."
+      },
+      "measurement_opportunity_ids": [
+        "product_item_consideration"
+      ]
     },
     {
       "event_name": "begin_quote",
@@ -377,7 +419,9 @@
             "business_need": "Compare quote starts for reusable form implementations.",
             "official_candidate": "No prescribed begin_quote parameter identifies the form.",
             "why_not_fit": "A stable form identifier is required to analyse multiple quote entry points."
-          }
+          },
+          "value_mode": "controlled_semantic",
+          "value_language": "en"
         },
         {
           "name": "project_type",
@@ -404,7 +448,9 @@
             "business_need": "Analyse quote starts by requested project.",
             "official_candidate": "No official begin_quote parameter represents the requested project.",
             "why_not_fit": "The project is a business-specific quote dimension."
-          }
+          },
+          "value_mode": "controlled_semantic",
+          "value_language": "en"
         }
       ],
       "data_layer": {
@@ -423,7 +469,10 @@
         "business_need": "Measure intentional entry into a quote journey before a lead exists.",
         "official_candidate": "form_start",
         "why_not_fit": "The business requires a quote-specific funnel start across interfaces that do not all expose a standard form start."
-      }
+      },
+      "measurement_opportunity_ids": [
+        "quote_intentional_start"
+      ]
     }
   ]
 }

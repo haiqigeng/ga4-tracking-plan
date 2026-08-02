@@ -52,9 +52,8 @@ Show only:
 - scope;
 - type;
 - definition;
-- example;
-- exhaustive values or value rule;
-- concerned events.
+- rule;
+- possible values or example.
 
 Do not show:
 
@@ -64,8 +63,6 @@ Do not show:
 - registration in GA4;
 - privacy, consent, or cardinality;
 - agent or research metadata.
-
-Concerned events contains event names only.
 
 ## Event Tabs
 
@@ -81,8 +78,8 @@ Each event tab contains:
    - type;
    - requirement;
    - definition;
-   - values or rule;
-   - example;
+   - rule;
+   - possible values or example;
 6. one complete dataLayer example with quoted keys;
 7. only event-specific implementation notes.
 
@@ -90,6 +87,8 @@ Keep parameter conditions, source logic, destinations, classifications, and
 dataLayer paths in the hidden canonical model. They drive validation and
 maintenance but are not visible columns in the default workbook. A supplied
 template may retain them when it explicitly provides legitimate locations.
+The default event-sheet template may retain its classification row only as a
+hidden projection safeguard; generated event tabs must keep that row hidden.
 
 The event tab, Event Matrix, and Parameter Reference are derived from the same
 event object and must never be maintained independently.

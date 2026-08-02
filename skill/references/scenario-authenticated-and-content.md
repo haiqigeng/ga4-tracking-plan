@@ -10,6 +10,12 @@ Use official `login` and `sign_up` for successful outcomes when their semantics
 fit. Custom account events require a meaningful self-service or diagnostic
 question beyond a typed page view.
 
+Do not stop account discovery at authentication. When present, inspect password
+recovery, account navigation, order history and detail, reorder, wishlist,
+profile or preference outcomes, returns, cancellation, refunds, and support
+entry points. Measure only the outcomes or diagnostics that answer a concrete
+question, but record a decision for every material capability.
+
 Inventory relevant user and account fields exposed to the implementation.
 Separate dataLayer presence from GA4 destination mapping.
 

@@ -18,20 +18,14 @@ from official_ga4_catalog import normalize, normalize_type, parse_catalog_html
 from tracking_plan_model import load_json
 
 ALLOWED_HOSTS = {"developers.google.com", "support.google.com"}
-RECOMMENDED_EVENTS_BASE = (
-    "https://developers.google.com/analytics/devguides/collection/ga4/reference/events"
-)
+RECOMMENDED_EVENTS_BASE = "https://developers.google.com/analytics/devguides/collection/ga4/reference/events"
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL_CATALOG = ROOT / "references" / "library-ga4-recommended-events.json"
-DEFAULT_CACHE = Path(
-    os.environ.get("LOCALAPPDATA", tempfile.gettempdir())
-) / "Codex" / "ga4-tracking-plan" / "official-source-cache"
+DEFAULT_CACHE = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir())) / "Codex" / "ga4-tracking-plan" / "official-source-cache"
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Verify every selected official GA4 source used by a tracking plan."
-    )
+    parser = argparse.ArgumentParser(description="Verify every selected official GA4 source used by a tracking plan.")
     parser.add_argument("plan", type=Path)
     parser.add_argument("--output", "-o", type=Path, required=True)
     parser.add_argument(
@@ -72,10 +66,7 @@ def source_declarations(plan: dict[str, Any]) -> list[dict[str, str]]:
             if isinstance(source, dict):
                 result.append(
                     {
-                        "owner": (
-                            f'parameter:{event_name}:{parameter.get("name", "")}:'
-                            f'{parameter.get("scope", "")}'
-                        ),
+                        "owner": (f"parameter:{event_name}:{parameter.get('name', '')}:{parameter.get('scope', '')}"),
                         "url": str(source.get("url", "")),
                         "section": str(source.get("section", "")),
                         "wording_origin": str(source.get("wording_origin", "")),
@@ -90,7 +81,7 @@ def source_declarations(plan: dict[str, Any]) -> list[dict[str, str]]:
 def fetch(url: str) -> tuple[int, str, str]:
     request = Request(
         url,
-        headers={"User-Agent": "ga4-tracking-plan-official-source-check/2.3"},
+        headers={"User-Agent": "ga4-tracking-plan-official-source-check/2.4"},
     )
     with urlopen(request, timeout=45) as response:
         content = response.read().decode("utf-8", "ignore")
@@ -199,17 +190,12 @@ def anchor_present(content: str, fragment: str) -> bool:
         return True
     escaped = re.escape(fragment)
     return bool(
-        re.search(rf'\bid=["\']{escaped}["\']', content, flags=re.IGNORECASE)
-        or re.search(rf'\bname=["\']{escaped}["\']', content, flags=re.IGNORECASE)
+        re.search(rf'\bid=["\']{escaped}["\']', content, flags=re.IGNORECASE) or re.search(rf'\bname=["\']{escaped}["\']', content, flags=re.IGNORECASE)
     )
 
 
 def catalog_index(records: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    return {
-        str(record.get("event")): record
-        for record in records
-        if isinstance(record, dict) and record.get("event")
-    }
+    return {str(record.get("event")): record for record in records if isinstance(record, dict) and record.get("event")}
 
 
 def parameter_index(record: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
@@ -230,12 +216,7 @@ def semantic_errors(
         return []
     live_records = parse_catalog_html(content)
     if not live_records:
-        return [
-            (
-                "The current recommended-events page parsed zero events. "
-                "Treat this as a source-parser failure, not as event-level catalog drift."
-            )
-        ]
+        return [("The current recommended-events page parsed zero events. Treat this as a source-parser failure, not as event-level catalog drift.")]
     live = catalog_index(live_records)
     local_records = json.loads(LOCAL_CATALOG.read_text(encoding="utf-8-sig"))
     local = catalog_index(local_records)
@@ -254,24 +235,17 @@ def semantic_errors(
         checked_names.add(event_name)
         live_event = live.get(event_name)
         if not live_event:
-            errors.append(
-                f'Selected official event "{event_name}" is absent from the current recommended-events page.'
-            )
+            errors.append(f'Selected official event "{event_name}" is absent from the current recommended-events page.')
             continue
-        if (
-            event.get("official_source", {}).get("wording_origin") == "exact"
-            and normalize(event.get("definition")) != normalize(live_event.get("description"))
-        ):
-            errors.append(
-                f'Event "{event_name}" no longer matches the current official definition.'
-            )
+        if event.get("official_source", {}).get("wording_origin") == "exact" and normalize(event.get("definition")) != normalize(live_event.get("description")):
+            errors.append(f'Event "{event_name}" no longer matches the current official definition.')
+        if normalize(event.get("official_source", {}).get("official_text")) != normalize(live_event.get("description")):
+            errors.append(f'Event "{event_name}" does not preserve the current exact official source text.')
         live_parameters = parameter_index(live_event)
         for parameter in event.get("parameters", []):
             if not isinstance(parameter, dict) or parameter.get("classification") != "official":
                 continue
-            parameter_source_base, _ = urldefrag(
-                str(parameter.get("official_source", {}).get("url", ""))
-            )
+            parameter_source_base, _ = urldefrag(str(parameter.get("official_source", {}).get("url", "")))
             if parameter_source_base != RECOMMENDED_EVENTS_BASE:
                 continue
             key = (
@@ -280,54 +254,39 @@ def semantic_errors(
             )
             live_parameter = live_parameters.get(key)
             if not live_parameter:
-                errors.append(
-                    f'Official parameter "{key[0]}" ({key[1]}) is absent from the current "{event_name}" table.'
-                )
+                errors.append(f'Official parameter "{key[0]}" ({key[1]}) is absent from the current "{event_name}" table.')
                 continue
             if normalize_type(parameter.get("type")) != normalize_type(live_parameter.get("type")):
-                errors.append(
-                    f'Parameter "{event_name}.{key[0]}" no longer matches the current official type.'
-                )
-            if (
-                parameter.get("official_source", {}).get("wording_origin") == "exact"
-                and normalize(parameter.get("definition"))
-                != normalize(live_parameter.get("description"))
+                errors.append(f'Parameter "{event_name}.{key[0]}" no longer matches the current official type.')
+            if parameter.get("official_source", {}).get("wording_origin") == "exact" and normalize(parameter.get("definition")) != normalize(
+                live_parameter.get("description")
             ):
-                errors.append(
-                    f'Parameter "{event_name}.{key[0]}" no longer matches the current official definition.'
-                )
+                errors.append(f'Parameter "{event_name}.{key[0]}" no longer matches the current official definition.')
+            if normalize(parameter.get("official_source", {}).get("official_text")) != normalize(live_parameter.get("description")):
+                errors.append(f'Parameter "{event_name}.{key[0]}" does not preserve the current exact official source text.')
     for event_name in sorted(checked_names):
         live_event = live.get(event_name)
         local_event = local.get(event_name)
         if not live_event or not local_event:
             if live_event and not local_event:
-                errors.append(
-                    f'The bundled official library is missing selected event "{event_name}".'
-                )
+                errors.append(f'The bundled official library is missing selected event "{event_name}".')
             continue
-        if (
-            normalize(live_event.get("description"))
-            != normalize(local_event.get("description"))
-            or {
-                key: (
-                    normalize_type(value.get("type")),
-                    normalize(value.get("required")),
-                    normalize(value.get("description")),
-                )
-                for key, value in parameter_index(live_event).items()
-            }
-            != {
-                key: (
-                    normalize_type(value.get("type")),
-                    normalize(value.get("required")),
-                    normalize(value.get("description")),
-                )
-                for key, value in parameter_index(local_event).items()
-            }
-        ):
-            errors.append(
-                f'The bundled official library has drifted from Google for selected event "{event_name}".'
+        if normalize(live_event.get("description")) != normalize(local_event.get("description")) or {
+            key: (
+                normalize_type(value.get("type")),
+                normalize(value.get("required")),
+                normalize(value.get("description")),
             )
+            for key, value in parameter_index(live_event).items()
+        } != {
+            key: (
+                normalize_type(value.get("type")),
+                normalize(value.get("required")),
+                normalize(value.get("description")),
+            )
+            for key, value in parameter_index(local_event).items()
+        }:
+            errors.append(f'The bundled official library has drifted from Google for selected event "{event_name}".')
     return errors
 
 
@@ -346,9 +305,7 @@ def check(
         base_url, _ = urldefrag(declaration["url"])
         host = (urlparse(base_url).hostname or "").lower()
         if host not in ALLOWED_HOSTS:
-            errors.append(
-                f'{declaration["owner"]} references a non-official host: {host or "(missing)"}'
-            )
+            errors.append(f"{declaration['owner']} references a non-official host: {host or '(missing)'}")
             continue
         if offline or base_url in pages:
             continue
@@ -374,9 +331,7 @@ def check(
                 errors.append(f"Official source returned HTTP {status}: {base_url}")
             final_host = (urlparse(final_url).hostname or "").lower()
             if final_host not in ALLOWED_HOSTS:
-                errors.append(
-                    f"Official source redirected to a non-official host: {final_host or '(missing)'}"
-                )
+                errors.append(f"Official source redirected to a non-official host: {final_host or '(missing)'}")
         except Exception as error:
             pages[base_url] = {
                 "status": 0,
@@ -384,9 +339,7 @@ def check(
                 "content_sha256": "",
                 "content": "",
             }
-            errors.append(
-                f"Could not fetch official source {base_url}: {type(error).__name__}: {error}"
-            )
+            errors.append(f"Could not fetch official source {base_url}: {type(error).__name__}: {error}")
 
     checks: list[dict[str, Any]] = []
     for declaration in declarations:
@@ -394,9 +347,7 @@ def check(
         page = pages.get(base_url, {})
         anchor_ok = True if offline else anchor_present(str(page.get("content", "")), fragment)
         if not anchor_ok:
-            errors.append(
-                f'{declaration["owner"]} references missing section "#{fragment}" at {base_url}'
-            )
+            errors.append(f'{declaration["owner"]} references missing section "#{fragment}" at {base_url}')
         checks.append(
             {
                 **declaration,
@@ -408,11 +359,7 @@ def check(
         )
     if not offline:
         errors.extend(semantic_errors(plan, pages))
-    public_pages = [
-        {key: value for key, value in page.items() if key != "content"}
-        | {"url": url}
-        for url, page in pages.items()
-    ]
+    public_pages = [{key: value for key, value in page.items() if key != "content"} | {"url": url} for url, page in pages.items()]
     return {
         "status": "passed" if not errors else "failed",
         "mode": "offline" if offline else "live",

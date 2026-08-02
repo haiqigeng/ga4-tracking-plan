@@ -70,24 +70,15 @@ def parse_catalog_html(page: str) -> list[dict[str, Any]]:
         event_block = block[: item_heading.start()] if item_heading else block
         item_block = block[item_heading.end() :] if item_heading else ""
         group = next(
-            (
-                sections[item][1]
-                for item in range(len(sections) - 1)
-                if sections[item][0] <= position < sections[item + 1][0]
-            ),
+            (sections[item][1] for item in range(len(sections) - 1) if sections[item][0] <= position < sections[item + 1][0]),
             "",
         )
         events.append(
             {
                 "event": clean_html(match.group(2)),
                 "group": group,
-                "description": (
-                    clean_html(description_match.group(1)) if description_match else ""
-                ),
-                "parameters": (
-                    parameter_rows(event_block, "event")
-                    + parameter_rows(item_block, "item")
-                ),
+                "description": (clean_html(description_match.group(1)) if description_match else ""),
+                "parameters": (parameter_rows(event_block, "event") + parameter_rows(item_block, "item")),
             }
         )
     return events
@@ -101,6 +92,10 @@ def normalize_type(value: Any) -> str:
     result = normalize(value)
     if result.startswith("array"):
         return "array"
+    if result.startswith("string"):
+        return "string"
+    if result.startswith("number"):
+        return "number"
     if result in {"float", "double"}:
         return "number"
     return result

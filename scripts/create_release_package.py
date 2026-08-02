@@ -11,6 +11,7 @@ PACKAGE_ROOTS = [ROOT / "skill"]
 WRAPPER_NAMES = [
     "adapt_tracking_plan_workbook.py",
     "analyze_tracking_plan_change_impact.py",
+    "build_analysis_context_seed.py",
     "annotate_screenshot.py",
     "build_tracking_plan_delivery.py",
     "capture_interactive_journey.py",
@@ -70,7 +71,15 @@ def iter_package_files() -> list[Path]:
             raise FileNotFoundError(path)
         assert_public_path(path)
         files.append(path)
-    return files
+    return sorted(set(files), key=lambda path: path.relative_to(ROOT).as_posix())
+
+
+def deterministic_zip_info(path: Path) -> zipfile.ZipInfo:
+    info = zipfile.ZipInfo(path.relative_to(ROOT).as_posix(), date_time=(1980, 1, 1, 0, 0, 0))
+    info.create_system = 3
+    info.external_attr = (0o100644 & 0xFFFF) << 16
+    info.compress_type = zipfile.ZIP_DEFLATED
+    return info
 
 
 def main() -> int:
@@ -79,12 +88,21 @@ def main() -> int:
     requested_version = args.version.removeprefix("v")
     if args.version not in {"local", "validation"} and requested_version != project_version:
         raise ValueError(f"Release version {args.version} does not match pyproject.toml version {project_version}.")
+    if args.version not in {"local", "validation"}:
+        from validate_package import check_release_provenance
+
+        check_release_provenance(args.version)
     output = args.output or ROOT / "release" / f"ga4-tracking-plan-package-{args.version}.zip"
     output.parent.mkdir(parents=True, exist_ok=True)
     files = iter_package_files()
-    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for path in files:
-            archive.write(path, path.relative_to(ROOT).as_posix())
+            archive.writestr(
+                deterministic_zip_info(path),
+                path.read_bytes(),
+                compress_type=zipfile.ZIP_DEFLATED,
+                compresslevel=9,
+            )
     print(output)
     return 0
 

@@ -1,11 +1,23 @@
 {
   "target_state": "to_be",
   "scope_claim": "journey_subset",
+  "language_decision": {
+    "language": "en",
+    "basis": "user",
+    "evidence_refs": [
+      "business_brief"
+    ],
+    "observed_website_languages": [
+      "en"
+    ],
+    "reasoning": "The example brief explicitly requests an English tracking plan."
+  },
   "sources": [
     {
       "source_id": "live_site",
       "source_type": "live_website",
       "reference": "https://example.com/",
+      "sha256": "841606887fa79e7980b494c5029b4d1563e2587876edac95b2f6b1b18087fe07",
       "evidence_role": "live_behavior",
       "state": "as_is",
       "supports": [
@@ -29,24 +41,91 @@
       ]
     }
   ],
+  "discovery_reports": [
+    {
+      "report_id": "discovery_example_com_fixture",
+      "source_id": "live_site",
+      "reference": "example-discovery-report.json",
+      "sha256": "841606887fa79e7980b494c5029b4d1563e2587876edac95b2f6b1b18087fe07",
+      "outcome": "completed",
+      "hint_ids": [
+        "item_consideration",
+        "quote_intentional_start"
+      ],
+      "journey_ids": [
+        "product_discovery",
+        "quote_request"
+      ],
+      "variant_ids": [
+        "product_detail_standard",
+        "quote_request_standard"
+      ]
+    }
+  ],
   "journey_coverage": [
     {
       "journey_id": "product_discovery",
       "material": true,
       "status": "observed",
-      "evidence_refs": ["live_site"],
-      "entry_points": ["https://example.com/products/example-window"],
-      "states_covered": ["entry", "progression"],
-      "variants": ["product detail"]
+      "evidence_refs": [
+        "live_site"
+      ],
+      "entry_points": [
+        "https://example.com/products/example-window"
+      ],
+      "states_covered": [
+        "entry",
+        "progression"
+      ],
+      "variants": [
+        "product detail"
+      ],
+      "variant_coverage": [
+        {
+          "variant_id": "product_detail_standard",
+          "material": true,
+          "status": "observed",
+          "evidence_refs": ["live_site"],
+          "entry_points": ["https://example.com/products/example-window"],
+          "states_covered": ["entry", "progression"]
+        }
+      ],
+      "opportunity_ids": [
+        "product_item_consideration"
+      ]
     },
     {
       "journey_id": "quote_request",
       "material": true,
       "status": "confirmed",
-      "evidence_refs": ["business_brief"],
-      "entry_points": ["https://example.com/request-a-quote"],
-      "states_covered": ["entry", "progression", "success", "failure"],
-      "variants": ["standard quote form"]
+      "evidence_refs": [
+        "business_brief"
+      ],
+      "entry_points": [
+        "https://example.com/request-a-quote"
+      ],
+      "states_covered": [
+        "entry",
+        "progression",
+        "success",
+        "failure"
+      ],
+      "variants": [
+        "standard quote form"
+      ],
+      "variant_coverage": [
+        {
+          "variant_id": "quote_request_standard",
+          "material": true,
+          "status": "confirmed",
+          "evidence_refs": ["business_brief"],
+          "entry_points": ["https://example.com/request-a-quote"],
+          "states_covered": ["entry", "progression", "success", "failure"]
+        }
+      ],
+      "opportunity_ids": [
+        "quote_intentional_start"
+      ]
     }
   ],
   "coverage_gaps": [],
@@ -57,8 +136,24 @@
       "scope": "implementation",
       "kind": "finite",
       "complete": true,
-      "values": ["home", "product_detail", "quote_form", "confirmation"],
-      "evidence_refs": ["live_site"]
+      "values": [
+        "home",
+        "product_detail",
+        "quote_form",
+        "confirmation"
+      ],
+      "evidence_refs": [
+        "live_site"
+      ],
+      "normalization": "controlled_semantic",
+      "value_language": "en"
+      ,
+      "value_labels": [
+        {"value": "home", "label": "home", "language": "en"},
+        {"value": "product_detail", "label": "product detail", "language": "en"},
+        {"value": "quote_form", "label": "quote form", "language": "en"},
+        {"value": "confirmation", "label": "confirmation", "language": "en"}
+      ]
     },
     {
       "domain_id": "login_statuses",
@@ -66,50 +161,251 @@
       "scope": "user",
       "kind": "finite",
       "complete": true,
-      "values": ["logged_out", "logged_in"],
-      "evidence_refs": ["business_brief"]
+      "values": [
+        "logged_out",
+        "logged_in"
+      ],
+      "evidence_refs": [
+        "business_brief"
+      ],
+      "normalization": "controlled_semantic",
+      "value_language": "en"
+      ,
+      "value_labels": [
+        {"value": "logged_out", "label": "logged out", "language": "en"},
+        {"value": "logged_in", "label": "logged in", "language": "en"}
+      ]
     },
     {
       "domain_id": "currencies",
       "parameter_name": "currency",
       "scope": "event",
-      "event_names": ["view_item"],
+      "event_names": [
+        "view_item"
+      ],
       "kind": "finite",
       "complete": true,
-      "values": ["EUR"],
-      "evidence_refs": ["live_site"]
+      "values": [
+        "EUR"
+      ],
+      "evidence_refs": [
+        "live_site"
+      ],
+      "normalization": "technical_identifier"
     },
     {
       "domain_id": "item_colors",
       "parameter_name": "item_color",
       "scope": "item",
-      "event_names": ["view_item"],
+      "event_names": [
+        "view_item"
+      ],
       "kind": "finite",
       "complete": true,
-      "values": ["white", "black", "oak"],
-      "evidence_refs": ["live_site"]
+      "values": [
+        "white",
+        "black",
+        "oak"
+      ],
+      "evidence_refs": [
+        "live_site"
+      ],
+      "normalization": "controlled_semantic",
+      "value_language": "en"
+      ,
+      "value_labels": [
+        {"value": "white", "label": "white", "language": "en"},
+        {"value": "black", "label": "black", "language": "en"},
+        {"value": "oak", "label": "oak", "language": "en"}
+      ]
     },
     {
       "domain_id": "form_names",
       "parameter_name": "form_name",
       "scope": "event",
-      "event_names": ["begin_quote"],
+      "event_names": [
+        "begin_quote"
+      ],
       "kind": "finite",
       "complete": true,
-      "values": ["quote_request"],
-      "evidence_refs": ["business_brief"]
+      "values": [
+        "quote_request"
+      ],
+      "evidence_refs": [
+        "business_brief"
+      ],
+      "normalization": "controlled_semantic",
+      "value_language": "en"
+      ,
+      "value_labels": [
+        {"value": "quote_request", "label": "quote request", "language": "en"}
+      ]
     },
     {
       "domain_id": "project_types",
       "parameter_name": "project_type",
       "scope": "event",
-      "event_names": ["begin_quote"],
+      "event_names": [
+        "begin_quote"
+      ],
       "kind": "finite",
       "complete": true,
-      "values": ["window", "door", "shutter"],
-      "evidence_refs": ["business_brief"]
+      "values": [
+        "window",
+        "door",
+        "shutter"
+      ],
+      "evidence_refs": [
+        "business_brief"
+      ],
+      "normalization": "controlled_semantic",
+      "value_language": "en"
+      ,
+      "value_labels": [
+        {"value": "window", "label": "window", "language": "en"},
+        {"value": "door", "label": "door", "language": "en"},
+        {"value": "shutter", "label": "shutter", "language": "en"}
+      ]
+    },
+    {
+      "domain_id": "user_ids",
+      "parameter_name": "user_id",
+      "scope": "user",
+      "event_names": [
+        "core_data"
+      ],
+      "kind": "dynamic",
+      "normalization": "technical_identifier",
+      "rule": "Use the stable opaque authenticated account identifier.",
+      "dynamic_reason": "identifier",
+      "evidence_refs": [
+        "business_brief"
+      ]
+    },
+    {
+      "domain_id": "item_values",
+      "parameter_name": "value",
+      "scope": "event",
+      "event_names": [
+        "view_item"
+      ],
+      "kind": "dynamic",
+      "normalization": "numeric",
+      "rule": "Calculate the current item value from price and quantity.",
+      "dynamic_reason": "changing_inventory",
+      "evidence_refs": [
+        "live_site"
+      ]
+    },
+    {
+      "domain_id": "item_arrays",
+      "parameter_name": "items",
+      "scope": "event",
+      "event_names": [
+        "view_item"
+      ],
+      "kind": "dynamic",
+      "normalization": "structured",
+      "rule": "Build the array from the rendered product and selected variant.",
+      "dynamic_reason": "structured",
+      "evidence_refs": [
+        "live_site"
+      ]
+    },
+    {
+      "domain_id": "item_ids",
+      "parameter_name": "item_id",
+      "scope": "item",
+      "event_names": [
+        "view_item"
+      ],
+      "kind": "dynamic",
+      "normalization": "technical_identifier",
+      "rule": "Use the stable catalog SKU or product identifier.",
+      "dynamic_reason": "identifier",
+      "evidence_refs": [
+        "live_site"
+      ]
+    },
+    {
+      "domain_id": "item_names",
+      "parameter_name": "item_name",
+      "scope": "item",
+      "event_names": [
+        "view_item"
+      ],
+      "kind": "dynamic",
+      "normalization": "authoritative_raw",
+      "rule": "Use the authoritative current catalog product name.",
+      "dynamic_reason": "changing_inventory",
+      "evidence_refs": [
+        "live_site"
+      ]
+    },
+    {
+      "domain_id": "item_variants",
+      "parameter_name": "item_variant",
+      "scope": "item",
+      "event_names": [
+        "view_item"
+      ],
+      "kind": "dynamic",
+      "normalization": "authoritative_raw",
+      "rule": "Use the authoritative selected primary variant label or code.",
+      "dynamic_reason": "changing_inventory",
+      "evidence_refs": [
+        "live_site"
+      ]
     }
   ],
   "assumptions": [],
-  "official_checks": []
+  "official_checks": [],
+  "measurement_opportunities": [
+    {
+      "opportunity_id": "product_item_consideration",
+      "journey_id": "product_discovery",
+      "variant_id": "product_detail_standard",
+      "name": "Product item consideration",
+      "category": "interaction",
+      "material": true,
+      "evidence_status": "observed",
+      "evidence_refs": [
+        "live_site"
+      ],
+      "business_question": "Which products and variants attract consideration before later commerce actions?",
+      "official_candidate": "view_item",
+      "official_fit": "fit",
+      "decision": "measure",
+      "decision_reason": "The official ecommerce event represents the rendered product-detail state.",
+      "event_names": [
+        "view_item"
+      ],
+      "discovery_hint_ids": [
+        "item_consideration"
+      ]
+    },
+    {
+      "opportunity_id": "quote_intentional_start",
+      "journey_id": "quote_request",
+      "variant_id": "quote_request_standard",
+      "name": "Intentional quote start",
+      "category": "progression",
+      "material": true,
+      "evidence_status": "confirmed",
+      "evidence_refs": [
+        "business_brief"
+      ],
+      "business_question": "How many visitors intentionally enter the quote journey, and for which projects?",
+      "official_candidate": "form_start",
+      "official_fit": "gap",
+      "decision": "measure",
+      "decision_reason": "The business start spans interfaces that do not all expose a standard form start.",
+      "event_names": [
+        "begin_quote"
+      ],
+      "discovery_hint_ids": [
+        "quote_intentional_start"
+      ]
+    }
+  ]
 }

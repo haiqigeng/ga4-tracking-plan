@@ -12,7 +12,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "4.0.0"
+      "const": "5.0.0"
     },
     "document": {
       "$ref": "#/$defs/document"
@@ -221,7 +221,9 @@
       "required": [
         "url",
         "section",
-        "wording_origin"
+        "wording_origin",
+        "official_text",
+        "checked_date"
       ],
       "properties": {
         "url": {
@@ -238,6 +240,10 @@
             "exact",
             "faithful_translation"
           ]
+        },
+        "official_text": {
+          "type": "string",
+          "minLength": 1
         },
         "checked_date": {
           "type": "string",
@@ -280,6 +286,8 @@
         "requirement",
         "definition",
         "value_rule",
+        "value_mode",
+        "value_evidence_refs",
         "destination"
       ],
       "properties": {
@@ -334,6 +342,21 @@
           "type": "string",
           "minLength": 1
         },
+        "value_mode": {
+          "enum": [
+            "controlled_semantic",
+            "official_enum",
+            "technical_identifier",
+            "authoritative_raw",
+            "numeric",
+            "boolean",
+            "structured"
+          ]
+        },
+        "value_language": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(?:-[A-Z]{2})?$"
+        },
         "allowed_values": {
           "type": "array",
           "maxItems": 50,
@@ -363,6 +386,7 @@
         },
         "value_evidence_refs": {
           "type": "array",
+          "minItems": 1,
           "uniqueItems": true,
           "items": {
             "type": "string",
@@ -390,6 +414,19 @@
         }
       },
       "allOf": [
+        {
+          "if": {
+            "properties": {
+              "value_mode": {
+                "const": "controlled_semantic"
+              }
+            },
+            "required": ["value_mode"]
+          },
+          "then": {
+            "required": ["value_language"]
+          }
+        },
         {
           "if": {
             "properties": {
@@ -523,6 +560,15 @@
           "type": "string",
           "minLength": 1
         },
+        "measurement_opportunity_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{1,79}$"
+          }
+        },
         "official_source": {
           "$ref": "#/$defs/officialSource"
         },
@@ -553,7 +599,7 @@
             "required": ["classification"]
           },
           "then": {
-            "required": ["business_question"]
+            "required": ["business_question", "measurement_opportunity_ids"]
           }
         },
         {

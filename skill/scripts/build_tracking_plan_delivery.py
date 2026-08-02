@@ -16,6 +16,7 @@ from delivery_artifacts import (
     expected_events_contract,
 )
 from diff_tracking_plans import compare
+from discovery_contract import load_discovery_report, validate_discovery_bindings
 from generate_tracking_plan_workbook import build_workbook
 from jsonschema import Draft202012Validator, FormatChecker
 from maintenance_analysis import analyze_change_impact, detect_context_drift
@@ -35,6 +36,7 @@ RELEASE = ROOT / "release.json"
 CONTRACTS = {
     "tracking-plan.schema.json": ROOT / "references" / "schema-tracking-plan.json",
     "analysis-context.schema.json": ROOT / "references" / "schema-analysis-context.json",
+    "discovery-report.schema.json": ROOT / "references" / "schema-discovery-report.json",
     "expected-events.schema.json": ROOT / "references" / "schema-expected-events.json",
     "delivery-handoff.schema.json": ROOT / "references" / "schema-delivery-handoff.json",
     "change-request.schema.json": ROOT / "references" / "schema-change-request.json",
@@ -57,8 +59,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mapping", type=Path)
     parser.add_argument("--previous-plan", type=Path)
     parser.add_argument("--previous-analysis-context", type=Path)
+    parser.add_argument(
+        "--previous-discovery-report",
+        type=Path,
+        help="Prior rendered discovery report for structural drift comparison.",
+    )
     parser.add_argument("--change-request", type=Path)
     parser.add_argument("--screenshot-dir", type=Path)
+    parser.add_argument(
+        "--discovery-report",
+        type=Path,
+        action="append",
+        default=[],
+        help=("Original rendered discovery report bound by analysis-context hash. Repeat for each report. Required when live-website evidence is used."),
+    )
     parser.add_argument(
         "--evidence",
         type=Path,
@@ -99,10 +113,7 @@ def _validate_json(instance: Any, schema_path: Path, label: str) -> None:
     )
     errors = sorted(validator.iter_errors(instance), key=lambda item: list(item.absolute_path))
     if errors:
-        rendered = "\n".join(
-            f"- {'/'.join(str(part) for part in error.absolute_path) or '<root>'}: {error.message}"
-            for error in errors
-        )
+        rendered = "\n".join(f"- {'/'.join(str(part) for part in error.absolute_path) or '<root>'}: {error.message}" for error in errors)
         raise ValueError(f"Generated {label} failed its contract:\n{rendered}")
 
 
@@ -150,6 +161,13 @@ def build_delivery(args: argparse.Namespace) -> Path:
     )
     if context_issues:
         raise ValueError("Analysis-context delivery gate failed:\n" + render_text(context_issues))
+    discovery_binding_errors = validate_discovery_bindings(
+        analysis_context,
+        args.discovery_report,
+        require_live_report=True,
+    )
+    if discovery_binding_errors:
+        raise ValueError("Discovery-to-opportunity delivery gate failed:\n- " + "\n- ".join(discovery_binding_errors))
 
     official = check(
         plan,
@@ -159,10 +177,7 @@ def build_delivery(args: argparse.Namespace) -> Path:
         refresh=args.refresh_official,
     )
     if official["errors"]:
-        raise ValueError(
-            "Official-source gate failed:\n"
-            + "\n".join(f"- {error}" for error in official["errors"])
-        )
+        raise ValueError("Official-source gate failed:\n" + "\n".join(f"- {error}" for error in official["errors"]))
 
     output = args.output_dir.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -186,15 +201,34 @@ def build_delivery(args: argparse.Namespace) -> Path:
                 (official_path, "official_source_verification"),
             ]
         )
+        for source in args.discovery_report:
+            target = internal / "discovery" / source.name
+            counter = 2
+            while target.exists():
+                target = internal / "discovery" / f"{source.stem}-{counter}{source.suffix}"
+                counter += 1
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+            artifacts.append((target, "rendered_discovery_report"))
         if args.previous_analysis_context:
             previous_context = load_json(args.previous_analysis_context)
             previous_context_issues = validate_analysis_context(previous_context)
             if previous_context_issues:
-                raise ValueError(
-                    "Previous analysis-context input is invalid:\n"
-                    + render_text(previous_context_issues)
-                )
-            drift = detect_context_drift(previous_context, analysis_context, plan)
+                raise ValueError("Previous analysis-context input is invalid:\n" + render_text(previous_context_issues))
+            current_discovery = None
+            previous_discovery = None
+            if args.previous_discovery_report or args.discovery_report:
+                if not args.previous_discovery_report or len(args.discovery_report) != 1:
+                    raise ValueError("Rendered delivery drift needs one --previous-discovery-report and exactly one current --discovery-report.")
+                previous_discovery = load_discovery_report(args.previous_discovery_report)
+                current_discovery = load_discovery_report(args.discovery_report[0])
+            drift = detect_context_drift(
+                previous_context,
+                analysis_context,
+                plan,
+                previous_discovery,
+                current_discovery,
+            )
             _validate_json(
                 drift,
                 ROOT / "references" / "schema-drift-report.json",
@@ -218,10 +252,7 @@ def build_delivery(args: argparse.Namespace) -> Path:
                 "business change impact report",
             )
             if impact["unresolved_selectors"]:
-                raise ValueError(
-                    "Business change selectors do not resolve in the plan: "
-                    + ", ".join(impact["unresolved_selectors"])
-                )
+                raise ValueError("Business change selectors do not resolve in the plan: " + ", ".join(impact["unresolved_selectors"]))
             impact_path = internal / "change-impact.json"
             _write_json(impact_path, impact)
             artifacts.append((impact_path, "business_change_impact"))
@@ -245,13 +276,10 @@ def build_delivery(args: argparse.Namespace) -> Path:
             schema_path = schemas_dir / f"{event_name}.schema.json"
             _write_json(schema_path, schema)
             validator = Draft202012Validator(schema)
-            example_errors = list(
-                validator.iter_errors(event.get("data_layer", {}).get("push", {}))
-            )
+            example_errors = list(validator.iter_errors(event.get("data_layer", {}).get("push", {})))
             if example_errors:
                 raise ValueError(
-                    f'Generated event schema rejects the canonical push for "{event_name}": '
-                    + "; ".join(error.message for error in example_errors)
+                    f'Generated event schema rejects the canonical push for "{event_name}": ' + "; ".join(error.message for error in example_errors)
                 )
             artifacts.append((schema_path, "event_push_schema"))
 
@@ -270,20 +298,14 @@ def build_delivery(args: argparse.Namespace) -> Path:
             previous = load_json(args.previous_plan)
             previous_issues = validate_plan(previous)
             if previous_issues:
-                raise ValueError(
-                    "Previous-plan diff input is invalid:\n" + render_text(previous_issues)
-                )
+                raise ValueError("Previous-plan diff input is invalid:\n" + render_text(previous_issues))
             difference = compare(previous, plan)
             changes = difference["changes"]
             diff_path = internal / "semantic-diff.json"
             _write_json(diff_path, difference)
             artifacts.append((diff_path, "semantic_change_log"))
 
-        workbook_path = staging / (
-            "tracking-plan.xlsm"
-            if args.template and args.template.suffix.lower() == ".xlsm"
-            else "tracking-plan.xlsx"
-        )
+        workbook_path = staging / ("tracking-plan.xlsm" if args.template and args.template.suffix.lower() == ".xlsm" else "tracking-plan.xlsx")
         if args.template:
             mapping = load_json(args.mapping)
             workbook = adapt(plan, args.template, mapping)
@@ -309,21 +331,13 @@ def build_delivery(args: argparse.Namespace) -> Path:
             )
             fidelity = add_package_fidelity(fidelity, args.template, workbook_path)
             if fidelity["violations"]:
-                raise ValueError(
-                    "Saved supplied-template fidelity gate failed: "
-                    + ", ".join(
-                        str(item.get("kind")) for item in fidelity["violations"][:12]
-                    )
-                )
+                raise ValueError("Saved supplied-template fidelity gate failed: " + ", ".join(str(item.get("kind")) for item in fidelity["violations"][:12]))
             fidelity_path = internal / "template-fidelity.json"
             _write_json(fidelity_path, fidelity)
             artifacts.append((fidelity_path, "supplied_template_fidelity"))
         workbook_errors = validate_workbook(workbook_path, plan)
         if workbook_errors:
-            raise ValueError(
-                "Rendered workbook gate failed:\n"
-                + "\n".join(f"- {error}" for error in workbook_errors)
-            )
+            raise ValueError("Rendered workbook gate failed:\n" + "\n".join(f"- {error}" for error in workbook_errors))
         artifacts.append((workbook_path, "human_tracking_plan_workbook"))
 
         release = load_json(RELEASE)

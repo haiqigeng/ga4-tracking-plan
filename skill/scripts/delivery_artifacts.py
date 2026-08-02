@@ -32,9 +32,7 @@ def _schema_from_value(value: Any) -> dict[str, Any]:
         return {
             "type": "object",
             "additionalProperties": False,
-            "properties": {
-                str(key): _schema_from_value(child) for key, child in value.items()
-            },
+            "properties": {str(key): _schema_from_value(child) for key, child in value.items()},
             "required": [],
         }
     return {"type": ["null", "string", "number", "boolean", "object", "array"]}
@@ -75,13 +73,7 @@ def _apply_parameter(
                 inferred = {"type": "array", "items": inferred}
             existing = properties.get(name, {})
             if existing.get("type") == "array" and inferred.get("type") == "array":
-                existing.update(
-                    {
-                        key: value
-                        for key, value in inferred.items()
-                        if key not in {"items"}
-                    }
-                )
+                existing.update({key: value for key, value in inferred.items() if key not in {"items"}})
                 existing.setdefault("items", inferred.get("items", {}))
                 properties[name] = existing
             else:
@@ -163,11 +155,7 @@ def expected_events_contract(plan: dict[str, Any]) -> dict[str, Any]:
                 "scope": parameter.get("scope"),
                 "type": parameter.get("type"),
                 "requirement": parameter.get("requirement"),
-                **(
-                    {"condition": parameter.get("condition")}
-                    if parameter.get("condition")
-                    else {}
-                ),
+                **({"condition": parameter.get("condition")} if parameter.get("condition") else {}),
                 "data_layer_path": parameter.get("data_layer_path"),
                 "destination": parameter.get("destination"),
             }
@@ -180,11 +168,8 @@ def expected_events_contract(plan: dict[str, Any]) -> dict[str, Any]:
                 "event_name": event_name,
                 "classification": event.get("classification"),
                 "journey_ids": event.get("journey_ids", []),
-                **(
-                    {"business_question": event.get("business_question")}
-                    if event.get("business_question")
-                    else {}
-                ),
+                "measurement_opportunity_ids": event.get("measurement_opportunity_ids", []),
+                **({"business_question": event.get("business_question")} if event.get("business_question") else {}),
                 "trigger": event.get("trigger"),
                 "locations": event.get("locations", []),
                 "clear_before_push": event.get("data_layer", {}).get("clear", []),
@@ -239,9 +224,7 @@ def build_handoff(
         {
             str(source.get("reference"))
             for source in analysis_context.get("sources", [])
-            if isinstance(source, dict)
-            and source.get("source_type") == "live_website"
-            and str(source.get("reference", "")).startswith(("http://", "https://"))
+            if isinstance(source, dict) and source.get("source_type") == "live_website" and str(source.get("reference", "")).startswith(("http://", "https://"))
         }
     )
     return {
@@ -262,6 +245,18 @@ def build_handoff(
             "state": approval_state,
             **({"approved_by": approved_by} if approved_by else {}),
         },
+        "discovery_reports": [
+            {
+                "report_id": report.get("report_id"),
+                "source_id": report.get("source_id"),
+                "sha256": report.get("sha256"),
+                "outcome": report.get("outcome"),
+                "hint_ids": report.get("hint_ids", []),
+                "journey_ids": report.get("journey_ids", []),
+            }
+            for report in analysis_context.get("discovery_reports", [])
+            if isinstance(report, dict)
+        ],
         "upstream_evidence": upstream,
         "artifacts": artifacts,
     }

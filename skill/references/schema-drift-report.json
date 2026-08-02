@@ -3,11 +3,14 @@
   "title": "GA4 tracking-plan evidence drift report",
   "type": "object",
   "additionalProperties": false,
-  "required": ["report_version", "status", "changes", "affected_events", "notes"],
+  "required": ["report_version", "status", "changes", "discovery_changes", "affected_journeys", "affected_opportunities", "affected_events", "notes"],
   "properties": {
-    "report_version": {"const": "1.0.0"},
+    "report_version": {"const": "2.0.0"},
     "status": {"enum": ["unchanged", "review_required"]},
     "changes": {"type": "array", "items": {"type": "object"}},
+    "discovery_changes": {"type": "array", "items": {"type": "object"}},
+    "affected_journeys": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "affected_opportunities": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
     "affected_events": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
     "notes": {"type": "array", "items": {"type": "string"}}
   }

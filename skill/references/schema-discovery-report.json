@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rendered website discovery report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "discovery_version",
+    "report_id",
+    "generated_at",
+    "root_url",
+    "outcome",
+    "rounds",
+    "language_summary",
+    "pages_sampled",
+    "measurement_opportunity_hints",
+    "journey_coverage_ledger",
+    "coverage_gaps",
+    "automatic_interaction_runs"
+  ],
+  "properties": {
+    "discovery_version": {"const": "1.1.0"},
+    "report_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,119}$"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "root_url": {"type": "string", "format": "uri", "pattern": "^https?://"},
+    "outcome": {"enum": ["completed", "partial", "blocked"]},
+    "rounds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "round_number",
+          "attempted_page_count",
+          "usable_page_count",
+          "new_candidate_count",
+          "material_unvisited_candidate_count",
+          "stop_reason"
+        ],
+        "properties": {
+          "round_number": {"type": "integer", "minimum": 1},
+          "attempted_page_count": {"type": "integer", "minimum": 0},
+          "usable_page_count": {"type": "integer", "minimum": 0},
+          "new_candidate_count": {"type": "integer", "minimum": 0},
+          "material_unvisited_candidate_count": {"type": "integer", "minimum": 0},
+          "stop_reason": {
+            "enum": [
+              "continue_targeted_discovery",
+              "material_coverage_complete",
+              "candidate_queue_exhausted",
+              "max_rounds_reached",
+              "blocked"
+            ]
+          }
+        }
+      }
+    },
+    "language_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary_language", "observed_languages", "evidence_urls"],
+      "properties": {
+        "primary_language": {"type": "string", "pattern": "^[a-z]{2}(?:-[A-Z]{2})?$"},
+        "observed_languages": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z]{2}(?:-[A-Z]{2})?$"}
+        },
+        "evidence_urls": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "format": "uri"}
+        }
+      }
+    },
+    "pages_sampled": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["url", "template"],
+        "properties": {
+          "url": {"type": "string", "format": "uri"},
+          "template": {"type": "string", "minLength": 1},
+          "language": {"type": "string"},
+          "rendered_structure_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "rendered_dom_sha256": {"type": "string", "pattern": "^(?:[a-f0-9]{64})?$"}
+        }
+      }
+    },
+    "measurement_opportunity_hints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hint_id",
+          "hint_key",
+          "journey_id",
+          "variant_id",
+          "category",
+          "materiality",
+          "evidence_urls",
+          "evidence_structure_hashes",
+          "reason",
+          "requires_interactive_review"
+        ],
+        "properties": {
+          "hint_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "hint_key": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "journey_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "variant_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "category": {"enum": ["outcome", "progression", "diagnostic", "interaction", "context"]},
+          "materiality": {"enum": ["material", "candidate"]},
+          "evidence_urls": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "format": "uri"}
+          },
+          "evidence_structure_hashes": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+          },
+          "reason": {"type": "string", "minLength": 1},
+          "requires_interactive_review": {"type": "boolean"}
+        }
+      }
+    },
+    "journey_coverage_ledger": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "journey_id",
+          "material",
+          "status",
+          "entry_points",
+          "states_covered",
+          "evidence_urls",
+          "variant_coverage"
+        ],
+        "properties": {
+          "journey_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "material": {"type": "boolean"},
+          "status": {"enum": ["observed", "partial", "blocked"]},
+          "entry_points": {"type": "array", "items": {"type": "string", "format": "uri"}},
+          "states_covered": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"enum": ["entry", "progression", "success", "failure", "empty", "post_conversion"]}
+          },
+          "evidence_urls": {"type": "array", "items": {"type": "string", "format": "uri"}},
+          "variant_coverage": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "variant_id",
+                "material",
+                "status",
+                "entry_points",
+                "states_covered",
+                "evidence_urls",
+                "unvisited_material_candidates"
+              ],
+              "properties": {
+                "variant_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+                "material": {"type": "boolean"},
+                "status": {"enum": ["observed", "partial", "blocked"]},
+                "entry_points": {"type": "array", "items": {"type": "string", "format": "uri"}},
+                "states_covered": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {"enum": ["entry", "progression", "success", "failure", "empty", "post_conversion"]}
+                },
+                "evidence_urls": {"type": "array", "items": {"type": "string", "format": "uri"}},
+                "unvisited_material_candidates": {"type": "array", "items": {"type": "string", "format": "uri"}}
+              }
+            }
+          }
+        }
+      }
+    },
+    "coverage_gaps": {"type": "array", "items": {"type": "object"}},
+    "automatic_interaction_runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["recipe_id", "journey_id", "variant_id", "start_url", "outcome", "actions"],
+        "properties": {
+          "recipe_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,119}$"},
+          "journey_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "variant_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "start_url": {"type": "string", "format": "uri"},
+          "outcome": {"enum": ["completed", "partial", "blocked", "stopped_before_consequential_action"]},
+          "actions": {"type": "array", "items": {"type": "object"}}
+        }
+      }
+    },
+    "finite_value_candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_id",
+          "journey_id",
+          "variant_id",
+          "source_label",
+          "complete",
+          "observed_value_count",
+          "values",
+          "evidence_urls"
+        ],
+        "properties": {
+          "candidate_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,119}$"},
+          "journey_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "variant_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "source_label": {"type": "string", "minLength": 1},
+          "complete": {"type": "boolean"},
+          "observed_value_count": {"type": "integer", "minimum": 1},
+          "values": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["value", "label"],
+              "properties": {
+                "value": {"type": "string", "minLength": 1},
+                "label": {"type": "string", "minLength": 1}
+              }
+            }
+          },
+          "evidence_urls": {"type": "array", "items": {"type": "string", "format": "uri"}}
+        }
+      }
+    }
+  }
+}

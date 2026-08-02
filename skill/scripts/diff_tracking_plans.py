@@ -12,19 +12,14 @@ from validate_tracking_plan import render_text, validate_plan
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Create a semantic change log between two GA4 tracking plans."
-    )
+    parser = argparse.ArgumentParser(description="Create a semantic change log between two GA4 tracking plans.")
     parser.add_argument("before", type=Path)
     parser.add_argument("after", type=Path)
     parser.add_argument("--output", "-o", type=Path, required=True)
     parser.add_argument(
         "--allow-visible-recovery",
         action="store_true",
-        help=(
-            "Allow best-effort recovery when an XLSX input has no embedded "
-            "canonical model."
-        ),
+        help=("Allow best-effort recovery when an XLSX input has no embedded canonical model."),
     )
     parser.add_argument(
         "--reconcile-visible-edits",
@@ -70,25 +65,15 @@ def _change(
 
 
 def _indexed(values: list[dict[str, Any]], key: str) -> dict[str, dict[str, Any]]:
-    return {
-        str(item.get(key)): item
-        for item in values
-        if isinstance(item, dict) and item.get(key)
-    }
+    return {str(item.get(key)): item for item in values if isinstance(item, dict) and item.get(key)}
 
 
 def _parameter_key(parameter: dict[str, Any]) -> str:
-    return "|".join(
-        str(parameter.get(name, ""))
-        for name in ("name", "scope")
-    )
+    return "|".join(str(parameter.get(name, "")) for name in ("name", "scope"))
 
 
 def _parameter_display_key(parameter: dict[str, Any]) -> str:
-    return "|".join(
-        str(parameter.get(name, ""))
-        for name in ("name", "scope", "data_layer_path")
-    )
+    return "|".join(str(parameter.get(name, "")) for name in ("name", "scope", "data_layer_path"))
 
 
 def _compare_parameters(
@@ -174,7 +159,7 @@ def compare(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
                     "changed",
                     "document",
                     f"document:{field}",
-                    f'Changed document {field.replace("_", " ")}.',
+                    f"Changed document {field.replace('_', ' ')}.",
                     previous_document.get(field),
                     current_document.get(field),
                 )
@@ -193,13 +178,9 @@ def compare(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
     previous_journeys = _indexed(before.get("journeys", []), "journey_id")
     current_journeys = _indexed(after.get("journeys", []), "journey_id")
     for key in sorted(current_journeys.keys() - previous_journeys.keys()):
-        changes.append(
-            _change("added", "journey", key, f'Added journey "{key}".', after=current_journeys[key])
-        )
+        changes.append(_change("added", "journey", key, f'Added journey "{key}".', after=current_journeys[key]))
     for key in sorted(previous_journeys.keys() - current_journeys.keys()):
-        changes.append(
-            _change("deprecated", "journey", key, f'Removed journey "{key}".', before=previous_journeys[key])
-        )
+        changes.append(_change("deprecated", "journey", key, f'Removed journey "{key}".', before=previous_journeys[key]))
     for key in sorted(previous_journeys.keys() & current_journeys.keys()):
         if previous_journeys[key] != current_journeys[key]:
             changes.append(
@@ -216,13 +197,9 @@ def compare(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
     previous_events = _indexed(before.get("events", []), "event_name")
     current_events = _indexed(after.get("events", []), "event_name")
     for key in sorted(current_events.keys() - previous_events.keys()):
-        changes.append(
-            _change("added", "event", key, f'Added event "{key}".', after=current_events[key])
-        )
+        changes.append(_change("added", "event", key, f'Added event "{key}".', after=current_events[key]))
     for key in sorted(previous_events.keys() - current_events.keys()):
-        changes.append(
-            _change("deprecated", "event", key, f'Removed event "{key}".', before=previous_events[key])
-        )
+        changes.append(_change("deprecated", "event", key, f'Removed event "{key}".', before=previous_events[key]))
     for key in sorted(previous_events.keys() & current_events.keys()):
         old = previous_events[key]
         new = current_events[key]
@@ -253,10 +230,7 @@ def compare(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
             )
         )
 
-    counts = {
-        action: sum(1 for item in changes if item["action"] == action)
-        for action in ("added", "changed", "deprecated")
-    }
+    counts = {action: sum(1 for item in changes if item["action"] == action) for action in ("added", "changed", "deprecated")}
     return {
         "before_version": before.get("document", {}).get("version", ""),
         "after_version": after.get("document", {}).get("version", ""),
@@ -280,10 +254,7 @@ def main() -> int:
         )
         issues = [*validate_plan(before), *validate_plan(after)]
         if issues:
-            raise ValueError(
-                "Semantic diff requires two delivery-valid canonical inputs:\n"
-                + render_text(issues)
-            )
+            raise ValueError("Semantic diff requires two delivery-valid canonical inputs:\n" + render_text(issues))
         result = compare(before, after)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(

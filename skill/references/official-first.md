@@ -2,15 +2,20 @@
 
 ## Events
 
-For every meaningful action:
+For every material measurement opportunity:
 
 1. Define the business outcome or analysis question.
 2. Check current official GA4 event documentation.
 3. Use the official event when its semantics genuinely match.
 4. Use an official ecommerce event when an item, promotion, checkout, or
    transaction action fits its documented semantics.
-5. Create a custom event only when the official model cannot represent the
+5. Create a custom event when the official model cannot represent the
    meaningful business or diagnostic action.
+
+Official first defines the order of evaluation. It does not create a higher
+burden of proof for custom events than for official events, and it never allows
+an evidenced opportunity to disappear merely because no recommended event
+fits.
 
 Record that concrete purpose in the machine event as `business_question` for
 every non-context event, whether official or custom. It must state the analysis
@@ -97,17 +102,25 @@ Definitions explain meaning. Triggers explain firing. Do not merge them.
 ## Finite Values
 
 Exhaust a stable observable domain when it contains up to 50 practical values.
-Show normalized values in the selected workbook language unless they are
-official codes, technical identifiers, numbers, booleans, or authoritative raw
-values.
+Show controlled semantic values in the selected workbook language and normalize
+them to lowercase ASCII `snake_case`. Preserve official enums, codes, technical
+identifiers, numbers, booleans, free text, and authoritative raw values in the
+format required by their source.
 
-Every project-specific finite list must reference the exact analysis-context
-value domain used to exhaust it; that domain points to rendered website,
-business, or technical evidence. An official parameter does not make its
-website-specific values official: for example, `currency` is an official
-parameter, while the site's supported currency list is website evidence. A
-genuinely prescribed official enum, specifically the documented
-`customer_type` values, does not need a project value-domain reference.
+Classify every parameter value domain internally as finite or dynamic. A
+dynamic domain must state why it is not exhaustible: free text, identifier,
+URL, changing inventory, structured value, inaccessible evidence, or more than
+50 observed values. Do not omit the domain record because enumeration is
+inconvenient.
+
+Every finite list must reference the exact analysis-context value domain used
+to exhaust it. A project-specific domain points to rendered website, business,
+or technical evidence. An official parameter does not make its website-
+specific values official: for example, `currency` is an official parameter,
+while the site's supported currency list is website evidence. A genuinely
+prescribed enum, specifically the documented `customer_type` values, uses an
+`official_enum` domain whose evidence is the checked official source rather
+than scraped project values.
 
 Do not exhaust:
 

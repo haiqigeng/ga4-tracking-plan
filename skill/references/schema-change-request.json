@@ -14,6 +14,7 @@
       "additionalProperties": false,
       "properties": {
         "journey_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "opportunity_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
         "event_names": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
         "value_domain_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
         "parameters": {

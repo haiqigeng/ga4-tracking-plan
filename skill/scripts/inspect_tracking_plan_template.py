@@ -12,55 +12,86 @@ from openpyxl import load_workbook
 
 ALIASES = {
     "event": {
-        "event", "event name", "event_name", "evenement", "nom evenement",
-        "nom de levenement", "nom de l evenement",
+        "event",
+        "event name",
+        "event_name",
+        "evenement",
+        "nom evenement",
+        "nom de levenement",
+        "nom de l evenement",
     },
     "journey": {"journey", "parcours", "funnel", "etape du parcours"},
     "classification": {"classification", "type evenement", "event type"},
     "definition": {"definition", "description", "explication"},
     "trigger": {
-        "trigger", "declencheur", "condition de declenchement",
+        "trigger",
+        "declencheur",
+        "condition de declenchement",
         "regle de declenchement",
     },
     "locations": {
-        "locations", "pages routes components", "emplacement", "page", "url",
+        "locations",
+        "pages routes components",
+        "emplacement",
+        "page",
+        "url",
         "pages routes composants",
     },
     "variables": {
-        "variables", "parameters", "parametres", "variables propres a levenement",
+        "variables",
+        "parameters",
+        "parametres",
+        "variables propres a levenement",
         "event specific variables",
     },
     "variable": {
-        "variable", "parameter", "parametre", "nom variable", "nom du parametre",
+        "variable",
+        "parameter",
+        "parametre",
+        "nom variable",
+        "nom du parametre",
     },
     "scope": {"scope", "portee", "niveau"},
     "type": {"type", "format", "type format"},
     "requirement": {"requirement", "exigence", "statut", "obligation"},
     "condition": {"condition", "condition dexigence", "required when"},
     "values": {
-        "possible values rule", "valeurs possibles regle", "valeurs des variables",
-        "regles de valeurs", "regle de valeur", "valeurs possibles",
+        "possible values rule",
+        "valeurs possibles regle",
+        "valeurs des variables",
+        "valeurs possibles",
+    },
+    "rule": {"rule", "value rule", "regle", "regle de valeur"},
+    "possible_values_or_examples": {
+        "possible values or examples",
+        "possible values or example",
+        "valeurs possibles ou exemples",
+        "valeurs possibles ou exemple",
     },
     "example": {"example", "exemple", "example value", "valeur exemple"},
     "concerned_events": {
-        "concerned events", "evenements concernes", "disponibilite par evenement",
+        "concerned events",
+        "evenements concernes",
+        "disponibilite par evenement",
     },
     "source_path": {
-        "datalayer path source", "chemin datalayer source", "source",
+        "datalayer path source",
+        "chemin datalayer source",
+        "source",
         "chemin datalayer",
     },
     "notes": {"notes", "note"},
     "datalayer": {
-        "datalayer specification", "specification datalayer", "datalayer",
+        "datalayer specification",
+        "specification datalayer",
+        "datalayer",
         "exemple datalayer",
     },
 }
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Inspect a supplied tracking-plan workbook and propose semantic regions."
-    )
+    parser = argparse.ArgumentParser(description="Inspect a supplied tracking-plan workbook and propose semantic regions.")
     parser.add_argument("template", type=Path)
     parser.add_argument("--output", "-o", type=Path, required=True)
     return parser.parse_args()
@@ -72,10 +103,7 @@ def normalize(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", " ", text.casefold()).strip()
 
 
-NORMALIZED_ALIASES = {
-    field: {normalize(value) for value in values}
-    for field, values in ALIASES.items()
-}
+NORMALIZED_ALIASES = {field: {normalize(value) for value in values} for field, values in ALIASES.items()}
 
 
 def field_for(value: Any) -> str | None:
@@ -152,9 +180,24 @@ def classify_regions(
             data_layer_table = candidate
         if not event_matrix and {"event", "definition"} <= fields:
             event_matrix = candidate
-        if not parameter_reference and "variable" in fields and len(
-            fields & {"scope", "type", "definition", "values", "example", "concerned_events"}
-        ) >= 3:
+        if (
+            not parameter_reference
+            and "variable" in fields
+            and len(
+                fields
+                & {
+                    "scope",
+                    "type",
+                    "definition",
+                    "values",
+                    "rule",
+                    "possible_values_or_examples",
+                    "example",
+                    "concerned_events",
+                }
+            )
+            >= 3
+        ):
             parameter_reference = candidate
     return event_matrix, parameter_reference, data_layer_table
 
@@ -166,24 +209,31 @@ def event_tab_candidate(sheet) -> dict[str, Any] | None:
             field = field_for(sheet.cell(row, column).value)
             if field and field not in field_cells:
                 field_cells[field] = sheet.cell(row, column).coordinate
-    if "event" not in field_cells or len(
-        set(field_cells) & {"definition", "trigger", "locations", "datalayer"}
-    ) < 2:
+    if "event" not in field_cells or len(set(field_cells) & {"definition", "trigger", "locations", "datalayer"}) < 2:
         return None
-    field_rows = {
-        sheet[coordinate].row
-        for field, coordinate in field_cells.items()
-        if field in {"event", "definition", "trigger", "locations", "datalayer"}
-    }
+    field_rows = {sheet[coordinate].row for field, coordinate in field_cells.items() if field in {"event", "definition", "trigger", "locations", "datalayer"}}
     if len(field_rows) < 3:
         return None
     event_label = sheet[field_cells["event"]]
     value_cell = sheet.cell(event_label.row, event_label.column + 1).coordinate
     parameter_region = None
     for candidate in header_candidates(sheet):
-        if "variable" in candidate["columns"] and len(
-            set(candidate["columns"]) & {"scope", "type", "requirement", "definition", "values"}
-        ) >= 3:
+        if (
+            "variable" in candidate["columns"]
+            and len(
+                set(candidate["columns"])
+                & {
+                    "scope",
+                    "type",
+                    "requirement",
+                    "definition",
+                    "values",
+                    "rule",
+                    "possible_values_or_examples",
+                }
+            )
+            >= 3
+        ):
             parameter_region = candidate
             break
     data_layer_cell = ""
@@ -218,26 +268,16 @@ def inspect(path: Path) -> dict[str, Any]:
         keep_links=True,
         keep_vba=path.suffix.lower() == ".xlsm",
     )
-    candidates = [
-        candidate
-        for sheet in workbook.worksheets
-        for candidate in header_candidates(sheet)
-    ]
+    candidates = [candidate for sheet in workbook.worksheets for candidate in header_candidates(sheet)]
     event_matrix, parameter_reference, data_layer_table = classify_regions(candidates)
-    event_tabs = [
-        candidate
-        for sheet in workbook.worksheets
-        if (candidate := event_tab_candidate(sheet)) is not None
-    ]
+    event_tabs = [candidate for sheet in workbook.worksheets if (candidate := event_tab_candidate(sheet)) is not None]
     review: list[str] = []
     if not event_matrix:
         review.append("No semantic Event Matrix region was recognized.")
     if not parameter_reference:
         review.append("No semantic Parameter Reference region was recognized.")
     if not event_tabs and not data_layer_table:
-        review.append(
-            "No event-tab or dataLayer-table region was recognized; do not add sections without template approval."
-        )
+        review.append("No event-tab or dataLayer-table region was recognized; do not add sections without template approval.")
     return {
         "mapping_version": "1.0",
         "template": {

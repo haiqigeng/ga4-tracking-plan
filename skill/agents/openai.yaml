@@ -1,4 +1,4 @@
 interface:
   display_name: "GA4 Tracking Plan"
   short_description: "Create complete, human-first GA4 dataLayer specifications"
-  default_prompt: "Use $ga4-tracking-plan to investigate and safely test the real journeys, validate evidence coverage and current official GA4 semantics, add custom semantics only for demonstrated gaps, and deliver a lean XLSX tracking plan with its canonical implementation and approval contracts."
+  default_prompt: "Use $ga4-tracking-plan to investigate and safely exercise the real journeys and material interactions, close every measurement opportunity as measured, excluded, or explicitly blocked, validate current official GA4 semantics first, add precise custom semantics for demonstrated gaps, and deliver a lean XLSX tracking plan with its canonical implementation contracts."

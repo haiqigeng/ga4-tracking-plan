@@ -43,13 +43,14 @@ specification containing:
 - concrete website trigger;
 - pages, routes, states, or components;
 - event-specific parameters only;
-- parameter scope, type, requirement, definition, values, and example;
+- parameter scope, type, requirement, definition, rule, and possible values or example;
 - one quoted dataLayer example.
 
 The canonical machine event also retains its concrete business question plus
-parameter conditions, classifications, destinations, sources, and dataLayer
-paths for validation and maintenance. Those internal fields are not
-automatically visible workbook columns.
+measurement-opportunity links, parameter conditions, classifications,
+destinations, sources, value-domain decisions, and dataLayer paths for
+validation and maintenance. Those internal fields are not automatically
+visible workbook columns.
 
 The Event Matrix, Parameter Reference, event tabs, and optional exports are
 derived views of that same event specification. None is a separately authored
@@ -62,6 +63,7 @@ The standard delivery separates audiences without expanding the workbook:
 - `expected-events.json` and `schemas/<event>.schema.json` for implementation
   and downstream acceptance tooling;
 - `handoff.json` for version, approval, artifact hashes, and upstream evidence;
+- the original hash-bound rendered discovery report;
 - `internal/analysis-context.json` and official, drift, impact, or fidelity
   evidence for machine checks and analyst maintenance.
 
@@ -87,27 +89,33 @@ The result is ready when:
 1. Meaningful in-scope journeys, material variants, failures, empty states,
    and post-conversion states are covered or their unresolved boundary is
    stated without fabricated site behavior.
-2. Official semantics are current and correctly applied.
-3. Custom semantics have a concrete official gap and business need.
-4. Each event contains only its own parameters.
-5. Definitions, triggers, value rules, and dataLayer examples agree.
-6. An analyst can review or change the plan without understanding the internal
+2. Every material journey has a resolved measurement-opportunity ledger, every
+   measured opportunity maps to an event, and every non-context event maps back
+   to a concrete opportunity.
+3. Official semantics are current and correctly applied.
+4. Custom semantics have a concrete official gap and business need.
+5. Each event contains only its own parameters.
+6. Definitions, triggers, value rules, and dataLayer examples agree.
+7. An analyst can review or change the plan without understanding the internal
    machinery.
-7. A developer can implement the dataLayer without inventing missing
+8. A developer can implement the dataLayer without inventing missing
    semantics.
-8. The workbook contains no unnecessary reading barriers.
-9. Every non-context event supports a concrete internal business question, and
+9. The workbook contains no unnecessary reading barriers.
+10. Every non-context event supports a concrete internal business question, and
    overlapping purposes or triggers have been reconciled across the plan.
-10. Parameter meaning, scope, type, destination, and journey-level commerce or
+11. Parameter meaning, scope, type, destination, and journey-level commerce or
    outcome logic are coherent across events.
-11. Page and user context share one core context push, and any authenticated
+12. Page and user context share one core context push, and any authenticated
    User-ID is mapped as a GA4 configuration setting rather than an event
    parameter or user property.
-12. Material journey coverage and finite website values are backed by the
+13. Material journey coverage and every finite or dynamic value-domain decision are backed by the
     validated analysis context; sample caps and blocked states are explicit.
-13. The rendered workbook, event schemas, expected-events contract, official
+14. Every discovery hint and journey is hash-bound to an explicit opportunity
+    or coverage row, and every controlled finite value has one localized label
+    in the selected workbook language.
+15. The rendered workbook, event schemas, expected-events contract, official
     check, and hash-stamped handoff all validate as one delivery.
-14. Visible workbook edits cannot be silently overridden by an older embedded
+16. Visible workbook edits cannot be silently overridden by an older embedded
     model, and supplied-template content outside mapped regions is unchanged.
 
 ## Non-Goals

@@ -56,6 +56,8 @@ LABELS = {
         "condition": "Condition",
         "values": "Possible values / rule",
         "example": "Example",
+        "rule": "Rule",
+        "possible_values_or_examples": "Possible values or examples",
         "concerned_events": "Concerned events",
         "source_path": "dataLayer path / source",
         "notes": "Notes",
@@ -103,6 +105,8 @@ LABELS = {
         "condition": "Condition",
         "values": "Valeurs possibles / règle",
         "example": "Exemple",
+        "rule": "Règle",
+        "possible_values_or_examples": "Valeurs possibles ou exemples",
         "concerned_events": "Événements concernés",
         "source_path": "Chemin dataLayer / source",
         "notes": "Notes",
@@ -215,9 +219,7 @@ def workbook_language(plan: dict[str, Any]) -> str:
         return "fr"
     if language.startswith("en"):
         return "en"
-    raise ValueError(
-        f'Workbook language "{language}" is unsupported. Use an English or French language tag.'
-    )
+    raise ValueError(f'Workbook language "{language}" is unsupported. Use an English or French language tag.')
 
 
 def label(plan: dict[str, Any], key: str) -> str:
@@ -241,19 +243,12 @@ def requirement_label(plan: dict[str, Any], value: str) -> str:
 
 
 def journey_lookup(plan: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    return {
-        str(journey.get("journey_id")): journey
-        for journey in plan.get("journeys", [])
-        if isinstance(journey, dict) and journey.get("journey_id")
-    }
+    return {str(journey.get("journey_id")): journey for journey in plan.get("journeys", []) if isinstance(journey, dict) and journey.get("journey_id")}
 
 
 def event_journey_names(plan: dict[str, Any], event: dict[str, Any]) -> list[str]:
     journeys = journey_lookup(plan)
-    return [
-        str(journeys.get(str(journey_id), {}).get("name", journey_id))
-        for journey_id in event.get("journey_ids", [])
-    ]
+    return [str(journeys.get(str(journey_id), {}).get("name", journey_id)) for journey_id in event.get("journey_ids", [])]
 
 
 def location_text(event: dict[str, Any]) -> str:
@@ -261,11 +256,7 @@ def location_text(event: dict[str, Any]) -> str:
     for location in event.get("locations", []):
         if not isinstance(location, dict):
             continue
-        values = [
-            str(location.get(key, "")).strip()
-            for key in ("page_type", "url_pattern", "component", "state")
-            if str(location.get(key, "")).strip()
-        ]
+        values = [str(location.get(key, "")).strip() for key in ("page_type", "url_pattern", "component", "state") if str(location.get(key, "")).strip()]
         if values:
             lines.append(" | ".join(values))
     return "\n".join(lines)
@@ -275,17 +266,27 @@ def value_rule_text(
     parameter: dict[str, Any],
     plan: dict[str, Any] | None = None,
 ) -> str:
+    return str(parameter.get("value_rule", "")).strip()
+
+
+def possible_values_or_example(parameter: dict[str, Any]) -> str:
     values = parameter.get("allowed_values")
-    rule = str(parameter.get("value_rule", "")).strip()
     if isinstance(values, list) and values:
-        values_text = " | ".join(str(value) for value in values)
-        prefix = (
-            "Valeurs possibles"
-            if plan is not None and workbook_language(plan) == "fr"
-            else "Allowed values"
-        )
-        return f"{rule}\n{prefix}: {values_text}" if rule else f"{prefix}: {values_text}"
-    return rule
+        return " | ".join(compact_value(value) for value in values)
+    return compact_value(parameter.get("example"))
+
+
+def combined_value_rule_text(
+    parameter: dict[str, Any],
+    plan: dict[str, Any] | None = None,
+) -> str:
+    """Legacy combined projection for supplied templates with one values/rule field."""
+    rule = value_rule_text(parameter, plan)
+    possible = possible_values_or_example(parameter)
+    if not parameter.get("allowed_values"):
+        return rule
+    prefix = "Valeurs possibles" if plan is not None and workbook_language(plan) == "fr" else "Allowed values"
+    return f"{rule}\n{prefix}: {possible}" if rule else f"{prefix}: {possible}"
 
 
 def compact_value(value: Any) -> str:
@@ -302,13 +303,9 @@ def datalayer_code(event: dict[str, Any]) -> str:
     data_layer = event.get("data_layer", {})
     lines = ["window.dataLayer = window.dataLayer || [];"]
     for key in data_layer.get("clear", []):
-        lines.append(f'window.dataLayer.push({json.dumps({str(key): None}, ensure_ascii=False)});')
+        lines.append(f"window.dataLayer.push({json.dumps({str(key): None}, ensure_ascii=False)});")
     push = data_layer.get("push", {})
-    lines.append(
-        "window.dataLayer.push("
-        + json.dumps(push, ensure_ascii=False, indent=2)
-        + ");"
-    )
+    lines.append("window.dataLayer.push(" + json.dumps(push, ensure_ascii=False, indent=2) + ");")
     return "\n".join(lines)
 
 
@@ -375,8 +372,8 @@ def parameter_reference_rows(plan: dict[str, Any]) -> list[dict[str, Any]]:
                     "scope": parameter.get("scope", ""),
                     "type": parameter.get("type", ""),
                     "definition": parameter.get("definition", ""),
-                    "example": compact_value(parameter.get("example")),
-                    "values": value_rule_text(parameter, plan),
+                    "rule": value_rule_text(parameter, plan),
+                    "possible_values_or_example": possible_values_or_example(parameter),
                     "events": [],
                 }
             if event_name not in grouped[key]["events"]:
@@ -396,7 +393,7 @@ def safe_sheet_title(value: str, used: Iterable[str] = ()) -> str:
     index = 2
     while True:
         suffix = f"_{index}"
-        candidate = f"{cleaned[:31-len(suffix)]}{suffix}"
+        candidate = f"{cleaned[: 31 - len(suffix)]}{suffix}"
         if candidate.lower() not in used_lower:
             return candidate
         index += 1

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import time
 from dataclasses import asdict, dataclass
@@ -151,11 +152,19 @@ def parse_sitemap(
     locations = [canonical_url(loc.text.strip()) for loc in root.findall(".//{*}loc") if loc.text]
     if root.tag.rsplit("}", 1)[-1].lower() == "sitemapindex":
         urls: list[str] = []
-        for child in locations:
+        children = locations[:100]
+        for index, child in enumerate(children):
+            remaining_children = len(children) - index
+            remaining_limit = limit - len(urls)
+            if remaining_limit <= 0:
+                break
+            # Allocate a fair share to every sitemap branch so a large product
+            # sitemap cannot hide categories, services, account, or support.
+            child_limit = max(1, math.ceil(remaining_limit / remaining_children))
             urls.extend(
                 parse_sitemap(
                     child,
-                    limit - len(urls),
+                    child_limit,
                     errors,
                     seen,
                     delay_seconds,
@@ -167,33 +176,68 @@ def parse_sitemap(
     return locations[:limit]
 
 
-def infer_template(url: str) -> str:
+def infer_template(url: str, text: str = "") -> str:
     path = urlparse(url).path.lower()
+    corpus = f"{path} {text}".casefold()
     if path in {"", "/"}:
         return "homepage"
-    if any(token in path for token in ["checkout", "commande", "payment", "paiement"]):
+    if any(token in corpus for token in ["checkout", "commande", "payment", "paiement"]):
         return "checkout"
-    if any(token in path for token in ["cart", "panier", "basket"]):
+    if any(token in corpus for token in ["cart", "panier", "basket"]):
         return "cart"
-    if any(token in path for token in ["account", "compte", "login", "connexion"]):
+    if any(
+        token in corpus
+        for token in [
+            "order-history",
+            "order history",
+            "mes commandes",
+            "historique commande",
+            "return",
+            "retour",
+            "cancel order",
+            "annuler commande",
+            "refund",
+            "remboursement",
+        ]
+    ):
+        return "post_purchase"
+    if any(token in corpus for token in ["account", "compte", "login", "connexion", "sign up", "inscription"]):
         return "account"
-    if any(token in path for token in ["devis", "quote", "estimate", "estimation", "mon-projet", "simulation"]):
+    if any(token in corpus for token in ["devis", "quote", "estimate", "estimation", "mon-projet", "simulation"]):
         return "lead_form"
-    if any(token in path for token in ["rendez-vous", "appointment", "booking", "reservation"]):
+    if any(token in corpus for token in ["rendez-vous", "appointment", "booking", "reservation"]):
         return "appointment"
-    if any(token in path for token in ["catalogue", "catalog", "brochure"]):
+    if any(token in corpus for token in ["catalogue", "catalog", "brochure"]):
         return "catalogue"
-    if any(token in path for token in ["magasin", "store", "agence", "showroom"]):
+    if any(token in corpus for token in ["newsletter", "infolettre", "lettre d'information"]):
+        return "newsletter"
+    if any(token in corpus for token in ["wishlist", "favori", "favorite", "liste d'envies"]):
+        return "wishlist"
+    if any(token in corpus for token in ["promotion", "promo", "offre", "soldes", "discount"]):
+        return "promotion"
+    if any(token in corpus for token in ["magasin", "store", "agence", "showroom"]):
         return "store_locator"
-    if any(token in path for token in ["configurateur", "configurator", "personnaliser", "customize"]):
+    if any(token in corpus for token in ["configurateur", "configurator", "personnaliser", "customize"]):
         return "configurator"
-    if any(token in path for token in ["contact", "help", "aide", "faq", "service-client"]):
+    if any(token in corpus for token in ["contact", "help", "aide", "faq", "service-client"]):
         return "support_or_contact"
-    if any(token in path for token in ["search", "recherche"]):
+    if any(token in corpus for token in ["search", "recherche"]):
         return "search_results"
     if re.search(r"/p/|/product|/produit", path):
         return "product_detail"
-    if any(token in path for token in ["category", "categorie", "collection", "boutique"]):
+    if any(
+        token in corpus
+        for token in [
+            "category",
+            "categorie",
+            "collection",
+            "boutique",
+            "filter",
+            "filtre",
+            "sort",
+            "trier",
+        ]
+    ):
         return "listing"
     return "content_or_other"
 
@@ -210,9 +254,13 @@ def infer_journey(template: str) -> str:
         "lead_form": "lead_generation",
         "appointment": "appointment_booking",
         "catalogue": "catalogue_request",
+        "newsletter": "newsletter_signup",
+        "wishlist": "wishlist",
+        "promotion": "promotion_engagement",
         "store_locator": "store_discovery",
         "configurator": "configuration",
         "support_or_contact": "support_contact",
+        "post_purchase": "post_purchase_service",
     }
     return mapping.get(template, "content_navigation")
 
@@ -352,10 +400,7 @@ def main() -> int:
         "delivery_notice": delivery_notice,
         "sources_checked": [
             {"source_type": "robots_txt", "source_ref": robots_url, "used_for": "sitemap discovery"},
-            *[
-                {"source_type": "sitemap", "source_ref": sitemap, "used_for": "URL discovery"}
-                for sitemap in sitemap_candidates
-            ],
+            *[{"source_type": "sitemap", "source_ref": sitemap, "used_for": "URL discovery"} for sitemap in sitemap_candidates],
             {"source_type": "static_html", "source_ref": root_url, "used_for": "static HTML link and form discovery"},
         ],
         "source_errors": [asdict(error) for error in errors],

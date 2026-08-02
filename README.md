@@ -136,6 +136,9 @@ journey:
 
 ```powershell
 python scripts/discover_site_journeys_playwright.py https://www.example.com/ --output discovery.json
+python scripts/build_analysis_context_seed.py discovery.json --output analysis-context.json
+# Explicit context overrides website-language evidence when provided:
+python scripts/build_analysis_context_seed.py discovery.json --output analysis-context.json --language fr --language-basis user --target-state to_be
 python scripts/capture_interactive_journey.py interactive-journey.json --output journey-evidence.json
 ```
 
@@ -148,15 +151,15 @@ python scripts/check_official_sources.py plan.json --output official-check.json
 Validate the evidence checkpoint and build the complete delivery atomically:
 
 ```powershell
-python scripts/validate_analysis_context.py analysis-context.json --plan plan.json --delivery
-python scripts/build_tracking_plan_delivery.py plan.json analysis-context.json --output-dir delivery
+python scripts/validate_analysis_context.py analysis-context.json --plan plan.json --discovery-report discovery.json --delivery
+python scripts/build_tracking_plan_delivery.py plan.json analysis-context.json --discovery-report discovery.json --output-dir delivery
 ```
 
 Inspect and adapt a supplied workbook:
 
 ```powershell
 python scripts/inspect_tracking_plan_template.py client-template.xlsx --output template-map.json
-python scripts/build_tracking_plan_delivery.py plan.json analysis-context.json --template client-template.xlsx --mapping template-map.json --output-dir delivery
+python scripts/build_tracking_plan_delivery.py plan.json analysis-context.json --discovery-report discovery.json --template client-template.xlsx --mapping template-map.json --output-dir delivery
 ```
 
 Maintain an existing plan:
@@ -165,7 +168,7 @@ Maintain an existing plan:
 python scripts/import_tracking_plan_workbook.py previous-plan.xlsx --output previous-plan.json
 python scripts/import_tracking_plan_workbook.py edited-plan.xlsx --reconcile-visible-edits --output reconciled-plan.json
 python scripts/diff_tracking_plans.py previous-plan.json updated-plan.json --output changes.json
-python scripts/detect_tracking_plan_drift.py previous-analysis-context.json analysis-context.json updated-plan.json --output drift-report.json
+python scripts/detect_tracking_plan_drift.py previous-analysis-context.json analysis-context.json updated-plan.json --before-discovery-report previous-discovery.json --after-discovery-report discovery.json --output drift-report.json
 python scripts/analyze_tracking_plan_change_impact.py updated-plan.json change-request.json --analysis-context analysis-context.json --output impact-report.json
 ```
 
@@ -199,6 +202,12 @@ git diff --check
 The package validator checks metadata and every machine schema/example, strict
 semantic and evidence-context validation, exact XLSX round-trip behavior, an
 atomic offline delivery build, release contents, and repository cleanliness.
+It also extracts the generated zip and runs validation and an offline delivery
+through the packaged root wrappers, and generates the archive twice to require
+byte-for-byte reproducibility. For an official release, run
+`python scripts/validate_package.py --release-tag vX.Y.Z`; this additionally
+requires a clean worktree, matching metadata, and a tag that resolves exactly
+to `HEAD`. Official package creation applies the same provenance gate.
 
 ## Boundaries
 
@@ -212,13 +221,38 @@ The skill does not:
 
 ## Versioning
 
-Version `2.3.0` keeps schema `4.0.0` and the lean, event-centered workbook while
-adding evidence-gated journey coverage, safe rendered interaction capture,
-finite-value provenance, atomic human-and-machine delivery contracts, strict
-supplied-template fidelity, visible-edit reconciliation, semantic drift
-detection, and targeted change-impact analysis. Versions `2.1.0` and `2.2.0`
-were local development iterations and were not public GitHub releases;
-`2.3.0` is the next public release after `2.0.0`.
+Version `2.5.0` keeps canonical plan schema `5.0.0` and completes the operational
+closure that `2.4.0` started. Rendered discovery now runs automatic targeted
+rounds, captures evidence-backed website language, and safely progresses
+every distinct material non-transactional funnel variant with synthetic data.
+One successful route can no longer close sibling funnel variants. Contextual
+hints retain their journey and variant provenance, heuristic candidates remain
+separate from material opportunities, and finite-choice discovery covers
+native and common custom controls. A valid partial report continues to analyst
+resolution instead of failing the pipeline. Its versioned
+report is SHA-256-bound to the analysis context: every hint must become an
+explicit measure, exclude, or unresolved opportunity and every journey must
+remain in coverage at variant level. Delivery rejects missing reports, changed
+hashes, vanished hints or variants, and unresolved material decisions. The
+release also validates localized
+controlled-value labels, compares rendered forms, controls, hints, and
+interaction outcomes during drift, infers business-change impact when explicit
+selectors are absent, and supplies direct machine handoffs to GTM configuration
+and Preview recette.
+
+Version `2.4.0` introduced schema `5.0.0`, broader rendered candidate scoring,
+the measurement-opportunity model, stricter official semantics, evidence-backed
+value domains, and the lean workbook contract. Its crawler hints, opportunity
+ledger, delivery gate, interaction runner, and downstream artifacts were not
+yet mechanically connected end to end.
+
+Version `2.3.0` introduced evidence-gated journey coverage, rendered interaction
+capture, finite-value provenance, atomic delivery contracts, strict supplied-
+template fidelity, visible-edit reconciliation, semantic drift detection, and
+targeted change-impact analysis. Its interaction evidence was not yet a
+mandatory closure condition between discovery and event selection. Versions
+`2.1.0` and `2.2.0` were local development iterations and were not public
+GitHub releases; `2.3.0` was the next public release after `2.0.0`.
 
 Compatible capabilities are released as minor versions. Patch releases fix
 documentation, validation, rendering, or packaging defects.

@@ -24,12 +24,16 @@ For a complete plan, read:
 
 - `references/product.md`
 - `references/workflow.md`
+- `references/discovery-and-coverage.md`
 - `references/official-first.md`
+- `references/official-semantic-rules.md`
 - `references/workbook-contract.md`
 
 Read only the relevant scenario reference:
 
 - ecommerce: `references/scenario-ecommerce.md`
+- search, listing, filtering, sorting, or merchandising discovery:
+  `references/scenario-search-and-listing.md`
 - lead, form, quote, or booking funnels:
   `references/scenario-lead-generation.md`
 - account, support, navigation, or content:
@@ -45,10 +49,11 @@ Read only the relevant scenario reference:
 - Investigate the live website with an interactive browser. Accept the CMP
   choice needed for investigation and use safe synthetic information for
   accessible forms, signup, login, and gated journeys unless the user opts out.
-- Build the rendered candidate universe from supplied entry points, sitemaps,
-  and discovered links; prioritize materially distinct journeys and templates.
-  A page cap, sitemap cap, blocked state, or unvisited material candidate makes
-  coverage partial, never complete.
+- Build the rendered candidate universe from supplied entry points, stratified
+  sitemap evidence, and discovered links. Explore by distinct journey,
+  template, route family, and interaction rather than link order or repeated
+  product pages. Treat a page cap as a sampling budget, never as a stopping
+  condition: run targeted discovery rounds for uncovered material candidates.
 - Treat every evidence source according to what it can prove. Distinguish live
   behavior, intended future design, business requirements, current tracking,
   technical data capability, and historical contracts.
@@ -60,6 +65,13 @@ Read only the relevant scenario reference:
   evidence, conflict, journey-coverage, and finite-value checkpoint. Delivery
   is blocked when a material journey or value domain is neither covered nor
   explicitly bounded.
+- Bind every rendered discovery report to the analysis context by SHA-256.
+  Every discovery hint must map to an explicit measured, excluded, or
+  unresolved opportunity; every discovered journey and material funnel
+  variant must map to the coverage ledger. Never let one successful variant
+  close a different route family, funnel shape, or component implementation.
+  Treat structural hints as candidates until analyst reasoning establishes
+  materiality; do not turn every detected control into a mandatory event.
 - Include only manually implemented measurement in the tracking plan. Do not
   include automatic or enhanced-measurement events, native/no-push rows, or
   related implementation guidance.
@@ -67,18 +79,32 @@ Read only the relevant scenario reference:
   Include required parameters, applicable conditional parameters, and optional
   official parameters supported by a real analysis, business, attribution, or
   implementation need. Do not copy the table mechanically.
-- Add custom events and parameters only after the concise official-gap test in
-  `references/official-first.md`.
+- Evaluate official semantics first for every material measurement
+  opportunity. This is a sequence rule, not a bias against custom measurement:
+  add precise custom events and parameters whenever the official model leaves
+  a meaningful business or diagnostic gap.
 - Record one concrete internal `business_question` for every non-context
   event. It must explain the decision or analysis the event supports; it is
   reasoning traceability, not a visible workbook column.
 - Keep each event's parameter list exact. Never inject inherited page, user, or
   journey variables into an event unless they are genuinely sent with it.
-- Exhaust stable, observable finite value domains of up to 50 values. Use a
-  precise rule for dynamic or larger domains.
-- Use exact official definitions and attached conditions for official
-  semantics. Use equally precise official-like wording for custom semantics.
-  Generic filler is invalid.
+- Classify the value domain of every parameter. Exhaust stable, observable
+  finite domains of up to 50 values; record a precise, evidenced reason and
+  generation rule for free text, identifiers, URLs, changing inventories,
+  structured values, inaccessible values, or domains above 50.
+- Localize controlled semantic values to the workbook language and normalize
+  them to lowercase ASCII `snake_case`. Keep official enums, codes, technical
+  identifiers, authoritative labels, free text, numbers, and booleans in their
+  required source format.
+- For every finite controlled domain, retain one localized human label per
+  technical value and prove that the technical value is the ASCII
+  `snake_case` normalization of that label. For a dynamic controlled domain,
+  retain the localized label-generation rule.
+- Resolve official definitions, conditions, types, examples, and cross-page
+  implementation rules from current Google documentation before authoring.
+  Preserve the exact official source text internally even when the visible
+  wording is faithfully localized. Use equally precise official-like wording
+  for custom semantics. Generic filler is invalid.
 - Keep `requirement` limited to `required`, `conditional`, or `optional`.
   Store a condition separately.
 - Make one event specification the implementation source of truth: event
@@ -124,17 +150,28 @@ Read only the relevant scenario reference:
    artifacts into the validated analysis context, including evidence roles,
    conflicts, hashes where available, and safe-test boundaries.
 3. Explore real public and safely accessible gated journeys in the rendered
-   website. Use prioritized sitemap and rendered-link candidates plus
-   controlled synthetic interaction recipes. Record incomplete boundaries
-   without inventing behavior or treating a sample cap as completeness.
-4. Build the business-value, journey-variant, and business-question model
-   before choosing events.
-5. Resolve selected official events and their parameter tables from current
-   official Google documentation. Apply custom-gap judgement only afterward.
+   website. Use stratified sitemap and rendered-link candidates, then run
+   targeted rounds for uncovered journey families, templates, interactions,
+   success, failure, empty, and post-conversion states. Use controlled
+   synthetic interaction recipes for every material safe funnel variant.
+   Record incomplete boundaries without inventing behavior or treating a
+   sample cap or another variant's success as completeness. A valid partial
+   discovery report remains usable input and must continue into analyst
+   resolution rather than aborting the workflow.
+4. Build the business-value and journey-variant model, then create an internal
+   measurement-opportunity ledger covering every material outcome,
+   progression signal, and actionable diagnostic. Resolve every opportunity
+   as measured or deliberately excluded before choosing events.
+5. For every measured opportunity, evaluate current official GA4 semantics
+   first, including the complete event parameter table and applicable
+   implementation guidance. Select the official event when it fits; otherwise
+   design the justified custom event. Do not let the official-first sequence
+   suppress uncovered custom needs.
 6. Specify exact triggers, event-specific parameters, finite values, source
    logic, one combined page-and-user core context, and quoted dataLayer
    pushes.
-7. Validate evidence coverage, official fit, scope, requiredness, custom gaps, dataLayer parity,
+7. Validate journey and measurement-opportunity coverage, official fit, scope,
+   requiredness, custom gaps, dataLayer parity,
    GA4 limits, User-ID handling, purchase customer type, event-purpose and
    trigger overlap, plan-wide coherence, and human wording. Review and resolve
    every warning before delivery.
@@ -148,25 +185,30 @@ Read only the relevant scenario reference:
 
 ## Commands
 
-Discover public journeys and execute a deliberately specified safe gated flow:
+Discover public and safely accessible gated journeys. The rendered helper
+automatically continues targeted rounds and executes representative safe
+synthetic form progression; use a manual recipe only for a known exception:
 
 ```powershell
 python scripts/discover_site_journeys_playwright.py https://www.example.com/ --output discovery.json
+python scripts/build_analysis_context_seed.py discovery.json --output analysis-context.json --target-state as_is
+# When explicit context overrides website language:
+python scripts/build_analysis_context_seed.py discovery.json --output analysis-context.json --language fr --language-basis user
 python scripts/capture_interactive_journey.py interactive-journey.json --output journey-evidence.json
 ```
 
 Validate the internal checkpoint, then build the complete default delivery:
 
 ```powershell
-python scripts/validate_analysis_context.py analysis-context.json --plan plan.json --delivery
-python scripts/build_tracking_plan_delivery.py plan.json analysis-context.json --output-dir delivery
+python scripts/validate_analysis_context.py analysis-context.json --plan plan.json --discovery-report discovery.json --delivery
+python scripts/build_tracking_plan_delivery.py plan.json analysis-context.json --discovery-report discovery.json --output-dir delivery
 ```
 
 For a supplied workbook, inspect it once and reuse the hash-bound mapping:
 
 ```powershell
 python scripts/inspect_tracking_plan_template.py client-template.xlsx --output template-map.json
-python scripts/build_tracking_plan_delivery.py plan.json analysis-context.json --template client-template.xlsx --mapping template-map.json --output-dir delivery
+python scripts/build_tracking_plan_delivery.py plan.json analysis-context.json --discovery-report discovery.json --template client-template.xlsx --mapping template-map.json --output-dir delivery
 ```
 
 Maintain, detect drift, or target a business change:
@@ -175,7 +217,7 @@ Maintain, detect drift, or target a business change:
 python scripts/import_tracking_plan_workbook.py previous-plan.xlsx --output previous-plan.json
 python scripts/import_tracking_plan_workbook.py edited-plan.xlsx --reconcile-visible-edits --output reconciled-plan.json
 python scripts/diff_tracking_plans.py previous-plan.json updated-plan.json --output changes.json
-python scripts/detect_tracking_plan_drift.py previous-analysis-context.json analysis-context.json updated-plan.json --output drift-report.json
+python scripts/detect_tracking_plan_drift.py previous-analysis-context.json analysis-context.json updated-plan.json --before-discovery-report previous-discovery.json --after-discovery-report discovery.json --output drift-report.json
 python scripts/analyze_tracking_plan_change_impact.py updated-plan.json change-request.json --analysis-context analysis-context.json --output impact-report.json
 ```
 

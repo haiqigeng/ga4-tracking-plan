@@ -27,9 +27,7 @@ SKILL_ROOT = Path(__file__).resolve().parents[1]
 
 
 def release_version() -> str:
-    release = json.loads(
-        (SKILL_ROOT / "release.json").read_text(encoding="utf-8-sig")
-    )
+    release = json.loads((SKILL_ROOT / "release.json").read_text(encoding="utf-8-sig"))
     return str(release["version"])
 
 
@@ -148,21 +146,20 @@ def build_event_matrix(wb: Workbook) -> None:
 
 def build_parameter_reference(wb: Workbook) -> None:
     ws = wb.create_sheet("Parameter Reference")
-    apply_title(ws, "{{PARAMETER_REFERENCE}}", "{{PARAMETER_REFERENCE_SUBTITLE}}", 7)
+    apply_title(ws, "{{PARAMETER_REFERENCE}}", "{{PARAMETER_REFERENCE_SUBTITLE}}", 6)
     headers = [
         "Variable",
         "Scope",
         "Type",
         "Definition",
-        "Example",
-        "Possible values / rule",
-        "Concerned events",
+        "Rule",
+        "Possible values or examples",
     ]
     for column, header in enumerate(headers, 1):
         ws.cell(4, column, header)
-    apply_header(ws, 4, 7)
-    apply_table_row(ws, 5, 7)
-    set_widths(ws, [22, 11, 11, 38, 22, 38, 28])
+    apply_header(ws, 4, 6)
+    apply_table_row(ws, 5, 6)
+    set_widths(ws, [22, 11, 11, 42, 42, 32])
     ws.sheet_view.showGridLines = False
     ws.sheet_view.zoomScale = 85
     ws.freeze_panes = "A5"
@@ -186,14 +183,17 @@ def build_event_template(wb: Workbook) -> None:
         ws.merge_cells(start_row=offset, start_column=2, end_row=offset, end_column=7)
         apply_value(ws.cell(offset, 2))
         ws.row_dimensions[offset].height = 32 if offset < 6 else 54
+    # Classification remains in the canonical model and hidden projection for
+    # maintenance checks, but it is not human-facing workbook content.
+    ws.row_dimensions[4].hidden = True
     headers = [
         "Variable",
         "Scope",
         "Type",
         "Requirement",
         "Definition",
-        "Possible values / rule",
-        "Example",
+        "Rule",
+        "Possible values or examples",
     ]
     for column, header in enumerate(headers, 1):
         set_cell_value(ws.cell(11, column), header)
@@ -211,9 +211,7 @@ def build_template() -> Workbook:
     wb.properties.title = "GA4 tracking plan default template"
     wb.properties.subject = "Human-first analyst and developer tracking-plan contract"
     wb.properties.creator = "ga4-tracking-plan"
-    wb.properties.description = (
-        f"Default workbook asset version {release_version()}"
-    )
+    wb.properties.description = f"Default workbook asset version {release_version()}"
     build_guide(wb)
     build_event_matrix(wb)
     build_parameter_reference(wb)

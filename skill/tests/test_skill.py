@@ -18,16 +18,22 @@ if str(SCRIPTS) not in sys.path:
 
 import generate_tracking_plan_workbook as workbook_generator
 from adapt_tracking_plan_workbook import adapt
+from build_analysis_context_seed import build_analysis_context_seed
 from capture_interactive_journey import load_and_validate_spec
 from check_official_sources import fetch_cached, semantic_errors
 from delivery_artifacts import event_push_schema, expected_events_contract
 from diff_tracking_plans import compare, load_plan
 from discover_site_journeys import same_host
 from discover_site_journeys_playwright import (
+    build_auto_interaction_recipes,
     candidate_priority,
+    discovery_round_stop_reason,
     material_unvisited_candidates,
+    measurement_opportunity_hints,
+    summarize_languages,
     summarize_measurement_evidence,
 )
+from discovery_contract import load_discovery_report, validate_discovery_bindings
 from generate_tracking_plan_workbook import build_workbook
 from import_tracking_plan_workbook import import_workbook
 from inspect_tracking_plan_template import inspect
@@ -47,38 +53,21 @@ class TrackingPlanSkillTests(unittest.TestCase):
         self.plan = load_json(EXAMPLE)
 
     def error_codes(self, plan: dict) -> set[str]:
-        return {
-            issue.code
-            for issue in validate_plan(plan)
-            if issue.severity == "error"
-        }
+        return {issue.code for issue in validate_plan(plan) if issue.severity == "error"}
 
     def warning_codes(self, plan: dict) -> set[str]:
-        return {
-            issue.code
-            for issue in validate_plan(plan)
-            if issue.severity == "warning"
-        }
+        return {issue.code for issue in validate_plan(plan) if issue.severity == "warning"}
 
     def purchase_plan(self) -> dict:
         plan = copy.deepcopy(self.plan)
-        catalog = json.loads(
-            (ROOT / "references" / "library-ga4-recommended-events.json").read_text(
-                encoding="utf-8-sig"
-            )
-        )
+        catalog = json.loads((ROOT / "references" / "library-ga4-recommended-events.json").read_text(encoding="utf-8-sig"))
         record = next(item for item in catalog if item["event"] == "purchase")
-        official = {
-            (item["name"], item["scope"]): item
-            for item in record["parameters"]
-        }
+        official = {(item["name"], item["scope"]): item for item in record["parameters"]}
         source = {
-            "url": (
-                "https://developers.google.com/analytics/devguides/"
-                "collection/ga4/reference/events#purchase"
-            ),
+            "url": ("https://developers.google.com/analytics/devguides/collection/ga4/reference/events#purchase"),
             "section": "purchase",
             "wording_origin": "exact",
+            "official_text": record["description"],
             "checked_date": "2026-07-31",
         }
 
@@ -94,11 +83,7 @@ class TrackingPlanSkillTests(unittest.TestCase):
         ) -> dict:
             row = official[(name, scope)]
             raw_type = str(row["type"]).casefold()
-            parameter_type = (
-                "array"
-                if raw_type.startswith("array")
-                else ("string" if raw_type.startswith("string") else raw_type)
-            )
+            parameter_type = "array" if raw_type.startswith("array") else ("string" if raw_type.startswith("string") else raw_type)
             result = {
                 "name": name,
                 "data_layer_path": path,
@@ -107,17 +92,32 @@ class TrackingPlanSkillTests(unittest.TestCase):
                 "type": parameter_type,
                 "requirement": requirement,
                 "definition": row["description"],
-                "value_rule": f"Use the confirmed purchase {name}.",
+                "value_rule": (
+                    "Set value to the sum of price * quantity for all items; exclude shipping and tax."
+                    if name == "value"
+                    else f"Use the confirmed purchase {name}."
+                ),
+                "value_mode": (
+                    "official_enum"
+                    if name == "customer_type"
+                    else (
+                        "structured"
+                        if parameter_type in {"array", "object"}
+                        else (
+                            "numeric"
+                            if parameter_type in {"number", "integer"}
+                            else ("technical_identifier" if name in {"currency", "transaction_id", "item_id"} else "authoritative_raw")
+                        )
+                    )
+                ),
+                "value_evidence_refs": [f"test_{scope}_{name}_domain"],
                 "example": value,
                 "source": "Confirmed order.",
-                "destination": (
-                    "ga4_item_parameter"
-                    if scope == "item"
-                    else "ga4_event_parameter"
-                ),
+                "destination": ("ga4_item_parameter" if scope == "item" else "ga4_event_parameter"),
                 "official_source": {
                     **source,
                     "section": "purchase parameters",
+                    "official_text": row["description"],
                 },
             }
             if condition:
@@ -131,10 +131,8 @@ class TrackingPlanSkillTests(unittest.TestCase):
             "event_name": "purchase",
             "classification": "official_ecommerce",
             "journey_ids": ["product_discovery"],
-            "business_question": (
-                "Which confirmed orders generate revenue, and are they from "
-                "new or returning customers?"
-            ),
+            "business_question": ("Which confirmed orders generate revenue, and are they from new or returning customers?"),
+            "measurement_opportunity_ids": ["purchase_confirmation"],
             "definition": record["description"],
             "trigger": "Push once after the backend confirms and identifies the completed order.",
             "locations": [{"state": "Order confirmation"}],
@@ -147,10 +145,7 @@ class TrackingPlanSkillTests(unittest.TestCase):
                     "ecommerce.customer_type",
                     "new",
                     "conditional",
-                    condition=(
-                        "Send when the confirmed order can be classified "
-                        "reliably as new or returning."
-                    ),
+                    condition=("Send when the confirmed order can be classified reliably as new or returning."),
                     allowed_values=["new", "returning"],
                 ),
                 parameter(
@@ -211,12 +206,8 @@ class TrackingPlanSkillTests(unittest.TestCase):
         plan = copy.deepcopy(self.plan)
         duplicate = copy.deepcopy(plan["events"][2])
         duplicate["event_name"] = "quote_start_duplicate"
-        duplicate["business_question"] = (
-            "Which visitors reach a second quote-start signal?"
-        )
-        duplicate["definition"] = (
-            "Indicates that a second quote-start signal was recorded."
-        )
+        duplicate["business_question"] = "Which visitors reach a second quote-start signal?"
+        duplicate["definition"] = "Indicates that a second quote-start signal was recorded."
         duplicate["custom_decision"] = {
             "business_need": "Distinguish a second quote-start signal.",
             "official_candidate": "No official event represents this signal.",
@@ -247,6 +238,70 @@ class TrackingPlanSkillTests(unittest.TestCase):
             [("value", "event"), ("item_id", "item")],
         )
 
+    def test_faithful_translation_still_preserves_exact_official_source_text(self) -> None:
+        plan = copy.deepcopy(self.plan)
+        event = plan["events"][1]
+        event["official_source"]["wording_origin"] = "faithful_translation"
+        event["definition"] = "Cet événement indique qu'un contenu a été présenté à l'utilisateur."
+        self.assertNotIn("OFFICIAL_EVENT_SOURCE_TEXT", self.error_codes(plan))
+        event["official_source"]["official_text"] = "Invented source wording."
+        self.assertIn("OFFICIAL_EVENT_SOURCE_TEXT", self.error_codes(plan))
+
+    def test_ecommerce_index_rule_must_be_zero_based(self) -> None:
+        plan = copy.deepcopy(self.plan)
+        event = plan["events"][1]
+        catalog = json.loads((ROOT / "references" / "library-ga4-recommended-events.json").read_text(encoding="utf-8-sig"))
+        record = next(item for item in catalog if item["event"] == "view_item")
+        index_row = next(item for item in record["parameters"] if item["name"] == "index" and item["scope"] == "item")
+        event["data_layer"]["push"]["ecommerce"]["items"][0]["index"] = 0
+        event["parameters"].append(
+            {
+                "name": "index",
+                "data_layer_path": "ecommerce.items[].index",
+                "classification": "official",
+                "scope": "item",
+                "type": "integer",
+                "requirement": "optional",
+                "definition": index_row["description"],
+                "value_rule": "Use a zero-based position; the first item is index 0.",
+                "value_mode": "numeric",
+                "value_evidence_refs": ["item_indexes"],
+                "example": 0,
+                "source": "Rendered item order.",
+                "destination": "ga4_item_parameter",
+                "official_source": {
+                    "url": ("https://developers.google.com/analytics/devguides/collection/ga4/reference/events#view_item"),
+                    "section": "items parameter",
+                    "wording_origin": "exact",
+                    "official_text": index_row["description"],
+                    "checked_date": "2026-08-01",
+                },
+            }
+        )
+        self.assertNotIn("INDEX_ZERO_BASE_MISSING", self.error_codes(plan))
+        event["parameters"][-1]["value_rule"] = "Start the position at 1 for the first item."
+        codes = self.error_codes(plan)
+        self.assertIn("INDEX_ZERO_BASE_MISSING", codes)
+        self.assertIn("INDEX_ONE_BASED", codes)
+
+    def test_ecommerce_value_rule_accepts_precise_french_semantics(self) -> None:
+        plan = copy.deepcopy(self.plan)
+        value = next(parameter for parameter in plan["events"][1]["parameters"] if parameter["name"] == "value")
+        value["value_rule"] = "Utiliser la somme de prix * quantite pour les articles, hors livraison et taxe."
+        self.assertNotIn("ECOMMERCE_VALUE_RULE_INCOMPLETE", self.error_codes(plan))
+
+    def test_controlled_values_follow_workbook_language_and_ascii_snake_case(self) -> None:
+        plan = copy.deepcopy(self.plan)
+        parameter = plan["events"][0]["parameters"][0]
+        parameter["allowed_values"] = ["fiche_produit"]
+        parameter["example"] = "fiche_produit"
+        parameter["value_language"] = "fr"
+        self.assertIn("CONTROLLED_VALUE_LANGUAGE", self.error_codes(plan))
+        parameter["value_language"] = "en"
+        parameter["allowed_values"] = ["Product Detail"]
+        parameter["example"] = "Product Detail"
+        self.assertIn("CONTROLLED_VALUE_FORMAT", self.error_codes(plan))
+
     def test_manual_only_schema_rejects_enhanced_measurement_classification(self) -> None:
         plan = copy.deepcopy(self.plan)
         plan["events"][0]["classification"] = "enhanced_measurement"
@@ -254,9 +309,7 @@ class TrackingPlanSkillTests(unittest.TestCase):
 
     def test_finite_value_domains_stop_at_fifty(self) -> None:
         plan = copy.deepcopy(self.plan)
-        plan["events"][0]["parameters"][0]["allowed_values"] = [
-            f"value_{index}" for index in range(51)
-        ]
+        plan["events"][0]["parameters"][0]["allowed_values"] = [f"value_{index}" for index in range(51)]
         self.assertIn("SCHEMA", self.error_codes(plan))
 
     def test_custom_event_cannot_relabel_an_official_event(self) -> None:
@@ -276,11 +329,7 @@ class TrackingPlanSkillTests(unittest.TestCase):
 
     def test_workbook_is_lean_quoted_and_maintenance_ready(self) -> None:
         workbook = build_workbook(self.plan)
-        visible = [
-            sheet.title
-            for sheet in workbook.worksheets
-            if sheet.sheet_state == "visible"
-        ]
+        visible = [sheet.title for sheet in workbook.worksheets if sheet.sheet_state == "visible"]
         self.assertEqual(
             visible,
             [
@@ -296,14 +345,8 @@ class TrackingPlanSkillTests(unittest.TestCase):
             workbook["__tracking_plan_model"].sheet_state,
             "veryHidden",
         )
-        matrix_headers = [
-            str(workbook["Event Matrix"].cell(4, column).value or "")
-            for column in range(1, 3)
-        ]
-        parameter_headers = {
-            str(workbook["Parameter Reference"].cell(4, column).value or "")
-            for column in range(1, 8)
-        }
+        matrix_headers = [str(workbook["Event Matrix"].cell(4, column).value or "") for column in range(1, 3)]
+        parameter_headers = {str(workbook["Parameter Reference"].cell(4, column).value or "") for column in range(1, 8)}
         forbidden = {
             "Availability",
             "Data owner",
@@ -314,16 +357,10 @@ class TrackingPlanSkillTests(unittest.TestCase):
         }
         self.assertEqual(matrix_headers, ["Event", "Definition"])
         self.assertTrue(parameter_headers.isdisjoint(forbidden))
-        guide_headers = {
-            str(workbook["Guide"].cell(15, column).value or "")
-            for column in range(1, 5)
-        }
+        guide_headers = {str(workbook["Guide"].cell(15, column).value or "") for column in range(1, 5)}
         self.assertNotIn("Status", guide_headers)
         self.assertIsNone(workbook["Event Matrix"]["C4"].value)
-        event_headers = [
-            str(workbook["core_data"].cell(11, column).value or "")
-            for column in range(1, 8)
-        ]
+        event_headers = [str(workbook["core_data"].cell(11, column).value or "") for column in range(1, 8)]
         self.assertEqual(
             event_headers,
             [
@@ -332,12 +369,13 @@ class TrackingPlanSkillTests(unittest.TestCase):
                 "Type",
                 "Requirement",
                 "Definition",
-                "Possible values / rule",
-                "Example",
+                "Rule",
+                "Possible values or examples",
             ],
         )
         self.assertNotIn("Condition", event_headers)
         self.assertNotIn("dataLayer path / source", event_headers)
+        self.assertTrue(workbook["core_data"].row_dimensions[4].hidden)
         code = str(workbook["view_item"]["A21"].value)
         self.assertIn('"event": "view_item"', code)
         self.assertIn('"item_color": "white"', code)
@@ -346,11 +384,7 @@ class TrackingPlanSkillTests(unittest.TestCase):
         self.assertIn('"user": {', core_code)
         self.assertIn('"user_id": "customer_12345"', core_code)
         visible_text = "\n".join(
-            str(cell.value or "")
-            for sheet in workbook.worksheets
-            if sheet.sheet_state == "visible"
-            for row in sheet.iter_rows()
-            for cell in row
+            str(cell.value or "") for sheet in workbook.worksheets if sheet.sheet_state == "visible" for row in sheet.iter_rows() for cell in row
         )
         self.assertNotIn(self.plan["events"][1]["business_question"], visible_text)
         self.assertNotIn(self.plan["events"][2]["business_question"], visible_text)
@@ -376,7 +410,7 @@ class TrackingPlanSkillTests(unittest.TestCase):
 
     def test_formula_like_text_stays_text_and_round_trips(self) -> None:
         plan = copy.deepcopy(self.plan)
-        plan["events"][2]["definition"] = "=HYPERLINK(\"https://invalid.example\",\"x\")"
+        plan["events"][2]["definition"] = '=HYPERLINK("https://invalid.example","x")'
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "formula-safe.xlsx"
             build_workbook(plan).save(path)
@@ -385,7 +419,7 @@ class TrackingPlanSkillTests(unittest.TestCase):
         self.assertEqual(reopened["begin_quote"]["B6"].data_type, "s")
         self.assertEqual(
             reopened["begin_quote"]["B6"].value,
-            "=HYPERLINK(\"https://invalid.example\",\"x\")",
+            '=HYPERLINK("https://invalid.example","x")',
         )
         self.assertEqual(imported, plan)
 
@@ -415,26 +449,14 @@ class TrackingPlanSkillTests(unittest.TestCase):
             del workbook["__tracking_plan_model"]
             workbook.save(path)
             recovered = import_workbook(path, allow_visible_recovery=True)
-        errors = [
-            item
-            for item in validate_plan(recovered)
-            if item.severity == "error"
-        ]
+        errors = [item for item in validate_plan(recovered) if item.severity == "error"]
         self.assertEqual(recovered["document"]["language"], "en")
-        self.assertIn("EVENT_PURPOSE_MISSING", {item.code for item in errors})
-        view_item = next(
-            item
-            for item in recovered["events"]
-            if item["event_name"] == "view_item"
-        )
+        self.assertNotIn("EVENT_PURPOSE_MISSING", {item.code for item in errors})
+        view_item = next(item for item in recovered["events"] if item["event_name"] == "view_item")
         self.assertIn("official_source", view_item)
-        self.assertTrue(
-            all(
-                "official_source" in parameter
-                for parameter in view_item["parameters"]
-                if parameter["classification"] == "official"
-            )
-        )
+        self.assertTrue(view_item["business_question"])
+        self.assertTrue(view_item["measurement_opportunity_ids"])
+        self.assertTrue(all("official_source" in parameter for parameter in view_item["parameters"] if parameter["classification"] == "official"))
 
     def test_diff_can_opt_into_visible_workbook_recovery(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -468,13 +490,8 @@ class TrackingPlanSkillTests(unittest.TestCase):
 
     def test_legitimate_contextual_wording_is_not_rejected_as_filler(self) -> None:
         plan = copy.deepcopy(self.plan)
-        plan["events"][2]["parameters"][0]["definition"] = (
-            "Identifies the value associated with the selected loyalty tier."
-        )
-        plan["events"][2]["trigger"] = (
-            "Push after the booking succeeds, when applicable shipping options "
-            "have already been resolved."
-        )
+        plan["events"][2]["parameters"][0]["definition"] = "Identifies the value associated with the selected loyalty tier."
+        plan["events"][2]["trigger"] = "Push after the booking succeeds, when applicable shipping options have already been resolved."
         self.assertNotIn("PARAMETER_DEFINITION_GENERIC", self.error_codes(plan))
         self.assertNotIn("TRIGGER_GENERIC", self.error_codes(plan))
 
@@ -491,16 +508,8 @@ class TrackingPlanSkillTests(unittest.TestCase):
     def test_page_and_user_context_cannot_be_split(self) -> None:
         plan = copy.deepcopy(self.plan)
         core = plan["events"][0]
-        user_parameters = [
-            parameter
-            for parameter in core["parameters"]
-            if str(parameter["data_layer_path"]).startswith("user.")
-        ]
-        core["parameters"] = [
-            parameter
-            for parameter in core["parameters"]
-            if not str(parameter["data_layer_path"]).startswith("user.")
-        ]
+        user_parameters = [parameter for parameter in core["parameters"] if str(parameter["data_layer_path"]).startswith("user.")]
+        core["parameters"] = [parameter for parameter in core["parameters"] if not str(parameter["data_layer_path"]).startswith("user.")]
         core["data_layer"]["push"].pop("user")
         plan["events"].insert(
             1,
@@ -526,28 +535,16 @@ class TrackingPlanSkillTests(unittest.TestCase):
 
     def test_user_id_must_use_the_official_configuration_destination(self) -> None:
         plan = copy.deepcopy(self.plan)
-        user_id = next(
-            parameter
-            for parameter in plan["events"][0]["parameters"]
-            if parameter["name"] == "user_id"
-        )
+        user_id = next(parameter for parameter in plan["events"][0]["parameters"] if parameter["name"] == "user_id")
         user_id["destination"] = "ga4_user_property"
         self.assertIn("USER_ID_DESTINATION", self.error_codes(plan))
 
     def test_authenticated_plan_requires_user_id_in_core_context(self) -> None:
         plan = copy.deepcopy(self.plan)
         core = plan["events"][0]
-        core["parameters"] = [
-            parameter
-            for parameter in core["parameters"]
-            if parameter["name"] != "user_id"
-        ]
+        core["parameters"] = [parameter for parameter in core["parameters"] if parameter["name"] != "user_id"]
         core["data_layer"]["push"]["user"].pop("user_id")
-        catalog = json.loads(
-            (ROOT / "references" / "library-ga4-recommended-events.json").read_text(
-                encoding="utf-8-sig"
-            )
-        )
+        catalog = json.loads((ROOT / "references" / "library-ga4-recommended-events.json").read_text(encoding="utf-8-sig"))
         login = next(item for item in catalog if item["event"] == "login")
         plan["events"].append(
             {
@@ -560,10 +557,7 @@ class TrackingPlanSkillTests(unittest.TestCase):
                 "parameters": [],
                 "data_layer": {"push": {"event": "login"}},
                 "official_source": {
-                    "url": (
-                        "https://developers.google.com/analytics/devguides/"
-                        "collection/ga4/reference/events#login"
-                    ),
+                    "url": ("https://developers.google.com/analytics/devguides/collection/ga4/reference/events#login"),
                     "section": "login",
                     "wording_origin": "exact",
                     "checked_date": "2026-07-31",
@@ -575,11 +569,7 @@ class TrackingPlanSkillTests(unittest.TestCase):
     def test_purchase_requires_conditional_customer_type_and_values(self) -> None:
         plan = self.purchase_plan()
         self.assertEqual(validate_plan(plan), [])
-        plan["events"][1]["parameters"] = [
-            parameter
-            for parameter in plan["events"][1]["parameters"]
-            if parameter["name"] != "customer_type"
-        ]
+        plan["events"][1]["parameters"] = [parameter for parameter in plan["events"][1]["parameters"] if parameter["name"] != "customer_type"]
         plan["events"][1]["data_layer"]["push"]["ecommerce"].pop("customer_type")
         self.assertIn("PURCHASE_CUSTOMER_TYPE_MISSING", self.error_codes(plan))
 
@@ -626,19 +616,12 @@ class TrackingPlanSkillTests(unittest.TestCase):
     def test_zero_event_catalog_parse_is_reported_as_parser_failure(self) -> None:
         errors = semantic_errors(
             self.plan,
-            {
-                (
-                    "https://developers.google.com/analytics/devguides/"
-                    "collection/ga4/reference/events"
-                ): {"content": "<html><body>No event tables</body></html>"}
-            },
+            {("https://developers.google.com/analytics/devguides/collection/ga4/reference/events"): {"content": "<html><body>No event tables</body></html>"}},
         )
         self.assertTrue(any("parsed zero events" in error for error in errors))
 
     def test_www_and_bare_domain_are_same_site(self) -> None:
-        self.assertTrue(
-            same_host("https://www.example.com/a", "https://example.com/")
-        )
+        self.assertTrue(same_host("https://www.example.com/a", "https://example.com/"))
 
     def test_measurement_evidence_summary_deduplicates_identifiers(self) -> None:
         summary = summarize_measurement_evidence(
@@ -693,13 +676,11 @@ class TrackingPlanSkillTests(unittest.TestCase):
         self.assertTrue(result["regions"]["event_matrix"])
         self.assertTrue(result["regions"]["parameter_reference"])
         self.assertTrue(result["regions"]["event_tabs"])
-        release = json.loads(
-            (ROOT / "release.json").read_text(encoding="utf-8-sig")
-        )
+        release = json.loads((ROOT / "release.json").read_text(encoding="utf-8-sig"))
         workbook = load_workbook(ASSET, read_only=True)
         self.assertEqual(
             workbook.properties.description,
-            f'Default workbook asset version {release["version"]}',
+            f"Default workbook asset version {release['version']}",
         )
         workbook.close()
 
@@ -732,17 +713,12 @@ class TrackingPlanSkillTests(unittest.TestCase):
         self.assertNotIn('Tier 1 — "Quick Plan"', text)
         self.assertNotIn("event-count-based execution mode", text)
 
-
     def test_official_ecommerce_rejects_event_wrapper(self) -> None:
         plan = copy.deepcopy(self.plan)
         event = plan["events"][1]
-        event["data_layer"]["push"]["event_data"] = event["data_layer"]["push"].pop(
-            "ecommerce"
-        )
+        event["data_layer"]["push"]["event_data"] = event["data_layer"]["push"].pop("ecommerce")
         for parameter in event["parameters"]:
-            parameter["data_layer_path"] = str(parameter["data_layer_path"]).replace(
-                "ecommerce.", "event_data."
-            )
+            parameter["data_layer_path"] = str(parameter["data_layer_path"]).replace("ecommerce.", "event_data.")
         codes = self.error_codes(plan)
         self.assertIn("ECOMMERCE_WRAPPER_MISSING", codes)
         self.assertIn("DATALAYER_WRAPPER_MISMATCH", codes)
@@ -757,11 +733,7 @@ class TrackingPlanSkillTests(unittest.TestCase):
         duplicate = copy.deepcopy(plan["events"][0]["parameters"][0])
         duplicate["data_layer_path"] = "event_data.page_template"
         plan["events"][2]["parameters"].append(duplicate)
-        rows = [
-            row
-            for row in parameter_reference_rows(plan)
-            if row["name"] == "page_template" and row["scope"] == "implementation"
-        ]
+        rows = [row for row in parameter_reference_rows(plan) if row["name"] == "page_template" and row["scope"] == "implementation"]
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["events"], ["core_data", "begin_quote"])
 
@@ -772,11 +744,24 @@ class TrackingPlanSkillTests(unittest.TestCase):
             [],
         )
         context["value_domains"][0]["values"] = ["home"]
-        codes = {
-            item.code
-            for item in validate_analysis_context(context, self.plan, delivery=True)
-        }
+        codes = {item.code for item in validate_analysis_context(context, self.plan, delivery=True)}
         self.assertIn("FINITE_VALUE_DOMAIN_MISMATCH", codes)
+
+    def test_material_interaction_opportunity_cannot_disappear_at_delivery(self) -> None:
+        context = load_json(ROOT / "references" / "example-analysis-context.json")
+        context["measurement_opportunities"][0]["decision"] = "unresolved"
+        context["measurement_opportunities"][0]["event_names"] = []
+        codes = {item.code for item in validate_analysis_context(context, self.plan, delivery=True)}
+        self.assertIn("MATERIAL_OPPORTUNITY_UNRESOLVED", codes)
+
+    def test_every_non_context_event_must_map_back_to_an_opportunity(self) -> None:
+        context = load_json(ROOT / "references" / "example-analysis-context.json")
+        opportunity = next(item for item in context["measurement_opportunities"] if "begin_quote" in item["event_names"])
+        opportunity["decision"] = "exclude"
+        opportunity["decision_reason"] = "Synthetic exclusion used to test backlink closure."
+        opportunity["event_names"] = []
+        codes = {item.code for item in validate_analysis_context(context, self.plan, delivery=True)}
+        self.assertIn("EVENT_WITHOUT_MEASUREMENT_OPPORTUNITY", codes)
 
     def test_visible_workbook_edits_are_not_silently_ignored(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -788,9 +773,7 @@ class TrackingPlanSkillTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "visible workbook has changed"):
                 import_workbook(path)
             reconciled = import_workbook(path, reconcile_visible_edits=True)
-        event = next(
-            item for item in reconciled["events"] if item["event_name"] == "begin_quote"
-        )
+        event = next(item for item in reconciled["events"] if item["event_name"] == "begin_quote")
         self.assertEqual(
             event["trigger"],
             "Push once after the visitor opens the quote form.",
@@ -816,6 +799,129 @@ class TrackingPlanSkillTests(unittest.TestCase):
         )
         gaps = material_unvisited_candidates([quote, article], root, {"homepage"})
         self.assertIn(quote["url"], {item["url"] for item in gaps})
+
+    def test_repeated_product_pages_do_not_outrank_an_unseen_journey(self) -> None:
+        root = "https://example.com/"
+        product = {
+            "url": "https://example.com/products/repeated-product",
+            "text": "Repeated product",
+            "source": "sitemap",
+        }
+        catalogue = {
+            "url": "https://example.com/request-catalogue",
+            "text": "Request a catalogue",
+            "source": "sitemap",
+        }
+        observed_templates = {"homepage": 1, "product_detail": 4}
+        observed_families = {"homepage", "product_detail"}
+        self.assertGreater(
+            candidate_priority(
+                catalogue,
+                root,
+                observed_templates,
+                observed_families,
+            ),
+            candidate_priority(
+                product,
+                root,
+                observed_templates,
+                observed_families,
+            ),
+        )
+
+    def test_rendered_interactions_seed_measurement_opportunity_review(self) -> None:
+        hints = measurement_opportunity_hints(
+            [
+                {
+                    "url": "https://example.com/products",
+                    "template": "listing",
+                    "buttons": ["Filter", "Sort"],
+                    "links": [],
+                    "interactive_controls": [
+                        {
+                            "label": "Size filter",
+                            "name": "size",
+                            "option_values": ["small", "large"],
+                        }
+                    ],
+                    "rendered_structure_sha256": "1" * 64,
+                }
+            ]
+        )
+        hint_keys = {item["hint_key"] for item in hints}
+        self.assertIn("item_list_discovery", hint_keys)
+        self.assertIn("filter_and_sort_usage", hint_keys)
+        self.assertTrue(all(item["requires_interactive_review"] for item in hints))
+        self.assertEqual(
+            next(item["materiality"] for item in hints if item["hint_key"] == "item_list_discovery"),
+            "material",
+        )
+        self.assertEqual(
+            next(item["materiality"] for item in hints if item["hint_key"] == "filter_and_sort_usage"),
+            "candidate",
+        )
+
+    def test_targeted_discovery_continues_until_material_families_close(self) -> None:
+        self.assertEqual(
+            discovery_round_stop_reason(3, 1, 3, 20),
+            "continue_targeted_discovery",
+        )
+        self.assertEqual(
+            discovery_round_stop_reason(0, 2, 3, 20),
+            "material_coverage_complete",
+        )
+        self.assertEqual(
+            discovery_round_stop_reason(2, 3, 3, 20),
+            "max_rounds_reached",
+        )
+
+    def test_safe_interaction_recipes_are_generated_but_payment_is_excluded(self) -> None:
+        pages = [
+            {
+                "url": "https://example.com/request-a-quote",
+                "template": "lead_form",
+                "forms": [
+                    {
+                        "selector": "#quote",
+                        "action": "https://example.com/request-a-quote",
+                        "fields": [
+                            {
+                                "selector": "input[name=email]",
+                                "name": "email",
+                                "type": "email",
+                            }
+                        ],
+                        "submit_controls": [{"selector": "button", "label": "Send request"}],
+                    }
+                ],
+            },
+            {
+                "url": "https://example.com/payment",
+                "template": "lead_form",
+                "forms": [
+                    {
+                        "selector": "#payment",
+                        "action": "https://example.com/pay",
+                        "fields": [],
+                        "submit_controls": [{"selector": "button", "label": "Pay now"}],
+                    }
+                ],
+            },
+        ]
+        recipes = build_auto_interaction_recipes(pages)
+        self.assertEqual([item["start_url"] for item in recipes], [pages[0]["url"]])
+        self.assertEqual(recipes[0]["fields"][0]["kind"], "email")
+
+    def test_website_language_summary_is_evidence_backed(self) -> None:
+        summary = summarize_languages(
+            [
+                {"url": "https://example.fr/", "language": "fr-FR"},
+                {"url": "https://example.fr/devis", "language": "fr"},
+            ],
+            "https://example.fr/",
+        )
+        self.assertEqual(summary["primary_language"], "fr")
+        self.assertEqual(summary["observed_languages"], ["fr", "fr-FR"])
 
     def test_interactive_spec_requires_explicit_non_transactional_submission(self) -> None:
         invalid = {
@@ -853,10 +959,7 @@ class TrackingPlanSkillTests(unittest.TestCase):
         self.assertEqual(len(contract["events"]), len(self.plan["events"]))
         self.assertEqual(
             {item["push_schema"] for item in contract["events"]},
-            {
-                f'schemas/{event["event_name"]}.schema.json'
-                for event in self.plan["events"]
-            },
+            {f"schemas/{event['event_name']}.schema.json" for event in self.plan["events"]},
         )
 
     def test_rendered_workbook_gate_matches_canonical_plan(self) -> None:
@@ -872,9 +975,7 @@ class TrackingPlanSkillTests(unittest.TestCase):
         parameter = updated["events"][2]["parameters"][0]
         old_path = parameter["data_layer_path"]
         parameter["data_layer_path"] = "event_data.form_identifier"
-        updated["events"][2]["data_layer"]["push"]["event_data"][
-            "form_identifier"
-        ] = updated["events"][2]["data_layer"]["push"]["event_data"].pop(
+        updated["events"][2]["data_layer"]["push"]["event_data"]["form_identifier"] = updated["events"][2]["data_layer"]["push"]["event_data"].pop(
             old_path.rsplit(".", 1)[-1]
         )
         result = compare(self.plan, updated)
@@ -882,12 +983,7 @@ class TrackingPlanSkillTests(unittest.TestCase):
         self.assertIn("data_layer_convention", entities)
         self.assertIn("business_question", entities)
         self.assertTrue(
-            any(
-                item["entity"] == "parameter"
-                and item.get("after", {}).get("data_layer_path")
-                == "event_data.form_identifier"
-                for item in result["changes"]
-            )
+            any(item["entity"] == "parameter" and item.get("after", {}).get("data_layer_path") == "event_data.form_identifier" for item in result["changes"])
         )
 
     def test_official_source_cache_avoids_duplicate_network_fetches(self) -> None:
@@ -932,18 +1028,56 @@ class TrackingPlanSkillTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "no mapped event tab"):
                 adapt(updated, source, mapping)
 
-
     def test_context_drift_targets_affected_events_without_mutating_plan(self) -> None:
         before = load_json(ROOT / "references" / "example-analysis-context.json")
         after = copy.deepcopy(before)
-        domain = next(
-            item for item in after["value_domains"] if item["domain_id"] == "project_types"
-        )
+        domain = next(item for item in after["value_domains"] if item["domain_id"] == "project_types")
         domain["values"].append("solar")
         report = detect_context_drift(before, after, self.plan)
         self.assertEqual(report["status"], "review_required")
         self.assertEqual(report["affected_events"], ["begin_quote"])
         self.assertNotIn("solar", self.plan["events"][2]["parameters"][1]["allowed_values"])
+
+    def test_discovery_context_plan_closure_is_hash_bound(self) -> None:
+        report_path = ROOT / "references" / "example-discovery-report.json"
+        report = load_discovery_report(report_path)
+        context = load_json(ROOT / "references" / "example-analysis-context.json")
+        self.assertEqual(
+            validate_discovery_bindings(
+                context,
+                [report_path],
+                require_live_report=True,
+            ),
+            [],
+        )
+        seed = build_analysis_context_seed(report, report_path)
+        seed_issues = validate_analysis_context(seed, delivery=True)
+        self.assertIn(
+            "MATERIAL_OPPORTUNITY_UNRESOLVED",
+            {item.code for item in seed_issues},
+        )
+        tampered = copy.deepcopy(context)
+        tampered["discovery_reports"][0]["sha256"] = "0" * 64
+        self.assertTrue(
+            any(
+                "hash mismatch" in message
+                for message in validate_discovery_bindings(
+                    tampered,
+                    [report_path],
+                    require_live_report=True,
+                )
+            )
+        )
+
+    def test_rendered_drift_includes_hint_and_opportunity_impact(self) -> None:
+        context = load_json(ROOT / "references" / "example-analysis-context.json")
+        before = load_discovery_report(ROOT / "references" / "example-discovery-report.json")
+        after = copy.deepcopy(before)
+        after["measurement_opportunity_hints"][0]["reason"] = "Changed evidence"
+        report = detect_context_drift(context, context, self.plan, before, after)
+        self.assertEqual(report["status"], "review_required")
+        self.assertIn("product_item_consideration", report["affected_opportunities"])
+        self.assertIn("view_item", report["affected_events"])
 
     def test_business_change_impact_targets_contract_and_recette(self) -> None:
         context = load_json(ROOT / "references" / "example-analysis-context.json")
@@ -962,13 +1096,53 @@ class TrackingPlanSkillTests(unittest.TestCase):
         self.assertIn("schemas/begin_quote.schema.json", report["artifacts_to_regenerate"])
         self.assertEqual(report["unresolved_selectors"], [])
 
+    def test_business_change_description_can_infer_payment_impact(self) -> None:
+        plan = copy.deepcopy(self.plan)
+        payment = copy.deepcopy(plan["events"][2])
+        payment["event_name"] = "add_payment_info"
+        payment["journey_ids"] = ["quote_request"]
+        payment["business_question"] = "Which payment method is selected?"
+        payment["measurement_opportunity_ids"] = ["checkout_payment_selection"]
+        payment["parameters"][1]["name"] = "payment_type"
+        payment["parameters"][1]["data_layer_path"] = "event_data.payment_type"
+        plan["events"].append(payment)
+        context = load_json(ROOT / "references" / "example-analysis-context.json")
+        context["measurement_opportunities"].append(
+            {
+                "opportunity_id": "checkout_payment_selection",
+                "journey_id": "quote_request",
+                "name": "Payment method selection",
+                "category": "progression",
+                "material": True,
+                "evidence_status": "confirmed",
+                "evidence_refs": ["business_brief"],
+                "business_question": "Which payment method is selected?",
+                "official_candidate": "add_payment_info",
+                "official_fit": "fit",
+                "decision": "measure",
+                "decision_reason": "Official checkout semantic.",
+                "event_names": ["add_payment_info"],
+                "discovery_hint_ids": [],
+            }
+        )
+        report = analyze_change_impact(
+            plan,
+            {
+                "request_version": "1.0.0",
+                "change_id": "add_paypal",
+                "description": "Add PayPal as a new payment method.",
+                "change_type": "other",
+                "selectors": {},
+            },
+            context,
+        )
+        self.assertTrue(report["inference"]["used"])
+        self.assertIn("add_payment_info", {item["event_name"] for item in report["affected_events"]})
+        self.assertEqual(report["unresolved_selectors"], [])
+
     def test_official_parameter_website_values_still_need_evidence(self) -> None:
         plan = copy.deepcopy(self.plan)
-        currency = next(
-            parameter
-            for parameter in plan["events"][1]["parameters"]
-            if parameter["name"] == "currency"
-        )
+        currency = next(parameter for parameter in plan["events"][1]["parameters"] if parameter["name"] == "currency")
         currency.pop("value_evidence_refs")
         self.assertIn("FINITE_VALUE_EVIDENCE_MISSING", self.error_codes(plan))
 

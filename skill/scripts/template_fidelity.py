@@ -40,10 +40,7 @@ def workbook_fidelity_snapshot(workbook: Any) -> dict[str, Any]:
         cells = {
             cell.coordinate: _cell_snapshot(cell)
             for cell in sheet._cells.values()
-            if cell.value not in (None, "")
-            or cell.hyperlink is not None
-            or cell.comment is not None
-            or cell.has_style
+            if cell.value not in (None, "") or cell.hyperlink is not None or cell.comment is not None or cell.has_style
         }
         sheets.append(
             {
@@ -123,12 +120,8 @@ def authorized_template_changes(
         title = str(event_mapping["sheet"])
         index = title_to_index[title]
         sheet_title_state.add(index)
-        existing = str(
-            workbook[title][str(event_mapping["event_name_cell"])].value or ""
-        ).strip()
-        if existing and existing not in {
-            str(event.get("event_name", "")) for event in events
-        }:
+        existing = str(workbook[title][str(event_mapping["event_name_cell"])].value or "").strip()
+        if existing and existing not in {str(event.get("event_name", "")) for event in events}:
             obsolete_targets.add(title)
         for coordinate in (event_mapping.get("field_labels") or {}).values():
             cells.add((index, _right(str(coordinate))))
@@ -177,9 +170,7 @@ def compare_template_fidelity(
         if index not in authorized["sheet_title_state"]:
             for field in ("title", "state"):
                 if old[field] != new[field]:
-                    violations.append(
-                        {"kind": f"sheet_{field}", "sheet": old["title"], "before": old[field], "after": new[field]}
-                    )
+                    violations.append({"kind": f"sheet_{field}", "sheet": old["title"], "before": old[field], "after": new[field]})
         for field in (
             "merged_cells",
             "image_count",
@@ -191,9 +182,7 @@ def compare_template_fidelity(
             "print_title_cols",
         ):
             if old[field] != new[field]:
-                violations.append(
-                    {"kind": field, "sheet": old["title"], "before": old[field], "after": new[field]}
-                )
+                violations.append({"kind": field, "sheet": old["title"], "before": old[field], "after": new[field]})
         if index not in authorized["auto_filter"] and old["auto_filter"] != new["auto_filter"]:
             violations.append({"kind": "auto_filter", "sheet": old["title"]})
         old_cells = old["cells"]
@@ -208,18 +197,11 @@ def compare_template_fidelity(
             old_without_link = {key: value for key, value in old_cell.items() if key != "hyperlink"}
             new_without_link = {key: value for key, value in new_cell.items() if key != "hyperlink"}
             old_target = str(old_cell.get("hyperlink") or "")
-            obsolete_link_change = (
-                old_without_link == new_without_link
-                and any(
-                    old_target.startswith(f"#{target}!")
-                    or old_target.startswith(f"#'{target}'!")
-                    for target in authorized["obsolete_targets"]
-                )
+            obsolete_link_change = old_without_link == new_without_link and any(
+                old_target.startswith(f"#{target}!") or old_target.startswith(f"#'{target}'!") for target in authorized["obsolete_targets"]
             )
             if not obsolete_link_change:
-                violations.append(
-                    {"kind": "unmapped_cell", "sheet": old["title"], "coordinate": coordinate}
-                )
+                violations.append({"kind": "unmapped_cell", "sheet": old["title"], "coordinate": coordinate})
     return {
         "status": "passed" if not violations else "failed",
         "checked_unmapped_content": True,
@@ -240,10 +222,9 @@ def add_package_fidelity(
     result["output_extension"] = output.suffix.lower()
     if template.suffix.lower() == ".xlsm":
         if output.suffix.lower() != ".xlsm":
-            result["violations"].append(
-                {"kind": "macro_extension", "message": "An XLSM template must remain XLSM."}
-            )
+            result["violations"].append({"kind": "macro_extension", "message": "An XLSM template must remain XLSM."})
         else:
+
             def macro_hash(path: Path) -> str:
                 try:
                     with ZipFile(path) as archive:
@@ -257,8 +238,6 @@ def add_package_fidelity(
             result["vba_project_sha256_before"] = before
             result["vba_project_sha256_after"] = after
             if not before or before != after:
-                result["violations"].append(
-                    {"kind": "vba_project", "message": "VBA project was not preserved byte-for-byte."}
-                )
+                result["violations"].append({"kind": "vba_project", "message": "VBA project was not preserved byte-for-byte."})
     result["status"] = "passed" if not result["violations"] else "failed"
     return result

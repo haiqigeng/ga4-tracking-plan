@@ -1,0 +1,119 @@
+{
+  "discovery_version": "1.1.0",
+  "report_id": "discovery_example_com_fixture",
+  "generated_at": "2026-08-01T10:00:00+00:00",
+  "root_url": "https://example.com/",
+  "generated_by": "test_fixture",
+  "crawl_mode": "playwright_rendered_dom",
+  "outcome": "completed",
+  "rounds": [
+    {
+      "round_number": 1,
+      "attempted_page_count": 2,
+      "usable_page_count": 2,
+      "new_candidate_count": 0,
+      "material_unvisited_candidate_count": 0,
+      "stop_reason": "material_coverage_complete"
+    }
+  ],
+  "language_summary": {
+    "primary_language": "en",
+    "observed_languages": ["en"],
+    "evidence_urls": ["https://example.com/products/example-window"]
+  },
+  "pages_sampled": [
+    {
+      "url": "https://example.com/products/example-window",
+      "template": "product_detail",
+      "language": "en",
+      "rendered_structure_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "rendered_dom_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "url": "https://example.com/request-a-quote",
+      "template": "lead_form",
+      "language": "en",
+      "rendered_structure_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "rendered_dom_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  ],
+  "measurement_opportunity_hints": [
+    {
+      "hint_id": "item_consideration",
+      "hint_key": "item_consideration",
+      "journey_id": "product_discovery",
+      "variant_id": "product_detail_standard",
+      "category": "interaction",
+      "materiality": "material",
+      "evidence_urls": ["https://example.com/products/example-window"],
+      "evidence_structure_hashes": ["1111111111111111111111111111111111111111111111111111111111111111"],
+      "reason": "Rendered item detail exposes product consideration.",
+      "requires_interactive_review": true
+    },
+    {
+      "hint_id": "quote_intentional_start",
+      "hint_key": "quote_intentional_start",
+      "journey_id": "quote_request",
+      "variant_id": "quote_request_standard",
+      "category": "progression",
+      "materiality": "material",
+      "evidence_urls": ["https://example.com/request-a-quote"],
+      "evidence_structure_hashes": ["3333333333333333333333333333333333333333333333333333333333333333"],
+      "reason": "Rendered quote entry exposes an intentional funnel start.",
+      "requires_interactive_review": true
+    }
+  ],
+  "journey_coverage_ledger": [
+    {
+      "journey_id": "product_discovery",
+      "material": true,
+      "status": "observed",
+      "entry_points": ["https://example.com/products/example-window"],
+      "states_covered": ["entry", "progression"],
+      "variants": ["product detail"],
+      "evidence_urls": ["https://example.com/products/example-window"],
+      "variant_coverage": [
+        {
+          "variant_id": "product_detail_standard",
+          "material": true,
+          "status": "observed",
+          "entry_points": ["https://example.com/products/example-window"],
+          "states_covered": ["entry", "progression"],
+          "evidence_urls": ["https://example.com/products/example-window"],
+          "unvisited_material_candidates": []
+        }
+      ]
+    },
+    {
+      "journey_id": "quote_request",
+      "material": true,
+      "status": "observed",
+      "entry_points": ["https://example.com/request-a-quote"],
+      "states_covered": ["entry", "progression", "success", "failure"],
+      "variants": ["standard quote form"],
+      "evidence_urls": ["https://example.com/request-a-quote"],
+      "variant_coverage": [
+        {
+          "variant_id": "quote_request_standard",
+          "material": true,
+          "status": "observed",
+          "entry_points": ["https://example.com/request-a-quote"],
+          "states_covered": ["entry", "progression", "success", "failure"],
+          "evidence_urls": ["https://example.com/request-a-quote"],
+          "unvisited_material_candidates": []
+        }
+      ]
+    }
+  ],
+  "coverage_gaps": [],
+  "automatic_interaction_runs": [
+    {
+      "recipe_id": "auto_quote_request_1",
+      "journey_id": "quote_request",
+      "variant_id": "quote_request_standard",
+      "start_url": "https://example.com/request-a-quote",
+      "outcome": "completed",
+      "actions": [{"step": 1, "status": "completed"}]
+    }
+  ]
+}

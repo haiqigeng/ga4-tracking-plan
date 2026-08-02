@@ -182,12 +182,7 @@ def bundled_channels() -> tuple[dict[str, str], str]:
     result: dict[str, str] = {}
     for channel, channel_patterns in patterns.items():
         executable = next(
-            (
-                path
-                for pattern in channel_patterns
-                for path in cache_root.glob(pattern)
-                if path.is_file()
-            ),
+            (path for pattern in channel_patterns for path in cache_root.glob(pattern) if path.is_file()),
             None,
         )
         if executable:
@@ -202,7 +197,9 @@ def inspect_browser_environment() -> dict[str, Any]:
     bundled, probe_error = bundled_channels()
     channels.update({name: path for name, path in bundled.items() if name not in channels})
     eligible_default = default_browser in channels and default_browser in SUPPORTED_CHANNELS
-    recommended = default_browser if eligible_default else next((name for name in ("msedge", "chrome", "firefox", "chromium", "webkit") if name in channels), "")
+    recommended = (
+        default_browser if eligible_default else next((name for name in ("msedge", "chrome", "firefox", "chromium", "webkit") if name in channels), "")
+    )
     if playwright_version == "not installed":
         readiness = "playwright_python_missing"
     elif import_error:
@@ -230,10 +227,7 @@ def inspect_browser_environment() -> dict[str, Any]:
 def resolve_browser_channel(requested: str, environment: dict[str, Any]) -> str:
     readiness = str(environment.get("readiness", ""))
     if readiness == "playwright_python_missing":
-        raise RuntimeError(
-            "Playwright Python is not installed. Install the skill dependencies "
-            f'with `python -m pip install -r "{REQUIREMENTS}"`.'
-        )
+        raise RuntimeError(f'Playwright Python is not installed. Install the skill dependencies with `python -m pip install -r "{REQUIREMENTS}"`.')
     if readiness in {"playwright_import_failed", "playwright_runtime_failed"}:
         detail = str(environment.get("playwright_probe_error", "unknown runtime error"))
         raise RuntimeError(f"Playwright is installed but unusable: {detail}")
