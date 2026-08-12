@@ -412,7 +412,7 @@ def parameter_reference_rows(
         if allowed_by_key:
             representative["allowed_values"] = [
                 allowed_by_key[key]
-                for key in sorted(allowed_by_key)
+                for key in allowed_by_key
             ]
         rows.append(
             {

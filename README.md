@@ -226,6 +226,17 @@ The skill does not:
 
 ## Versioning
 
+Version `2.7.1` is a focused quality release on canonical plan schema `5.0.0`.
+Synthetic interaction coverage is now reconciled by exact recipe and form
+identity, so one completed sibling form cannot conceal an untested form and a
+successful retry can close its precise earlier boundary. Rendered discovery
+may safely reveal hidden modal or tab forms only when a local control explicitly
+targets them; unrelated hidden global forms remain excluded. Parameter-reference
+workbooks preserve the analyst's authored order for finite allowed values,
+semantic diagnostics consolidate one conflict across all affected events, and
+generic whole-word form classification replaces ambiguous client-shaped
+shortcuts. The release remains compatible with `2.7.0` plans and contracts.
+
 Version `2.7.0` keeps canonical plan schema `5.0.0`, adds discovery report
 `1.3.0`, analysis-context `1.0.0`, and handoff `1.1.0`, while retaining the
 previous report and handoff contracts for maintenance compatibility. Fresh

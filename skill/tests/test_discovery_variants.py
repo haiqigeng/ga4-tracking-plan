@@ -269,6 +269,132 @@ class DiscoveryVariantTests(unittest.TestCase):
         self.assertEqual(len(incomplete_gaps), 2)
         self.assertEqual(len({gap["gap_id"] for gap in incomplete_gaps}), 2)
 
+    def test_completed_sibling_form_does_not_close_an_unexecuted_recipe(self) -> None:
+        page = lead_page("https://example.com/contact")
+        page["forms"] = [
+            {**page["forms"][0], "selector": "#sales", "id": "sales"},
+            {**page["forms"][0], "selector": "#support", "id": "support"},
+        ]
+        recipes = build_auto_interaction_recipes([page], limit=None)
+        completed = {**recipes[0], "outcome": "completed", "actions": [{"step": 1}]}
+        remaining_gap = interaction_coverage_gaps([recipes[1]], [])
+        variant_id = recipes[0]["variant_id"]
+        generated_ledger = journey_coverage_ledger(
+            [page],
+            [{"url": page["url"], "text": "Contact", "source": "fixture"}],
+            [],
+            [],
+            "https://example.com/",
+            [completed],
+            recipes,
+        )
+        generated_variant = generated_ledger[0]["variant_coverage"][0]
+        self.assertEqual(generated_variant["status"], "partial")
+        report = {
+            "report_id": "discovery_example_com_sibling_forms",
+            "generated_at": "2026-08-13T10:00:00+00:00",
+            "root_url": "https://example.com/",
+            "outcome": "partial",
+            "language_summary": {"primary_language": "en", "observed_languages": ["en"]},
+            "measurement_opportunity_hints": [],
+            "journey_coverage_ledger": [
+                {
+                    "journey_id": "lead_generation",
+                    "material": True,
+                    "status": "observed",
+                    "entry_points": [page["url"]],
+                    "states_covered": ["entry", "progression", "success"],
+                    "variants": ["contact"],
+                    "evidence_urls": [page["url"]],
+                    "unvisited_material_candidates": [],
+                    "variant_coverage": [
+                        {
+                            "variant_id": variant_id,
+                            "material": True,
+                            "status": "observed",
+                            "entry_points": [page["url"]],
+                            "states_covered": ["entry", "progression", "success"],
+                            "evidence_urls": [page["url"]],
+                            "unvisited_material_candidates": [],
+                        }
+                    ],
+                }
+            ],
+            "coverage_gaps": remaining_gap,
+            "automatic_interaction_runs": [completed],
+        }
+        merged = merge_discovery_reports([report])
+        self.assertEqual(len(merged["coverage_gaps"]), 1)
+        self.assertEqual(merged["coverage_gaps"][0]["recipe_id"], recipes[1]["recipe_id"])
+
+    def test_recipe_retry_replaces_its_previous_state_and_completion_closes_it(self) -> None:
+        recipe = build_auto_interaction_recipes(
+            [lead_page("https://example.com/quote/retry")],
+            limit=None,
+        )[0]
+
+        def report(report_id: str, gap: list[dict], runs: list[dict], status: str) -> dict:
+            return {
+                "report_id": report_id,
+                "generated_at": "2026-08-13T10:00:00+00:00",
+                "root_url": "https://example.com/",
+                "outcome": "partial" if gap else "completed",
+                "language_summary": {"primary_language": "en", "observed_languages": ["en"]},
+                "measurement_opportunity_hints": [],
+                "journey_coverage_ledger": [
+                    {
+                        "journey_id": recipe["journey_id"],
+                        "material": True,
+                        "status": status,
+                        "entry_points": [recipe["start_url"]],
+                        "states_covered": ["entry"],
+                        "variants": ["quote_retry"],
+                        "evidence_urls": [recipe["start_url"]],
+                        "unvisited_material_candidates": [],
+                        "variant_coverage": [
+                            {
+                                "variant_id": recipe["variant_id"],
+                                "material": True,
+                                "status": status,
+                                "entry_points": [recipe["start_url"]],
+                                "states_covered": ["entry"],
+                                "evidence_urls": [recipe["start_url"]],
+                                "unvisited_material_candidates": [],
+                            }
+                        ],
+                    }
+                ],
+                "coverage_gaps": gap,
+                "automatic_interaction_runs": runs,
+            }
+
+        not_tested = report(
+            "discovery_example_com_retry_one",
+            interaction_coverage_gaps([recipe], []),
+            [],
+            "not_tested",
+        )
+        partial_run = {**recipe, "outcome": "partial", "actions": []}
+        partial = report(
+            "discovery_example_com_retry_two",
+            interaction_coverage_gaps([], [partial_run]),
+            [partial_run],
+            "partial",
+        )
+        merged_partial = merge_discovery_reports([not_tested, partial])
+        self.assertEqual(len(merged_partial["coverage_gaps"]), 1)
+        self.assertEqual(merged_partial["coverage_gaps"][0]["evidence_state"], "partial")
+
+        completed_run = {**recipe, "outcome": "completed", "actions": [{"step": 1}]}
+        completed = report(
+            "discovery_example_com_retry_three",
+            [],
+            [completed_run],
+            "observed",
+        )
+        merged_completed = merge_discovery_reports([not_tested, partial, completed])
+        self.assertEqual(merged_completed["coverage_gaps"], [])
+
     def test_seed_preserves_language_precedence_target_state_and_hint_materiality(self) -> None:
         report = json.loads((ROOT / "references" / "example-discovery-report.json").read_text(encoding="utf-8"))
         candidate = copy.deepcopy(report["measurement_opportunity_hints"][0])

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from contract_utils import sha256_file
-from discovery_quality import merge_evidence_coverage_statuses
+from discovery_quality import coverage_gap_identity, merge_evidence_coverage_statuses
 from jsonschema import Draft202012Validator, FormatChecker
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -107,7 +107,7 @@ def validate_discovery_bindings(
     known_variants: set[str] = set()
     report_journey_statuses: dict[str, str] = {}
     report_variant_statuses: dict[tuple[str, str], str] = {}
-    report_gap_states: dict[str, str] = {}
+    report_gap_states: dict[tuple[str, ...], str] = {}
     for report_id, record in sorted(records.items()):
         record_run_id = str(record.get("run_id", ""))
         if record_run_id != context_run_id:
@@ -171,16 +171,21 @@ def validate_discovery_bindings(
                     )
         for gap in report.get("coverage_gaps", []):
             if isinstance(gap, dict) and gap.get("gap_id") and gap.get("evidence_state"):
-                gap_id = str(gap["gap_id"])
+                identity = coverage_gap_identity(gap)
                 gap_state = str(gap["evidence_state"])
-                existing_gap_state = report_gap_states.get(gap_id)
+                existing_gap_state = report_gap_states.get(identity)
                 if existing_gap_state and existing_gap_state != gap_state:
-                    errors.append(
-                        f"Coverage gap '{gap_id}' has conflicting factual states: "
-                        f"'{existing_gap_state}' and '{gap_state}'."
-                    )
+                    if identity[0] == "interaction_recipe":
+                        report_gap_states[identity] = merge_evidence_coverage_statuses(
+                            [existing_gap_state, gap_state]
+                        )
+                    else:
+                        errors.append(
+                            f"Coverage gap '{gap.get('gap_id')}' has conflicting factual states: "
+                            f"'{existing_gap_state}' and '{gap_state}'."
+                        )
                 else:
-                    report_gap_states[gap_id] = gap_state
+                    report_gap_states[identity] = gap_state
 
     mapped_hints: set[str] = set()
     for opportunity in context.get("measurement_opportunities", []):
@@ -243,7 +248,7 @@ def validate_discovery_bindings(
         if not isinstance(gap, dict):
             continue
         gap_id = str(gap.get("gap_id", ""))
-        report_state = report_gap_states.get(gap_id)
+        report_state = report_gap_states.get(coverage_gap_identity(gap))
         context_state = str(gap.get("evidence_state", ""))
         if report_state and context_state and report_state != context_state:
             errors.append(

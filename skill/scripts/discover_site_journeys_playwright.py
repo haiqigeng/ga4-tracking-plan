@@ -557,6 +557,7 @@ def journey_coverage_ledger(
     blocked_candidates: list[dict[str, str]],
     root_url: str,
     interaction_runs: list[dict[str, Any]] | None = None,
+    interaction_recipes: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     groups: dict[str, dict[str, Any]] = {}
 
@@ -659,6 +660,27 @@ def journey_coverage_ledger(
                 if current_status == "not_tested"
                 else aggregate_coverage_statuses([current_status, run_status])
             )
+    runs_by_recipe = {
+        str(run.get("recipe_id")): run
+        for run in interaction_runs or []
+        if isinstance(run, dict) and run.get("recipe_id")
+    }
+    recipe_statuses: dict[tuple[str, str], list[str]] = {}
+    for recipe in interaction_recipes or []:
+        if not isinstance(recipe, dict):
+            continue
+        journey_id = str(recipe.get("journey_id", "content_navigation"))
+        variant_id = str(recipe.get("variant_id", ""))
+        run = runs_by_recipe.get(str(recipe.get("recipe_id", "")))
+        run_status, _ = _interaction_run_coverage(run or {})
+        recipe_statuses.setdefault((journey_id, variant_id), []).append(
+            run_status or "not_tested"
+        )
+    for (journey_id, variant_id), statuses in recipe_statuses.items():
+        item = group(journey_id)
+        variant_item = item["variant_coverage"].get(variant_id)
+        if variant_item is not None:
+            variant_item["status"] = aggregate_coverage_statuses(statuses)
     for candidate in material_unvisited:
         url = str(candidate.get("url", ""))
         template = str(candidate.get("template", infer_template(url)))
@@ -897,7 +919,98 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
                 (field.labels && field.labels[0] && field.labels[0].innerText) ||
                 field.getAttribute("placeholder") || field.getAttribute("name") || ""
             ).trim();
-            return elements.map(element => ({
+            const controlLabel = control => (
+                control.innerText || control.value || control.getAttribute("aria-label") ||
+                control.getAttribute("title") || ""
+            ).trim();
+            const relationshipFor = (control, targetId) => {
+                if ((control.getAttribute("aria-controls") || "").split(/\s+/).includes(targetId)) return "aria_controls";
+                const fragment = `#${targetId}`;
+                for (const attribute of ["data-target", "data-bs-target", "data-modal-target", "data-dialog-target", "href"]) {
+                    if ((control.getAttribute(attribute) || "").trim() === fragment) return attribute.replace(/-/g, "_");
+                }
+                return "";
+            };
+            const revealControlFor = element => {
+                const hasMain = !!document.querySelector("main, [role='main'], article");
+                const isLocalControl = control => {
+                    const globalChrome = !!control.closest("header, footer, nav, [role='banner'], [role='contentinfo'], [role='navigation']");
+                    const insideMain = !!control.closest("main, [role='main'], article");
+                    const component = control.closest("section, [data-component], [data-testid], [class*='component' i]");
+                    const sameComponent = !!(component && component.contains(element));
+                    return {
+                        local: insideMain || sameComponent || (!hasMain && !globalChrome),
+                        insideMain,
+                        sameComponent
+                    };
+                };
+                const targetIds = [];
+                let node = element;
+                while (node && node.nodeType === 1 && node !== document.documentElement) {
+                    if (node.id && !targetIds.includes(node.id)) targetIds.push(node.id);
+                    node = node.parentElement;
+                }
+                for (const targetId of targetIds) {
+                    const fragment = `#${targetId}`;
+                    const query = [
+                        `[aria-controls="${attr(targetId)}"]`,
+                        `[data-target="${attr(fragment)}"]`,
+                        `[data-bs-target="${attr(fragment)}"]`,
+                        `[data-modal-target="${attr(fragment)}"]`,
+                        `[data-dialog-target="${attr(fragment)}"]`,
+                        `[href="${attr(fragment)}"]`
+                    ].join(",");
+                    for (const control of document.querySelectorAll(query)) {
+                        if (!visible(control) || control.disabled) continue;
+                        const locality = isLocalControl(control);
+                        if (!locality.local) continue;
+                        return {
+                            selector: selectorFor(control),
+                            label: controlLabel(control),
+                            relationship: relationshipFor(control, targetId),
+                            target_id: targetId,
+                            local: locality.local,
+                            inside_main: locality.insideMain,
+                            same_component: locality.sameComponent
+                        };
+                    }
+                }
+                const dialog = element.closest("dialog, [role='dialog'], [aria-modal='true']");
+                if (dialog) {
+                    const hiddenDialogs = [...document.querySelectorAll("dialog, [role='dialog'], [aria-modal='true']")]
+                        .filter(candidate => !visible(candidate) && candidate.querySelector("form"));
+                    const localDialogOpeners = [...document.querySelectorAll("[aria-haspopup='dialog']")]
+                        .filter(control => visible(control) && !control.disabled && isLocalControl(control).local);
+                    if (hiddenDialogs.length === 1 && hiddenDialogs[0] === dialog && localDialogOpeners.length === 1) {
+                        const control = localDialogOpeners[0];
+                        const locality = isLocalControl(control);
+                        return {
+                            selector: selectorFor(control),
+                            label: controlLabel(control),
+                            relationship: "unique_local_dialog_opener",
+                            target_id: dialog.id || "",
+                            local: true,
+                            inside_main: locality.insideMain,
+                            same_component: locality.sameComponent
+                        };
+                    }
+                }
+                return null;
+            };
+            return elements.map(element => {
+                const revealControl = revealControlFor(element);
+                const contextContainer = revealControl
+                    ? (document.getElementById(revealControl.target_id) || element.closest("dialog, [role='dialog'], [role='tabpanel'], section, article"))
+                    : element.closest("dialog, [role='dialog'], [role='tabpanel'], section, article");
+                const labelledBy = contextContainer && contextContainer.getAttribute("aria-labelledby");
+                const labelledElement = labelledBy ? document.getElementById(labelledBy.split(/\s+/)[0]) : null;
+                const heading = contextContainer && contextContainer.querySelector("h1, h2, h3, legend, [role='heading']");
+                const contextLabel = (
+                    (contextContainer && contextContainer.getAttribute("aria-label")) ||
+                    (labelledElement && labelledElement.textContent) ||
+                    (heading && heading.textContent) || ""
+                ).trim();
+                return {
                 action: new URL(element.getAttribute("action") || document.location.href, document.baseURI).href,
                 method: (element.getAttribute("method") || "get").toLowerCase(),
                 id: element.id || "",
@@ -905,6 +1018,8 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
                 selector: selectorFor(element),
                 visible: visible(element),
                 inside_main: !!element.closest("main, [role='main'], article"),
+                context_label: contextLabel,
+                reveal_control: revealControl,
                 fields: [...element.querySelectorAll("input, select, textarea")].slice(0, 50).map(field => ({
                     name: field.getAttribute("name") || "",
                     id: field.id || "",
@@ -938,7 +1053,8 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
                     type: (control.getAttribute("type") || control.getAttribute("role") || "button").toLowerCase(),
                     disabled: !!control.disabled
                 }))
-            }));
+                };
+            });
         }""",
     )
     buttons = page.eval_on_selector_all(
@@ -1246,13 +1362,23 @@ def build_auto_interaction_recipes(
                 for field in form.get("fields", [])
                 if isinstance(field, dict) and not field.get("disabled")
             ]
-            form_id = _identifier(
-                str(form.get("id") or form.get("name") or form_selector),
-                maximum=60,
+            raw_form_identity = str(form.get("id") or form.get("name") or form_selector)
+            form_id = _identifier(raw_form_identity, maximum=60)
+            raw_recipe_id = _identifier(
+                f"auto_{variant_id}_{form_id}",
+                maximum=512,
             )
+            if len(raw_recipe_id) <= 119:
+                recipe_id = raw_recipe_id
+            else:
+                recipe_digest = hashlib.sha256(
+                    f"{variant_id}|{form_selector}|{raw_form_identity}".encode("utf-8")
+                ).hexdigest()[:10]
+                recipe_id = f"{raw_recipe_id[:108].rstrip('_')}_{recipe_digest}"
+            reveal_control = form.get("reveal_control", {})
             recipes.append(
                 {
-                    "recipe_id": _identifier(f"auto_{variant_id}_{form_id}", maximum=119),
+                    "recipe_id": recipe_id,
                     "journey_id": journey_id,
                     "variant_id": variant_id,
                     "form_id": form_id,
@@ -1261,6 +1387,15 @@ def build_auto_interaction_recipes(
                     "submission_kind": submission_kind,
                     "form_selector": form_selector,
                     "initially_visible": bool(form.get("visible", True)),
+                    **(
+                        {
+                            "reveal_control_selector": str(reveal_control.get("selector", "")),
+                            "reveal_control_label": str(reveal_control.get("label", "")),
+                            "reveal_relationship": str(reveal_control.get("relationship", "")),
+                        }
+                        if isinstance(reveal_control, dict) and reveal_control.get("selector")
+                        else {}
+                    ),
                     "fields": fields,
                     "maximum_steps": 5,
                 }
@@ -1378,6 +1513,55 @@ def _visible_form_snapshot(page: Any, preferred_selector: str) -> dict[str, Any]
         return None
 
 
+def _reveal_recipe_form(
+    page: Any,
+    recipe: dict[str, Any],
+    *,
+    timeout_ms: int,
+    active_action: dict[str, int],
+    captured_pushes: list[dict[str, Any]],
+    captured_requests: list[dict[str, Any]],
+) -> tuple[dict[str, Any] | None, str | None]:
+    form_selector = str(recipe.get("form_selector", "form"))
+    if _visible_form_snapshot(page, form_selector) is not None:
+        return None, None
+    control_selector = str(recipe.get("reveal_control_selector", ""))
+    if not control_selector:
+        return None, "hidden_form_without_local_reveal_control"
+    active_action["index"] += 1
+    action_index = active_action["index"]
+    before_push = len(captured_pushes)
+    before_request = len(captured_requests)
+    action: dict[str, Any] = {
+        "action_index": action_index,
+        "step": 0,
+        "action_type": "reveal_form",
+        "before_url": page.url,
+        "control_label": str(recipe.get("reveal_control_label", "")),
+        "control_selector": control_selector,
+        "relationship": str(recipe.get("reveal_relationship", "")),
+        "filled_fields": [],
+    }
+    try:
+        control = page.locator(control_selector).first
+        if not control.is_visible(timeout=min(1000, timeout_ms)):
+            return None, "local_reveal_control_not_visible"
+        control.click(timeout=timeout_ms)
+        page.wait_for_timeout(500)
+        action["status"] = "completed"
+    except Exception as error:
+        action["status"] = "blocked"
+        action["error"] = f"{type(error).__name__}: {error}"
+    action["after_url"] = page.url
+    action["data_layer_pushes"] = captured_pushes[before_push:]
+    action["ga4_requests"] = captured_requests[before_request:]
+    if action["status"] == "blocked":
+        return action, str(action["error"])
+    if _visible_form_snapshot(page, form_selector) is None:
+        return action, "form_remained_hidden_after_local_reveal"
+    return action, None
+
+
 def execute_auto_interaction(
     page: Any,
     recipe: dict[str, Any],
@@ -1399,6 +1583,25 @@ def execute_auto_interaction(
             "actions": [],
             "blocker": f"navigation: {type(error).__name__}: {error}",
         }
+    if not recipe.get("initially_visible", True):
+        reveal_action, reveal_blocker = _reveal_recipe_form(
+            page,
+            recipe,
+            timeout_ms=timeout_ms,
+            active_action=active_action,
+            captured_pushes=captured_pushes,
+            captured_requests=captured_requests,
+        )
+        if reveal_action:
+            actions.append(reveal_action)
+        if reveal_blocker:
+            return {
+                **recipe,
+                "outcome": "partial",
+                "privacy_statement_accepted": accepted,
+                "actions": actions,
+                "blocker": reveal_blocker,
+            }
     for step in range(int(recipe.get("maximum_steps", 5))):
         page_text = ""
         try:
@@ -1910,7 +2113,9 @@ def interaction_coverage_gaps(
 ) -> list[dict[str, Any]]:
     gaps = [
         {
-            "gap_id": _interaction_gap_id("interaction_not_executed", recipe),
+            "gap_id": _interaction_gap_id("interaction_boundary", recipe),
+            "recipe_id": recipe["recipe_id"],
+            **({"form_id": recipe["form_id"]} if recipe.get("form_id") else {}),
             "journey_id": recipe["journey_id"],
             "variant_id": recipe["variant_id"],
             "material": True,
@@ -1925,7 +2130,9 @@ def interaction_coverage_gaps(
     ]
     gaps.extend(
         {
-            "gap_id": _interaction_gap_id("interaction_incomplete", run),
+            "gap_id": _interaction_gap_id("interaction_boundary", run),
+            "recipe_id": str(run.get("recipe_id")),
+            **({"form_id": str(run["form_id"])} if run.get("form_id") else {}),
             "journey_id": str(run.get("journey_id")),
             "variant_id": str(run.get("variant_id")),
             "material": True,
@@ -2283,6 +2490,7 @@ def main() -> int:
             blocked_candidates,
             root_url,
             automatic_interaction_runs,
+            all_recipes,
         ),
         "automatic_interaction_runs": automatic_interaction_runs,
         "notes": [

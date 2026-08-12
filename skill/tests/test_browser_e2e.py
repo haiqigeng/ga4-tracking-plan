@@ -55,6 +55,8 @@ class BrowserDiscoveryEndToEndTests(unittest.TestCase):
                 f"{root_url}/landing/quote.html",
                 "--seed-url",
                 f"{root_url}/category/windows.html",
+                "--seed-url",
+                f"{root_url}/contact/modal.html",
             ]
             try:
                 process = subprocess.run(
@@ -113,6 +115,24 @@ class BrowserDiscoveryEndToEndTests(unittest.TestCase):
         self.assertEqual(fixture_push["event_data"]["token"], "[redacted]")
         self.assertEqual(fixture_push["event_data"]["userProfile"]["phoneNumber"], "[redacted]")
         self.assertEqual(fixture_push["event_data"]["project_type"], "window")
+        modal_runs = [
+            item
+            for item in report["automatic_interaction_runs"]
+            if item["start_url"].endswith("/contact/modal.html")
+        ]
+        self.assertEqual(len(modal_runs), 1)
+        self.assertEqual(modal_runs[0]["outcome"], "completed")
+        self.assertEqual(modal_runs[0]["actions"][0]["action_type"], "reveal_form")
+        self.assertEqual(modal_runs[0]["actions"][0]["control_selector"], "#open-support")
+        modal_page = next(
+            page
+            for page in report["pages_sampled"]
+            if page["url"].endswith("/contact/modal.html")
+        )
+        support_form = next(form for form in modal_page["forms"] if form["id"] == "support-form")
+        newsletter_form = next(form for form in modal_page["forms"] if form["id"] == "global-newsletter")
+        self.assertEqual(support_form["reveal_control"]["selector"], "#open-support")
+        self.assertIsNone(newsletter_form["reveal_control"])
 
 
 if __name__ == "__main__":

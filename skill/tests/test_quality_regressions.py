@@ -13,6 +13,7 @@ if str(SCRIPTS) not in sys.path:
 
 from discover_site_journeys import SignalParser, classify_page_archetype, infer_journey
 from discover_site_journeys_playwright import (
+    build_auto_interaction_recipes,
     detect_interaction_capabilities,
     measurement_opportunity_hints,
 )
@@ -138,6 +139,66 @@ class DiscoveryQualityRegressionTests(unittest.TestCase):
             [form["selector"] for form in relevant_forms(page, visible_only=True)],
             ["#contact-card"],
         )
+
+    def test_local_modal_opener_retains_hidden_form_but_global_hidden_form_stays_excluded(self) -> None:
+        page = {
+            "url": "https://example.com/contact",
+            "template": "support_or_contact",
+            "forms": [
+                {
+                    "selector": "#support-form",
+                    "id": "support-form",
+                    "visible": False,
+                    "inside_main": False,
+                    "context_label": "Contact support",
+                    "reveal_control": {
+                        "selector": "#open-support",
+                        "label": "Contact support",
+                        "relationship": "aria_controls",
+                        "local": True,
+                    },
+                    "fields": [{"name": "message", "type": "text"}],
+                    "submit_controls": [{"label": "Send support request"}],
+                },
+                {
+                    "selector": "#global-newsletter",
+                    "name": "newsletter",
+                    "visible": False,
+                    "inside_main": False,
+                    "reveal_control": {
+                        "selector": "#footer-newsletter",
+                        "label": "Newsletter",
+                        "relationship": "aria_controls",
+                        "local": False,
+                    },
+                    "fields": [{"name": "email", "type": "email"}],
+                    "submit_controls": [{"label": "Subscribe"}],
+                },
+            ],
+        }
+        selected = relevant_forms(page)
+        self.assertEqual([form["selector"] for form in selected], ["#support-form"])
+        recipes = build_auto_interaction_recipes([page], limit=None)
+        self.assertEqual(len(recipes), 1)
+        self.assertEqual(recipes[0]["reveal_control_selector"], "#open-support")
+        self.assertEqual(recipes[0]["reveal_relationship"], "aria_controls")
+
+    def test_ambiguous_business_nouns_do_not_establish_contact_form_purpose(self) -> None:
+        for noun in ("carte", "recharge"):
+            page = {
+                "template": "support_or_contact",
+                "forms": [
+                    {
+                        "selector": f"#{noun}",
+                        "name": noun,
+                        "visible": True,
+                        "inside_main": False,
+                        "fields": [],
+                        "submit_controls": [{"label": "Continue"}],
+                    }
+                ],
+            }
+            self.assertEqual(relevant_forms(page), [])
 
     def test_interaction_families_are_detected_once_per_page_not_per_control(self) -> None:
         page = {
@@ -311,6 +372,32 @@ class DiscoveryQualityRegressionTests(unittest.TestCase):
                 issues,
             )
             self.assertNotIn("PARAMETER_CLASSIFICATION_VARIATION", {item.code for item in issues})
+
+    def test_reused_parameter_conflict_is_reported_once_with_affected_events(self) -> None:
+        events = []
+        for index in range(20):
+            events.append(
+                {
+                    "event_name": f"event_{index}",
+                    "parameters": [
+                        {
+                            "name": "form_name",
+                            "scope": "event",
+                            "type": "string",
+                            "destination": "ga4_event_parameter",
+                            "classification": "custom",
+                            "definition": "The stable form name.",
+                            "value_rule": "Use rule a." if index < 10 else "Use rule b.",
+                        }
+                    ],
+                }
+            )
+        issues = []
+        check_plan_parameter_consistency_and_budgets({"events": events}, issues)
+        conflicts = [item for item in issues if item.code == "PARAMETER_VALUE_RULE_VARIATION"]
+        self.assertEqual(len(conflicts), 1)
+        self.assertIn("event_0", conflicts[0].message)
+        self.assertIn("event_19", conflicts[0].message)
 
     def test_datalayer_renderer_can_emit_an_html_script_without_changing_semantics(self) -> None:
         event = {"data_layer": {"push": {"event": "generate_lead", "event_data": {"form_name": "contact"}}}}

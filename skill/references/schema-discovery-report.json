@@ -242,6 +242,8 @@
           "gap_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
           "journey_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
           "variant_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "recipe_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,119}$"},
+          "form_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
           "material": {"type": "boolean"},
           "description": {"type": "string", "minLength": 1},
           "evidence_state": {"enum": ["not_tested", "partial", "externally_blocked"]},

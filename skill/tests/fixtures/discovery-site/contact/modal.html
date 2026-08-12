@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>Contact support</title></head>
+  <body>
+    <main>
+      <h1>Contact support</h1>
+      <button id="open-support" type="button" aria-controls="support-dialog">Send a support request</button>
+    </main>
+    <div id="support-dialog" role="dialog" aria-labelledby="support-heading" hidden>
+      <h2 id="support-heading">Contact support</h2>
+      <form id="support-form" name="support_request" action="/success.html" method="get">
+        <label>Email <input name="email" type="email" required></label>
+        <label>Message <textarea name="message" required></textarea></label>
+        <button type="submit">Send support request</button>
+      </form>
+    </div>
+    <footer>
+      <button id="footer-newsletter" type="button" aria-controls="global-newsletter">Newsletter</button>
+      <form id="global-newsletter" name="newsletter" action="/success.html" hidden>
+        <label>Email <input name="email" type="email"></label>
+        <button type="submit">Subscribe</button>
+      </form>
+    </footer>
+    <script>
+      document.getElementById("open-support").addEventListener("click", () => {
+        document.getElementById("support-dialog").hidden = false;
+      });
+    </script>
+  </body>
+</html>

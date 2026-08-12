@@ -139,6 +139,8 @@ def build_analysis_context_seed(
                 "gap_id": _slug(str(gap.get("gap_id", f"discovery_gap_{index}")), "gap"),
                 **({"journey_id": str(gap["journey_id"])} if gap.get("journey_id") else {}),
                 **({"variant_id": str(gap["variant_id"])} if gap.get("variant_id") else {}),
+                **({"recipe_id": str(gap["recipe_id"])} if gap.get("recipe_id") else {}),
+                **({"form_id": str(gap["form_id"])} if gap.get("form_id") else {}),
                 "material": bool(gap.get("material", True)),
                 **({"evidence_state": str(gap["evidence_state"])} if gap.get("evidence_state") else {}),
                 "resolution": "unresolved",

@@ -762,6 +762,29 @@ class TrackingPlanSkillTests(unittest.TestCase):
         second = parameter_reference_rows(reordered)
         self.assertEqual(first, second)
 
+    def test_parameter_reference_preserves_authored_value_order(self) -> None:
+        plan = {
+            "language": "en",
+            "events": [
+                {
+                    "event_name": "select_size",
+                    "parameters": [
+                        {
+                            "name": "item_size",
+                            "scope": "item",
+                            "type": "string",
+                            "classification": "custom",
+                            "definition": "The selected size.",
+                            "value_rule": "Use the displayed size sequence.",
+                            "allowed_values": ["xs", "s", "m", "l", "xl"],
+                        }
+                    ],
+                }
+            ],
+        }
+        row = parameter_reference_rows(plan)[0]
+        self.assertEqual(row["possible_values_or_example"], "xs | s | m | l | xl")
+
     def test_analysis_context_is_a_real_delivery_gate(self) -> None:
         context = load_json(ROOT / "references" / "example-analysis-context.json")
         self.assertEqual(

@@ -962,6 +962,7 @@ def check_plan_parameter_consistency_and_budgets(
     for event_index, event in enumerate(plan.get("events", [])):
         if not isinstance(event, dict):
             continue
+        event_name = str(event.get("event_name", "")) or f"events[{event_index}]"
         for parameter in event.get("parameters", []):
             if not isinstance(parameter, dict):
                 continue
@@ -976,57 +977,14 @@ def check_plan_parameter_consistency_and_budgets(
                 "classification": str(parameter.get("classification", "")),
                 "definition": normalize(parameter.get("definition")),
                 "value_rule": normalize(parameter.get("value_rule")),
-                "allowed_values": {json.dumps(value, ensure_ascii=False, sort_keys=True) for value in parameter.get("allowed_values", [])},
+                "allowed_values": frozenset(
+                    json.dumps(value, ensure_ascii=False, sort_keys=True)
+                    for value in parameter.get("allowed_values", [])
+                ),
                 "has_custom_decision": isinstance(parameter.get("custom_decision"), dict),
+                "event_name": event_name,
             }
-            previous_signatures = semantics.setdefault(key, [])
-            for previous in previous_signatures:
-                if previous["type"] != signature["type"] or previous["destination"] != signature["destination"]:
-                    issue(
-                        issues,
-                        "error",
-                        "PARAMETER_SEMANTIC_CONFLICT",
-                        f"$.events[{event_index}].parameters",
-                        (f"Parameter {name} at {scope} scope has inconsistent type or destination across events."),
-                    )
-                if previous["classification"] != signature["classification"]:
-                    fallback_pair = {previous["classification"], signature["classification"]} == {"official", "custom"}
-                    justified_fallback = fallback_pair and (
-                        previous["has_custom_decision"] or signature["has_custom_decision"]
-                    )
-                    if not justified_fallback:
-                        issue(
-                            issues,
-                            "warning",
-                            "PARAMETER_CLASSIFICATION_VARIATION",
-                            f"$.events[{event_index}].parameters",
-                            (f"Parameter {name} at {scope} scope changes classification across events; confirm it remains one semantic concept."),
-                        )
-                if previous["value_rule"] != signature["value_rule"]:
-                    issue(
-                        issues,
-                        "warning",
-                        "PARAMETER_VALUE_RULE_VARIATION",
-                        f"$.events[{event_index}].parameters",
-                        (f"Parameter {name} at {scope} scope uses different value rules across events. Use one compatible rule or a different name."),
-                    )
-                if previous["allowed_values"] and signature["allowed_values"] and previous["allowed_values"] != signature["allowed_values"]:
-                    issue(
-                        issues,
-                        "error",
-                        "PARAMETER_VALUE_DOMAIN_CONFLICT",
-                        f"$.events[{event_index}].parameters",
-                        (f"Parameter {name} at {scope} scope has incompatible exhaustive value domains across events."),
-                    )
-                if previous["classification"] != "official" and signature["classification"] != "official" and previous["definition"] != signature["definition"]:
-                    issue(
-                        issues,
-                        "error",
-                        "PARAMETER_DEFINITION_CONFLICT",
-                        f"$.events[{event_index}].parameters",
-                        (f"Parameter {name} at {scope} scope has incompatible definitions across events."),
-                    )
-            previous_signatures.append(signature)
+            semantics.setdefault(key, []).append(signature)
             if destination == "ga4_user_property":
                 user_properties.add(name)
             if parameter.get("classification") == "custom":
@@ -1034,6 +992,78 @@ def check_plan_parameter_consistency_and_budgets(
                     custom_event_definitions.add(name)
                 elif destination == "ga4_item_parameter":
                     custom_item_definitions.add(name)
+
+    for (name, scope), occurrences in sorted(semantics.items()):
+        affected_events = sorted({str(item["event_name"]) for item in occurrences})
+        affected = ", ".join(affected_events)
+        path = "$.events"
+        type_destinations = {
+            (str(item["type"]), str(item["destination"]))
+            for item in occurrences
+        }
+        if len(type_destinations) > 1:
+            issue(
+                issues,
+                "error",
+                "PARAMETER_SEMANTIC_CONFLICT",
+                path,
+                f"Parameter {name} at {scope} scope has inconsistent type or destination across: {affected}.",
+            )
+
+        classifications = {str(item["classification"]) for item in occurrences}
+        justified_official_custom = (
+            classifications == {"official", "custom"}
+            and all(
+                item["has_custom_decision"]
+                for item in occurrences
+                if item["classification"] == "custom"
+            )
+        )
+        if len(classifications) > 1 and not justified_official_custom:
+            issue(
+                issues,
+                "warning",
+                "PARAMETER_CLASSIFICATION_VARIATION",
+                path,
+                f"Parameter {name} at {scope} scope changes classification across: {affected}; confirm it remains one semantic concept.",
+            )
+
+        if len({str(item["value_rule"]) for item in occurrences}) > 1:
+            issue(
+                issues,
+                "warning",
+                "PARAMETER_VALUE_RULE_VARIATION",
+                path,
+                f"Parameter {name} at {scope} scope uses different value rules across: {affected}. Use one compatible rule or a different name.",
+            )
+
+        nonempty_domains = {
+            item["allowed_values"]
+            for item in occurrences
+            if item["allowed_values"]
+        }
+        if len(nonempty_domains) > 1:
+            issue(
+                issues,
+                "error",
+                "PARAMETER_VALUE_DOMAIN_CONFLICT",
+                path,
+                f"Parameter {name} at {scope} scope has incompatible exhaustive value domains across: {affected}.",
+            )
+
+        custom_definitions = {
+            str(item["definition"])
+            for item in occurrences
+            if item["classification"] != "official"
+        }
+        if len(custom_definitions) > 1:
+            issue(
+                issues,
+                "error",
+                "PARAMETER_DEFINITION_CONFLICT",
+                path,
+                f"Parameter {name} at {scope} scope has incompatible definitions across: {affected}.",
+            )
 
     if len(user_properties) > 25:
         issue(

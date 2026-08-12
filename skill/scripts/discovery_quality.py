@@ -10,7 +10,7 @@ FORM_PURPOSE_TERMS: dict[str, tuple[str, ...]] = {
     "appointment": ("appointment", "booking", "rendez vous", "reservation"),
     "catalogue": ("catalogue", "catalog", "brochure"),
     "newsletter": ("newsletter", "infolettre"),
-    "support_or_contact": ("contact", "support", "message", "recharge", "carte"),
+    "support_or_contact": ("contact", "support", "message", "help", "aide"),
     "account": ("login", "connexion", "account", "compte", "password", "mot de passe"),
     "search_results": ("search", "recherche"),
     "listing": ("filter", "filtre", "sort", "trier", "tri", "category", "categorie"),
@@ -27,10 +27,13 @@ UNRELATED_FORM_TERMS: dict[str, tuple[str, ...]] = {
 
 
 def _form_corpus(form: dict[str, Any]) -> str:
+    reveal_control = form.get("reveal_control", {})
     parts = [
         str(form.get("action", "")),
         str(form.get("id", "")),
         str(form.get("name", "")),
+        str(form.get("context_label", "")),
+        str(reveal_control.get("label", "")) if isinstance(reveal_control, dict) else "",
         *[
             " ".join(str(field.get(key, "")) for key in ("name", "id", "label", "autocomplete"))
             for field in form.get("fields", [])
@@ -45,23 +48,36 @@ def _form_corpus(form: dict[str, Any]) -> str:
     return re.sub(r"[^a-z0-9]+", " ", " ".join(parts).casefold()).strip()
 
 
+def _corpus_has_term(corpus: str, term: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", " ", term.casefold()).strip()
+    return bool(normalized and re.search(rf"(?:^| ){re.escape(normalized)}(?: |$)", corpus))
+
+
 def form_relevance_score(page: dict[str, Any], form: dict[str, Any]) -> int:
     visible = bool(form.get("visible", True))
     inside_main = bool(form.get("inside_main", True))
-    if not visible and not inside_main:
+    reveal_control = form.get("reveal_control", {})
+    has_local_reveal = bool(
+        isinstance(reveal_control, dict)
+        and reveal_control.get("selector")
+        and reveal_control.get("relationship")
+        and reveal_control.get("local") is True
+    )
+    if not visible and not inside_main and not has_local_reveal:
         return -100
     score = 30 if visible else 0
     score += 50 if inside_main else 0
+    score += 55 if has_local_reveal else 0
     fields = [field for field in form.get("fields", []) if isinstance(field, dict) and not field.get("disabled")]
     controls = [control for control in form.get("submit_controls", []) if isinstance(control, dict) and not control.get("disabled")]
     score += min(10, len(fields) * 2)
     score += 5 if controls else -20
     template = str(page.get("template", ""))
     corpus = _form_corpus(form)
-    if any(term in corpus for term in FORM_PURPOSE_TERMS.get(template, ())):
+    if any(_corpus_has_term(corpus, term) for term in FORM_PURPOSE_TERMS.get(template, ())):
         score += 30
     for purpose, terms in UNRELATED_FORM_TERMS.items():
-        if purpose != template and any(term in corpus for term in terms):
+        if purpose != template and any(_corpus_has_term(corpus, term) for term in terms):
             score -= 55
     return score
 
@@ -258,24 +274,91 @@ def _observed_units(ledger: list[dict[str, Any]]) -> tuple[set[str], set[tuple[s
     return journeys, variants
 
 
+INTERACTION_GAP_ID = re.compile(
+    r"^interaction_(?:not_executed|incomplete|boundary)_.+_([a-f0-9]{10})$"
+)
+
+
+def coverage_gap_identity(record: dict[str, Any]) -> tuple[str, ...]:
+    """Return the stable coverage unit represented by a gap or interaction run."""
+    recipe_id = str(record.get("recipe_id", ""))
+    digest = hashlib.sha256(recipe_id.encode("utf-8")).hexdigest()[:10] if recipe_id else ""
+    if not digest:
+        match = INTERACTION_GAP_ID.fullmatch(str(record.get("gap_id", "")))
+        digest = match.group(1) if match else ""
+    if digest:
+        return (
+            "interaction_recipe",
+            str(record.get("journey_id", "")),
+            str(record.get("variant_id", "")),
+            digest,
+        )
+    return ("coverage_gap", str(record.get("gap_id", "")))
+
+
+def _group_gaps(reports: list[dict[str, Any]]) -> dict[tuple[str, ...], list[dict[str, Any]]]:
+    grouped: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+    for report in reports:
+        for record in report.get("coverage_gaps", []):
+            if isinstance(record, dict) and record.get("gap_id"):
+                grouped.setdefault(coverage_gap_identity(record), []).append(record)
+    return grouped
+
+
+def _completed_interaction_identities(reports: list[dict[str, Any]]) -> set[tuple[str, ...]]:
+    return {
+        coverage_gap_identity(run)
+        for report in reports
+        for run in report.get("automatic_interaction_runs", [])
+        if isinstance(run, dict)
+        and run.get("recipe_id")
+        and run.get("outcome") == "completed"
+    }
+
+
 def _merge_gaps(
     reports: list[dict[str, Any]],
     ledger: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     merged: list[dict[str, Any]] = []
-    grouped = _group_records(reports, "coverage_gaps", "gap_id")
+    grouped = _group_gaps(reports)
+    completed_interactions = _completed_interaction_identities(reports)
     observed_journeys, observed_variants = _observed_units(ledger)
-    for gap_id, records in sorted(grouped.items()):
+    for identity, records in sorted(grouped.items()):
+        gap_id = str(records[0].get("gap_id", ""))
+        interaction_gap = identity[0] == "interaction_recipe"
         _require_consistent(
             records,
             identity=f"Coverage gap '{gap_id}'",
-            keys=("journey_id", "variant_id", "evidence_state"),
+            keys=(
+                ("journey_id", "variant_id")
+                if interaction_gap
+                else ("journey_id", "variant_id", "evidence_state")
+            ),
         )
-        representative = _representative(records)
+        evidence_states = [
+            str(record.get("evidence_state", ""))
+            for record in records
+            if record.get("evidence_state")
+        ]
+        evidence_state = (
+            merge_evidence_coverage_statuses(evidence_states)
+            if evidence_states
+            else ""
+        )
+        matching_state = [
+            record
+            for record in records
+            if str(record.get("evidence_state", "")) == evidence_state
+        ]
+        representative = _representative(matching_state or records)
         journey_id = str(representative.get("journey_id", ""))
         variant_id = str(representative.get("variant_id", ""))
-        if (variant_id and (journey_id, variant_id) in observed_variants) or (
-            not variant_id and journey_id in observed_journeys
+        if interaction_gap and identity in completed_interactions:
+            continue
+        if not interaction_gap and (
+            (variant_id and (journey_id, variant_id) in observed_variants)
+            or (not variant_id and journey_id in observed_journeys)
         ):
             continue
         representative.update(
@@ -285,6 +368,8 @@ def _merge_gaps(
                 "candidate_urls": _union(records, "candidate_urls"),
             }
         )
+        if evidence_state:
+            representative["evidence_state"] = evidence_state
         merged.append(representative)
     return merged
 

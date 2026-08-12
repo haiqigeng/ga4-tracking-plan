@@ -260,6 +260,8 @@
           },
           "journey_id": {"type": "string", "minLength": 1},
           "variant_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "recipe_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,119}$"},
+          "form_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
           "material": {"type": "boolean"},
           "resolution": {
             "enum": ["confirmed_elsewhere", "excluded", "blocked", "unresolved"]
