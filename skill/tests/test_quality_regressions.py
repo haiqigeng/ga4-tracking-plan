@@ -11,12 +11,13 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-from discover_site_journeys import classify_page_archetype
+from discover_site_journeys import SignalParser, classify_page_archetype, infer_journey
 from discover_site_journeys_playwright import (
     detect_interaction_capabilities,
     measurement_opportunity_hints,
 )
 from discovery_contract import validate_discovery_report
+from discovery_quality import relevant_forms
 from tracking_plan_model import datalayer_code
 from validate_analysis_context import validate_analysis_context
 from validate_tracking_plan import (
@@ -74,6 +75,69 @@ class DiscoveryQualityRegressionTests(unittest.TestCase):
         listing = classify_page_archetype("https://example.com/products/")
         self.assertEqual(detail["primary"], "product_detail")
         self.assertEqual(listing["primary"], "listing")
+
+    def test_compound_listing_route_requires_local_page_evidence(self) -> None:
+        listing = classify_page_archetype(
+            "https://example.com/c/windows",
+            {
+                "title": "Windows",
+                "headings": "Our windows",
+                "components": "product listing category",
+            },
+        )
+        ambiguous = classify_page_archetype("https://example.com/c/terms")
+        self.assertEqual(listing["primary"], "listing")
+        self.assertEqual(ambiguous["primary"], "unknown")
+
+    def test_unknown_archetype_remains_an_unknown_journey(self) -> None:
+        self.assertEqual(infer_journey("unknown"), "unknown")
+
+    def test_static_parser_uses_local_surfaces_not_navigation_copy(self) -> None:
+        parser = SignalParser("https://example.com/about")
+        parser.feed(
+            """
+            <html><head><title>About us</title></head><body>
+              <nav>Search Promotions Cart</nav>
+              <main><h1>Our company</h1><p>Our history and commitments.</p></main>
+            </body></html>
+            """
+        )
+        result = classify_page_archetype(
+            "https://example.com/about",
+            {
+                "title": " ".join(parser.title_parts),
+                "headings": parser.headings,
+                "main": " ".join(parser.main_parts),
+            },
+        )
+        self.assertEqual(result["primary"], "unknown")
+
+    def test_visible_local_form_outranks_hidden_global_form(self) -> None:
+        page = {
+            "template": "support_or_contact",
+            "forms": [
+                {
+                    "selector": "#newsletter",
+                    "visible": False,
+                    "inside_main": False,
+                    "name": "newsletter",
+                    "fields": [{"name": "email"}],
+                    "submit_controls": [{"label": "Subscribe"}],
+                },
+                {
+                    "selector": "#contact-card",
+                    "visible": True,
+                    "inside_main": True,
+                    "name": "contact_card",
+                    "fields": [{"name": "message"}],
+                    "submit_controls": [{"label": "Send contact request"}],
+                },
+            ],
+        }
+        self.assertEqual(
+            [form["selector"] for form in relevant_forms(page, visible_only=True)],
+            ["#contact-card"],
+        )
 
     def test_interaction_families_are_detected_once_per_page_not_per_control(self) -> None:
         page = {
@@ -184,9 +248,19 @@ class DiscoveryQualityRegressionTests(unittest.TestCase):
                 "description": "A sample boundary remains.",
             }
         ]
+        report["discovery_version"] = "1.1.0"
+        report.pop("run_id", None)
         self.assertEqual(validate_discovery_report(report), [])
         report["discovery_version"] = "1.2.0"
         self.assertTrue(any("evidence_state" in error for error in validate_discovery_report(report)))
+
+    def test_discovery_1_3_requires_run_provenance(self) -> None:
+        report = json.loads((ROOT / "references" / "example-discovery-report.json").read_text(encoding="utf-8"))
+        report["discovery_version"] = "1.3.0"
+        report.pop("run_id", None)
+        self.assertTrue(any("run_id" in error for error in validate_discovery_report(report)))
+        report["run_id"] = "run_" + "a" * 32
+        self.assertEqual(validate_discovery_report(report), [])
 
     def test_defining_official_checkout_choices_cannot_be_silently_omitted(self) -> None:
         plan = json.loads((ROOT / "references" / "example-tracking-plan.json").read_text(encoding="utf-8"))

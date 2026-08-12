@@ -98,6 +98,21 @@ class BrowserDiscoveryEndToEndTests(unittest.TestCase):
         finite_labels = {item["source_label"] for item in report["finite_value_candidates"]}
         self.assertIn("sort_type", finite_labels)
         self.assertIn("item_color", finite_labels)
+        standard_page = next(
+            page
+            for page in report["pages_sampled"]
+            if page["url"].endswith("/quote/standard.html")
+        )
+        fixture_push = next(
+            push
+            for push in standard_page["measurement_evidence"]["data_layer_pushes"]
+            if isinstance(push, dict) and push.get("event") == "fixture_context"
+        )
+        self.assertEqual(fixture_push["event_data"]["email"], "[redacted]")
+        self.assertEqual(fixture_push["event_data"]["billingEmail"], "[redacted]")
+        self.assertEqual(fixture_push["event_data"]["token"], "[redacted]")
+        self.assertEqual(fixture_push["event_data"]["userProfile"]["phoneNumber"], "[redacted]")
+        self.assertEqual(fixture_push["event_data"]["project_type"], "window")
 
 
 if __name__ == "__main__":

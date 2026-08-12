@@ -109,12 +109,14 @@ The result is ready when:
 12. Page and user context share one core context push, and any authenticated
    User-ID is mapped as a GA4 configuration setting rather than an event
    parameter or user property.
-13. Material journey coverage and every finite or dynamic value-domain decision are backed by the
-    validated analysis context; not-tested, partial, and externally blocked
-    states are explicit and distinct from analyst resolution.
-14. Every discovery hint and journey is hash-bound to an explicit opportunity
-    or coverage row, and every controlled finite value has one localized label
-    in the selected workbook language.
+13. Material journey coverage and every finite or dynamic value-domain
+    decision are backed by the validated analysis context; not-tested,
+    partial, and externally blocked states are explicit and distinct from
+    analyst resolution.
+14. Every discovery hint and journey is bound to the current run ID and report
+    hash, then mapped to an explicit opportunity or coverage row. Every
+    controlled finite value has one localized label, and no sampled or
+    disagreeing control set is described as exhaustive.
 15. The rendered workbook, event schemas, expected-events contract, official
     check, and hash-stamped handoff all validate as one delivery.
 16. Visible workbook edits cannot be silently overridden by an older embedded

@@ -42,11 +42,15 @@ Treat sources as first-class only for what they can establish:
 | Previous tracking plan | Historical or approved contract |
 | Analytics export | Current data use and implementation symptoms |
 
-For a fresh task, start a new source manifest. Include only artifacts supplied
-for that task and evidence generated during the current run; do not import
-client-specific plans, values, or conclusions from session history or nearby
-files. Record hashes where available and preserve each rendered report's
-generation timestamp.
+For a fresh task, generate one new run ID and source inventory. Include only
+artifacts supplied for that task and evidence generated during that run; do
+not import client-specific plans, values, or conclusions from session history
+or nearby files. Bind every rendered report and the analysis context to that
+run ID, source hash, and generation timestamp. This is a lightweight freshness
+check, not a separate provenance graph.
+When targeted reports share that explicit run ID, merge them independently of
+input order. Later observed evidence may close an earlier not-tested boundary
+only for the same exact journey variant; retain every raw report and hash.
 
 Internally record whether evidence describes `as_is`, `to_be`, or both. When
 sources conflict, resolve the conflict according to the plan's target state and
@@ -104,7 +108,11 @@ observed/partial/not-tested/externally-blocked ledger. A cap or material
 unvisited candidate prevents a completeness claim.
 
 Rendered discovery generates and executes bounded recipes for every distinct
-material safe form variant by default. It accepts the privacy statement, fills synthetic value
+material safe form variant and locally relevant form purpose by default,
+including forms initially hidden behind a local tab or modal. It never
+substitutes a hidden footer newsletter or global search
+form for the page's primary quote, contact, authentication, or catalogue
+form. It accepts the privacy statement, fills synthetic value
 kinds, advances multi-step non-financial lead, authentication, catalogue,
 newsletter, contact, and search flows, and captures dataLayer pushes plus GA4
 request names for each action window. It stops at CAPTCHA, paid order, payment,

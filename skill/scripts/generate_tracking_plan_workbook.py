@@ -90,7 +90,7 @@ def content_row_height(
     maximum: int,
 ) -> int:
     max_lines = 1
-    for value, width in zip(values, widths):
+    for value, width in zip(values, widths, strict=True):
         text = compact_value(value)
         lines = 0
         for line in text.splitlines() or [""]:

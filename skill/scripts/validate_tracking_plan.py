@@ -4,11 +4,11 @@ import argparse
 import json
 import re
 import sys
-import unicodedata
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from contract_utils import normalize_ascii_text, normalize_text
 from jsonschema import Draft202012Validator, FormatChecker
 from tracking_plan_model import (
     flatten_push_paths,
@@ -159,12 +159,11 @@ def load_catalog() -> dict[str, dict[str, Any]]:
 
 
 def normalize(value: Any) -> str:
-    return " ".join(str(value or "").split()).strip().casefold()
+    return normalize_text(value)
 
 
 def normalize_ascii(value: Any) -> str:
-    text = unicodedata.normalize("NFKD", normalize(value))
-    return "".join(character for character in text if not unicodedata.combining(character))
+    return normalize_ascii_text(value)
 
 
 def normalize_type(value: Any) -> str:
@@ -956,7 +955,7 @@ def check_plan_parameter_consistency_and_budgets(
     plan: dict[str, Any],
     issues: list[Issue],
 ) -> None:
-    semantics: dict[tuple[str, str], dict[str, Any]] = {}
+    semantics: dict[tuple[str, str], list[dict[str, Any]]] = {}
     custom_event_definitions: set[str] = set()
     custom_item_definitions: set[str] = set()
     user_properties: set[str] = set()
@@ -980,10 +979,8 @@ def check_plan_parameter_consistency_and_budgets(
                 "allowed_values": {json.dumps(value, ensure_ascii=False, sort_keys=True) for value in parameter.get("allowed_values", [])},
                 "has_custom_decision": isinstance(parameter.get("custom_decision"), dict),
             }
-            previous = semantics.get(key)
-            if previous is None:
-                semantics[key] = signature
-            else:
+            previous_signatures = semantics.setdefault(key, [])
+            for previous in previous_signatures:
                 if previous["type"] != signature["type"] or previous["destination"] != signature["destination"]:
                     issue(
                         issues,
@@ -1029,6 +1026,7 @@ def check_plan_parameter_consistency_and_budgets(
                         f"$.events[{event_index}].parameters",
                         (f"Parameter {name} at {scope} scope has incompatible definitions across events."),
                     )
+            previous_signatures.append(signature)
             if destination == "ga4_user_property":
                 user_properties.add(name)
             if parameter.get("classification") == "custom":

@@ -41,7 +41,8 @@ large, quick, enterprise, or event-count mode.
 - adds custom events or parameters only after documenting the official gap;
 - exhausts stable website value domains of up to 50 values;
 - maintains a validated internal analysis context for evidence roles,
-  conflicts, journey coverage, gaps, and finite-value provenance;
+  conflicts, journey coverage, gaps, finite-value provenance, and lightweight
+  fresh-run binding;
 - specifies exact website triggers, event-specific parameters, source paths,
   and quoted dataLayer pushes;
 - adapts a supplied workbook semantically or uses the integrated default XLSX
@@ -137,6 +138,10 @@ journey:
 ```powershell
 python scripts/discover_site_journeys_playwright.py https://www.example.com/ --output discovery.json
 python scripts/build_analysis_context_seed.py discovery.json --output analysis-context.json
+# Multiple reports from the same site and run merge deterministically:
+python scripts/discover_site_journeys_playwright.py https://www.example.com/ --run-id run_11111111111111111111111111111111 --output discovery-round-1.json
+python scripts/discover_site_journeys_playwright.py https://www.example.com/ --seed-url https://www.example.com/secondary-entry --run-id run_11111111111111111111111111111111 --output discovery-round-2.json
+python scripts/build_analysis_context_seed.py discovery-round-1.json discovery-round-2.json --output analysis-context.json
 # Explicit context overrides website-language evidence when provided:
 python scripts/build_analysis_context_seed.py discovery.json --output analysis-context.json --language fr --language-basis user --target-state to_be
 python scripts/capture_interactive_journey.py interactive-journey.json --output journey-evidence.json
@@ -220,6 +225,25 @@ The skill does not:
 - maximize event or parameter counts.
 
 ## Versioning
+
+Version `2.7.0` keeps canonical plan schema `5.0.0`, adds discovery report
+`1.3.0`, analysis-context `1.0.0`, and handoff `1.1.0`, while retaining the
+previous report and handoff contracts for maintenance compatibility. Fresh
+discovery now binds reports, context, and handoff with one run ID in addition
+to hashes and timestamps. Same-site reports merge deterministically regardless
+of input order, and exact observed evidence can close an earlier not-tested
+boundary without discarding either raw report. Unknown page purposes remain
+explicit exploration targets;
+compound route aliases require corroborating local evidence; and the static
+helper now classifies from title, headings, main content, and local components
+instead of URL-only evidence. Safe interaction recipes select locally relevant
+forms, reject hidden global substitutes, and preserve sibling form purposes as
+separate evidence boundaries. Finite controls now distinguish complete,
+incomplete, and over-50 capture, so sampled or disagreeing instances cannot be
+described as exhaustive. Parameter-reference aggregation is deterministic,
+sensitive browser evidence uses one shared sanitizer, shared contract helpers
+remove duplicate hash and normalization behavior, and CI adds Python 3.13 plus
+a required Chromium end-to-end job.
 
 Version `2.6.0` keeps canonical plan schema `5.0.0` while correcting the
 coverage and evidence regressions found in repeated whole-site runs. Rendered

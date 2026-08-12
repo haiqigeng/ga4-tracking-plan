@@ -1,4 +1,7 @@
 {
+  "context_version": "1.0.0",
+  "run_id": "run_11111111111111111111111111111111",
+  "created_at": "2026-08-01T10:05:00+00:00",
   "target_state": "to_be",
   "scope_claim": "journey_subset",
   "language_decision": {
@@ -17,7 +20,7 @@
       "source_id": "live_site",
       "source_type": "live_website",
       "reference": "https://example.com/",
-      "sha256": "841606887fa79e7980b494c5029b4d1563e2587876edac95b2f6b1b18087fe07",
+      "sha256": "e6991df5e7286c34470e9595089645bc7959cc86cd33908e10eaa35f530b225d",
       "evidence_role": "live_behavior",
       "state": "as_is",
       "supports": [
@@ -44,9 +47,10 @@
   "discovery_reports": [
     {
       "report_id": "discovery_example_com_fixture",
+      "run_id": "run_11111111111111111111111111111111",
       "source_id": "live_site",
       "reference": "example-discovery-report.json",
-      "sha256": "841606887fa79e7980b494c5029b4d1563e2587876edac95b2f6b1b18087fe07",
+      "sha256": "e6991df5e7286c34470e9595089645bc7959cc86cd33908e10eaa35f530b225d",
       "outcome": "completed",
       "hint_ids": [
         "item_consideration",

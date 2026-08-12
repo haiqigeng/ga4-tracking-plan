@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import unicodedata
 from pathlib import Path
 from typing import Any
 
+from contract_utils import sha256_file
 from openpyxl import load_workbook
 
 ALIASES = {
@@ -115,11 +115,8 @@ def field_for(value: Any) -> str | None:
 
 
 def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    """Compatibility name retained for template-adaptation imports."""
+    return sha256_file(path)
 
 
 def sheet_inventory(sheet) -> dict[str, Any]:

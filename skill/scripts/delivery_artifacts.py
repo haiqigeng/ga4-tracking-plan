@@ -1,19 +1,12 @@
 from __future__ import annotations
 
-import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from contract_utils import sha256_file
+
 JSON_TYPES = {"string", "integer", "number", "boolean", "array", "object"}
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _schema_from_value(value: Any) -> dict[str, Any]:
@@ -227,8 +220,10 @@ def build_handoff(
             if isinstance(source, dict) and source.get("source_type") == "live_website" and str(source.get("reference", "")).startswith(("http://", "https://"))
         }
     )
+    run_id = str(analysis_context.get("run_id", ""))
     return {
-        "handoff_version": "1.0.0",
+        "handoff_version": "1.1.0" if run_id else "1.0.0",
+        **({"run_id": run_id} if run_id else {}),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "skill": {"name": "ga4-tracking-plan", "version": skill_version},
         "plan": {
@@ -248,6 +243,7 @@ def build_handoff(
         "discovery_reports": [
             {
                 "report_id": report.get("report_id"),
+                **({"run_id": report.get("run_id")} if report.get("run_id") else {}),
                 "source_id": report.get("source_id"),
                 "sha256": report.get("sha256"),
                 "outcome": report.get("outcome"),

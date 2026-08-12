@@ -4,6 +4,7 @@ import argparse
 import json
 import re
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -14,13 +15,19 @@ from discovery_contract import (
     report_variant_ids,
     sha256_file,
 )
+from discovery_quality import merge_discovery_reports
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=("Create an analysis-context seed in which every rendered discovery hint is an explicit unresolved measurement opportunity.")
     )
-    parser.add_argument("discovery_report", type=Path)
+    parser.add_argument(
+        "discovery_report",
+        type=Path,
+        nargs="+",
+        help="One or more same-site discovery reports from the same fresh run.",
+    )
     parser.add_argument("--output", "-o", type=Path, required=True)
     parser.add_argument("--source-id", default="live_site")
     parser.add_argument("--target-state", choices=["as_is", "to_be", "hybrid"], default="as_is")
@@ -59,6 +66,7 @@ def build_analysis_context_seed(
     selected_language = language or observed_language
     selected_basis = language_basis or ("user" if language else "website")
     report_id = str(report["report_id"])
+    run_id = str(report.get("run_id", ""))
     ledger = [item for item in report.get("journey_coverage_ledger", []) if isinstance(item, dict)]
     hints = [item for item in report.get("measurement_opportunity_hints", []) if isinstance(item, dict)]
     opportunities: list[dict[str, Any]] = []
@@ -175,6 +183,15 @@ def build_analysis_context_seed(
         )
 
     return {
+        **(
+            {
+                "context_version": "1.0.0",
+                "run_id": run_id,
+                "created_at": datetime.now(UTC).isoformat(),
+            }
+            if run_id
+            else {}
+        ),
         "target_state": target_state,
         "scope_claim": scope_claim,
         "language_decision": {
@@ -188,6 +205,7 @@ def build_analysis_context_seed(
         "discovery_reports": [
             {
                 "report_id": report_id,
+                **({"run_id": run_id} if run_id else {}),
                 "source_id": source_id,
                 "reference": str(report_path.resolve()),
                 "sha256": sha256_file(report_path),
@@ -207,13 +225,87 @@ def build_analysis_context_seed(
     }
 
 
+def build_analysis_context_seed_from_reports(
+    reports: list[tuple[dict[str, Any], Path]],
+    *,
+    source_id: str = "live_site",
+    target_state: str = "as_is",
+    scope_claim: str = "whole_site",
+    language: str | None = None,
+    language_basis: str | None = None,
+    language_reasoning: str | None = None,
+) -> dict[str, Any]:
+    ordered = sorted(reports, key=lambda item: (str(item[0].get("report_id", "")), str(item[1].resolve())))
+    if not ordered:
+        raise ValueError("At least one discovery report is required.")
+    if len(ordered) > 1:
+        run_ids = [str(report.get("run_id", "")) for report, _ in ordered]
+        if not all(run_ids) or len(set(run_ids)) != 1:
+            raise ValueError("Multiple discovery reports require one explicit shared run_id.")
+    primary_languages = {
+        str(report["language_summary"]["primary_language"])
+        for report, _ in ordered
+    }
+    if len(primary_languages) > 1 and not language:
+        raise ValueError("Discovery reports disagree on website language; provide an explicit language decision.")
+    merged = merge_discovery_reports([report for report, _ in ordered])
+    context = build_analysis_context_seed(
+        merged,
+        ordered[0][1],
+        source_id=source_id,
+        target_state=target_state,
+        scope_claim=scope_claim,
+        language=language,
+        language_basis=language_basis,
+        language_reasoning=language_reasoning,
+    )
+    context["discovery_reports"] = [
+        {
+            "report_id": str(report["report_id"]),
+            **({"run_id": str(context["run_id"])} if context.get("run_id") else {}),
+            "source_id": source_id,
+            "reference": str(path.resolve()),
+            "sha256": sha256_file(path),
+            "generated_at": report["generated_at"],
+            "outcome": report["outcome"],
+            "hint_ids": report_hint_ids(report),
+            "journey_ids": report_journey_ids(report),
+            "variant_ids": report_variant_ids(report),
+        }
+        for report, path in ordered
+    ]
+    supports = sorted(
+        {
+            value
+            for report, _ in ordered
+            for value in [
+                *report_journey_ids(report),
+                *report_variant_ids(report),
+                *report_hint_ids(report),
+            ]
+        }
+    ) or ["rendered_site_discovery"]
+    live_source = next(
+        source
+        for source in context["sources"]
+        if source.get("source_id") == source_id
+    )
+    live_source["reference"] = str(merged["root_url"])
+    live_source["supports"] = supports
+    if len(ordered) > 1:
+        live_source.pop("sha256", None)
+    return context
+
+
 def main() -> int:
     args = parse_args()
     try:
-        report = load_discovery_report(args.discovery_report)
-        context = build_analysis_context_seed(
-            report,
-            args.discovery_report,
+        reports = [
+            (load_discovery_report(path), path)
+            for path in args.discovery_report
+        ]
+        context = build_analysis_context_seed_from_reports(
+            reports,
             source_id=args.source_id,
             target_state=args.target_state,
             scope_claim=args.scope_claim,

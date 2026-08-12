@@ -753,7 +753,14 @@ class TrackingPlanSkillTests(unittest.TestCase):
         plan["events"][2]["parameters"].append(duplicate)
         rows = [row for row in parameter_reference_rows(plan) if row["name"] == "page_template" and row["scope"] == "implementation"]
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["events"], ["core_data", "begin_quote"])
+        self.assertEqual(rows[0]["events"], ["begin_quote", "core_data"])
+
+    def test_parameter_reference_aggregation_is_event_order_independent(self) -> None:
+        first = parameter_reference_rows(self.plan)
+        reordered = copy.deepcopy(self.plan)
+        reordered["events"] = list(reversed(reordered["events"]))
+        second = parameter_reference_rows(reordered)
+        self.assertEqual(first, second)
 
     def test_analysis_context_is_a_real_delivery_gate(self) -> None:
         context = load_json(ROOT / "references" / "example-analysis-context.json")

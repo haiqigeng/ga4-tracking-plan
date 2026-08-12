@@ -57,11 +57,10 @@ Read only the relevant scenario reference:
 - Treat every evidence source according to what it can prove. Distinguish live
   behavior, intended future design, business requirements, current tracking,
   technical data capability, and historical contracts.
-- For a new or fresh run, create the source manifest only from artifacts
-  explicitly supplied for that task and evidence generated during that run.
-  Never reuse another client's plans, inferred values, or prior discovery
-  merely because they remain in the session or filesystem. Retain hashes and
-  discovery timestamps so provenance can be checked.
+- For a new or fresh run, use a new run ID and source inventory containing only
+  explicitly supplied artifacts and current-run evidence. Never reuse another
+  client's plans, values, or prior discovery merely because they remain in the
+  session or filesystem. Bind every report to that run ID, hash, and timestamp.
 - Build an evidence-backed view of how the business creates value before
   designing measurement. Cover material entry points, alternate journey
   shapes, success, failure, empty, and post-conversion states without turning
@@ -82,7 +81,9 @@ Read only the relevant scenario reference:
 - Classify rendered pages from weighted route, title, heading, main-content,
   and component evidence. Exclude global header/footer controls from page
   purpose, use whole-word multilingual matching, and retain `unknown` plus
-  competing candidates when evidence is ambiguous.
+  competing candidates when evidence is ambiguous. Keep a material `unknown`
+  as an exploration target until it is resolved or explicitly bounded; never
+  relabel it as generic content merely to close coverage.
 - Keep factual discovery state separate from analyst resolution. `not_tested`
   is not an external blocker; use `externally_blocked` only for an evidenced
   access or execution barrier and never relabel sampling limits as blocked.
@@ -105,7 +106,9 @@ Read only the relevant scenario reference:
 - Classify the value domain of every parameter. Exhaust stable, observable
   finite domains of up to 50 values; record a precise, evidenced reason and
   generation rule for free text, identifiers, URLs, changing inventories,
-  structured values, inaccessible values, or domains above 50.
+  structured values, inaccessible values, or domains above 50. A captured
+  sample is exhaustive only when the source control exposes its full count and
+  every relevant instance agrees; otherwise keep the domain incomplete.
 - Localize controlled semantic values to the workbook language and normalize
   them to lowercase ASCII `snake_case`. Keep official enums, codes, technical
   identifiers, authoritative labels, free text, numbers, and booleans in their
@@ -177,7 +180,9 @@ Read only the relevant scenario reference:
    targeted rounds for uncovered journey families, page archetypes, and
    bounded interaction families,
    success, failure, empty, and post-conversion states. Use controlled
-   synthetic interaction recipes for every material safe funnel variant.
+   synthetic interaction recipes for every material safe funnel variant and
+   every distinct locally relevant form purpose within that variant, including
+   forms initially hidden behind a local tab or modal.
    Record `not_tested`, `partial`, and `externally_blocked` boundaries without
    inventing behavior or treating a sample cap or another variant's success
    as completeness. A valid partial
@@ -218,6 +223,10 @@ synthetic form progression; use a manual recipe only for a known exception:
 ```powershell
 python scripts/discover_site_journeys_playwright.py https://www.example.com/ --output discovery.json
 python scripts/build_analysis_context_seed.py discovery.json --output analysis-context.json --target-state as_is
+# Multiple same-site reports from one run merge deterministically:
+python scripts/discover_site_journeys_playwright.py https://www.example.com/ --run-id run_11111111111111111111111111111111 --output discovery-round-1.json
+python scripts/discover_site_journeys_playwright.py https://www.example.com/ --seed-url https://www.example.com/secondary-entry --run-id run_11111111111111111111111111111111 --output discovery-round-2.json
+python scripts/build_analysis_context_seed.py discovery-round-1.json discovery-round-2.json --output analysis-context.json --target-state as_is
 # When explicit context overrides website language:
 python scripts/build_analysis_context_seed.py discovery.json --output analysis-context.json --language fr --language-basis user
 python scripts/capture_interactive_journey.py interactive-journey.json --output journey-evidence.json

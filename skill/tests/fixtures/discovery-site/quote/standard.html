@@ -2,6 +2,19 @@
 <html lang="en">
   <head><meta charset="utf-8"><title>Standard quote</title></head>
   <body>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: "fixture_context",
+        event_data: {
+          email: "synthetic@example.com",
+          billingEmail: "billing@example.com",
+          token: "synthetic-secret",
+          userProfile: { phoneNumber: "0100000000" },
+          project_type: "window"
+        }
+      });
+    </script>
     <h1>Request a standard quote</h1>
     <form id="standard-quote" action="/success.html" method="get">
       <label>Email <input name="email" type="email" required></label>

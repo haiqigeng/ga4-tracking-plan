@@ -18,7 +18,8 @@
     "automatic_interaction_runs"
   ],
   "properties": {
-    "discovery_version": {"enum": ["1.1.0", "1.2.0"]},
+    "discovery_version": {"enum": ["1.1.0", "1.2.0", "1.3.0"]},
+    "run_id": {"type": "string", "pattern": "^run_[a-f0-9]{32}$"},
     "report_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,119}$"},
     "generated_at": {"type": "string", "format": "date-time"},
     "root_url": {"type": "string", "format": "uri", "pattern": "^https?://"},
@@ -274,8 +275,10 @@
           "journey_id",
           "variant_id",
           "source_label",
+          "capture_status",
           "complete",
           "observed_value_count",
+          "captured_value_count",
           "values",
           "evidence_urls"
         ],
@@ -284,8 +287,10 @@
           "journey_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
           "variant_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
           "source_label": {"type": "string", "minLength": 1},
+          "capture_status": {"enum": ["complete", "incomplete", "over_50"]},
           "complete": {"type": "boolean"},
           "observed_value_count": {"type": "integer", "minimum": 1},
+          "captured_value_count": {"type": "integer", "minimum": 1, "maximum": 50},
           "values": {
             "type": "array",
             "maxItems": 50,
@@ -307,7 +312,7 @@
   "allOf": [
     {
       "if": {
-        "properties": {"discovery_version": {"const": "1.2.0"}},
+        "properties": {"discovery_version": {"enum": ["1.2.0", "1.3.0"]}},
         "required": ["discovery_version"]
       },
       "then": {
@@ -316,6 +321,15 @@
             "items": {"required": ["evidence_state"]}
           }
         }
+      }
+    },
+    {
+      "if": {
+        "properties": {"discovery_version": {"const": "1.3.0"}},
+        "required": ["discovery_version"]
+      },
+      "then": {
+        "required": ["run_id"]
       }
     }
   ]

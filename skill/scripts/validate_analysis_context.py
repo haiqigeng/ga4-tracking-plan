@@ -241,6 +241,41 @@ def validate_analysis_context(
     opportunities = [item for item in context.get("measurement_opportunities", []) if isinstance(item, dict)]
     domains = [item for item in context.get("value_domains", []) if isinstance(item, dict)]
 
+    context_version = str(context.get("context_version", ""))
+    context_run_id = str(context.get("run_id", ""))
+    context_created_at = str(context.get("created_at", ""))
+    report_run_ids = {
+        str(item.get("run_id", ""))
+        for item in discovery_reports
+        if item.get("run_id")
+    }
+    if context_version or context_run_id or context_created_at or report_run_ids:
+        missing = [
+            name
+            for name, value in (
+                ("context_version", context_version),
+                ("run_id", context_run_id),
+                ("created_at", context_created_at),
+            )
+            if not value
+        ]
+        if missing:
+            issue(
+                issues,
+                "error",
+                "RUN_PROVENANCE_INCOMPLETE",
+                "$",
+                "Versioned run provenance is incomplete: " + ", ".join(missing) + ".",
+            )
+        if report_run_ids and report_run_ids != {context_run_id}:
+            issue(
+                issues,
+                "error",
+                "DISCOVERY_RUN_MISMATCH",
+                "$.discovery_reports",
+                "Every discovery report must use the analysis context run_id.",
+            )
+
     source_ids = [str(item.get("source_id", "")) for item in sources]
     coverage_ids = [str(item.get("journey_id", "")) for item in coverages]
     gap_ids = [str(item.get("gap_id", "")) for item in gaps]
@@ -305,27 +340,9 @@ def validate_analysis_context(
                 "A rendered discovery report must bind to a live_website source.",
             )
         hints = {str(value) for value in report.get("hint_ids", [])}
-        duplicate_hints = sorted(known_discovery_hints & hints)
-        if duplicate_hints:
-            issue(
-                issues,
-                "error",
-                "DISCOVERY_HINT_DUPLICATE",
-                f"$.discovery_reports[{index}].hint_ids",
-                "Hint IDs occur in multiple reports: " + ", ".join(duplicate_hints),
-            )
         known_discovery_hints.update(hints)
         known_discovery_journeys.update(str(value) for value in report.get("journey_ids", []))
         variants = {str(value) for value in report.get("variant_ids", [])}
-        duplicate_variants = sorted(known_discovery_variants & variants)
-        if duplicate_variants:
-            issue(
-                issues,
-                "error",
-                "DISCOVERY_VARIANT_DUPLICATE",
-                f"$.discovery_reports[{index}].variant_ids",
-                "Variant IDs occur in multiple reports: " + ", ".join(duplicate_variants),
-            )
         known_discovery_variants.update(variants)
     for collection_name, records in (
         ("journey_coverage", coverages),

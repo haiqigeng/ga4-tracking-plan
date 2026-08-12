@@ -59,6 +59,9 @@ REQUIRED_SKILL_FILES = {
     "scripts/validate_analysis_context.py",
     "scripts/validate_tracking_plan.py",
     "scripts/validate_tracking_plan_workbook.py",
+    "scripts/browser_capture.py",
+    "scripts/contract_utils.py",
+    "scripts/discovery_quality.py",
     "tests/test_skill.py",
 }
 
@@ -90,6 +93,19 @@ BANNED_PACKAGE_PARTS = {
     "deliverables",
     "generated",
     "release",
+}
+
+PUBLIC_HOST_ALLOWLIST = {
+    "developers.google.com",
+    "example.com",
+    "example.fr",
+    "example.invalid",
+    "github.com",
+    "img.shields.io",
+    "invalid.example",
+    "json-schema.org",
+    "www.example.com",
+    "www.sitemaps.org",
 }
 
 
@@ -480,13 +496,10 @@ def check_repository_cleanliness() -> None:
         if raw.startswith(b"\xef\xbb\xbf"):
             fail(f"Text file contains a UTF-8 BOM: {relative}")
         text = raw.decode("utf-8", errors="ignore")
-        client_markers = (
-            "".join(("daxon", ".fr")),
-            "".join(("kpark", ".fr")),
-        )
-        for client_marker in client_markers:
-            if client_marker in text.casefold():
-                fail(f"Repository contains client-specific data: {relative}")
+        for match in re.finditer(r"https?://([A-Za-z0-9][A-Za-z0-9.-]*)", text, re.I):
+            host = match.group(1).split(":", 1)[0].casefold()
+            if host not in PUBLIC_HOST_ALLOWLIST and not host.startswith("127."):
+                fail(f"Repository contains a non-public example host '{host}': {relative}")
         if re.search(r"gh[pousr]_[A-Za-z0-9]{30,}", text):
             fail(f"Repository contains a possible GitHub token: {relative}")
 

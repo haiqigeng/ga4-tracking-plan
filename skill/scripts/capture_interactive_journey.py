@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from browser_capture import data_layer_capture_init_script
 from browser_environment import (
     inspect_browser_environment,
     load_playwright_sync_api,
@@ -134,33 +135,7 @@ def _guard_click(locator: Any, *, allow_submit: bool, explicit_submit: bool) -> 
         raise ValueError("A form-submit control must use action=submit and allow_form_submission=true.")
 
 
-CAPTURE_INIT_SCRIPT = r"""
-(() => {
-  const sensitiveKey = /(?:^|_)(?:email|e_mail|phone|mobile|first_name|last_name|firstname|lastname|address|postal|postcode|zip|user_id|customer_id)(?:$|_)/i;
-  const sanitize = (value, key = "", depth = 0) => {
-    if (sensitiveKey.test(key)) return "[redacted]";
-    if (depth > 6) return "[depth-limited]";
-    if (value === null || ["string", "number", "boolean"].includes(typeof value)) return value;
-    if (Array.isArray(value)) return value.slice(0, 25).map(item => sanitize(item, key, depth + 1));
-    if (typeof value === "object") {
-      const result = {};
-      Object.entries(value).slice(0, 50).forEach(([childKey, child]) => {
-        result[childKey] = sanitize(child, childKey, depth + 1);
-      });
-      return result;
-    }
-    return `[${typeof value}]`;
-  };
-  window.dataLayer = Array.isArray(window.dataLayer) ? window.dataLayer : [];
-  const originalPush = window.dataLayer.push.bind(window.dataLayer);
-  window.dataLayer.push = (...items) => {
-    items.forEach(item => {
-      try { window.__ga4SkillCapture(sanitize(item)); } catch (_) {}
-    });
-    return originalPush(...items);
-  };
-})();
-"""
+CAPTURE_INIT_SCRIPT = data_layer_capture_init_script("__ga4SkillCapture")
 
 
 def run(spec: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:

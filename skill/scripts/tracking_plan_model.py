@@ -7,6 +7,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Iterable
 
+from contract_utils import load_json_object
+
 BASE_SHEETS = {
     "Guide",
     "Event Matrix",
@@ -168,10 +170,7 @@ REQUIREMENT_LABELS = {
 
 
 def load_json(path: Path) -> dict[str, Any]:
-    value = json.loads(path.read_text(encoding="utf-8-sig"))
-    if not isinstance(value, dict):
-        raise ValueError(f"{path} must contain a JSON object")
-    return value
+    return load_json_object(path)
 
 
 def workbook_projection(workbook) -> dict[str, Any]:
@@ -368,7 +367,7 @@ def parameter_reference_rows(
 ) -> list[dict[str, Any]]:
     if semantic_role not in {"all_used_parameters", "custom_parameters_only"}:
         raise ValueError(f"Unknown parameter-reference semantic role: {semantic_role}")
-    grouped: dict[tuple[str, str], dict[str, Any]] = {}
+    grouped: dict[tuple[str, str], list[tuple[str, dict[str, Any]]]] = {}
     for event in plan.get("events", []):
         if not isinstance(event, dict):
             continue
@@ -380,31 +379,53 @@ def parameter_reference_rows(
                 str(parameter.get("name", "")),
                 str(parameter.get("scope", "")),
             )
-            if key not in grouped:
-                grouped[key] = {
-                    "name": parameter.get("name", ""),
-                    "scope": parameter.get("scope", ""),
-                    "type": parameter.get("type", ""),
-                    "definition": parameter.get("definition", ""),
-                    "rule": value_rule_text(parameter, plan),
-                    "possible_values_or_example": possible_values_or_example(parameter),
-                    "events": [],
-                    "_classifications": set(),
-                }
-            if event_name not in grouped[key]["events"]:
-                grouped[key]["events"].append(event_name)
-            grouped[key]["_classifications"].add(str(parameter.get("classification", "")))
-    selected = [
-        row
-        for row in grouped.values()
-        if semantic_role == "all_used_parameters" or "custom" in row["_classifications"]
-    ]
-    for row in selected:
-        row.pop("_classifications", None)
-    return sorted(
-        selected,
-        key=lambda row: (str(row["name"]), str(row["scope"]), " | ".join(row["events"])),
-    )
+            grouped.setdefault(key, []).append((event_name, parameter))
+
+    classification_rank = {"official": 0, "implementation": 1, "custom": 2}
+    rows: list[dict[str, Any]] = []
+    for (name, scope), occurrences in sorted(grouped.items()):
+        classifications = {
+            str(parameter.get("classification", ""))
+            for _, parameter in occurrences
+        }
+        if semantic_role == "custom_parameters_only" and "custom" not in classifications:
+            continue
+        ranked = sorted(
+            occurrences,
+            key=lambda item: (
+                classification_rank.get(str(item[1].get("classification", "")), 9),
+                0 if item[1].get("allowed_values") else 1,
+                -len(str(item[1].get("value_rule", ""))),
+                -len(str(item[1].get("definition", ""))),
+                item[0],
+                json.dumps(item[1], ensure_ascii=False, sort_keys=True),
+            ),
+        )
+        representative = dict(ranked[0][1])
+        allowed_by_key: dict[str, Any] = {}
+        for _, parameter in occurrences:
+            for value in parameter.get("allowed_values", []):
+                allowed_by_key.setdefault(
+                    json.dumps(value, ensure_ascii=False, sort_keys=True),
+                    value,
+                )
+        if allowed_by_key:
+            representative["allowed_values"] = [
+                allowed_by_key[key]
+                for key in sorted(allowed_by_key)
+            ]
+        rows.append(
+            {
+                "name": name,
+                "scope": scope,
+                "type": representative.get("type", ""),
+                "definition": representative.get("definition", ""),
+                "rule": value_rule_text(representative, plan),
+                "possible_values_or_example": possible_values_or_example(representative),
+                "events": sorted({event_name for event_name, _ in occurrences}),
+            }
+        )
+    return rows
 
 
 def safe_sheet_title(value: str, used: Iterable[str] = ()) -> str:

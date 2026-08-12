@@ -1,22 +1,15 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 from typing import Any
 
+from contract_utils import sha256_file
+from discovery_quality import merge_evidence_coverage_statuses
 from jsonschema import Draft202012Validator, FormatChecker
 
 ROOT = Path(__file__).resolve().parents[1]
 DISCOVERY_SCHEMA = ROOT / "references" / "schema-discovery-report.json"
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def validate_discovery_report(report: dict[str, Any]) -> list[str]:
@@ -25,7 +18,25 @@ def validate_discovery_report(report: dict[str, Any]) -> list[str]:
         Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(report),
         key=lambda error: list(error.absolute_path),
     )
-    return [f"{'/'.join(str(part) for part in error.absolute_path) or '<root>'}: {error.message}" for error in errors]
+    messages = [f"{'/'.join(str(part) for part in error.absolute_path) or '<root>'}: {error.message}" for error in errors]
+    for index, candidate in enumerate(report.get("finite_value_candidates", [])):
+        if not isinstance(candidate, dict) or "capture_status" not in candidate:
+            continue
+        values = candidate.get("values", [])
+        captured = int(candidate.get("captured_value_count", -1))
+        observed = int(candidate.get("observed_value_count", -1))
+        status = str(candidate.get("capture_status", ""))
+        complete = candidate.get("complete") is True
+        path = f"finite_value_candidates/{index}"
+        if captured != len(values):
+            messages.append(f"{path}: captured_value_count must equal the number of retained unique values")
+        if complete != (status == "complete"):
+            messages.append(f"{path}: complete must be true exactly when capture_status is complete")
+        if status == "complete" and not (captured == observed <= 50):
+            messages.append(f"{path}: complete capture requires captured_value_count == observed_value_count <= 50")
+        if status == "over_50" and observed <= 50:
+            messages.append(f"{path}: over_50 requires observed_value_count above 50")
+    return messages
 
 
 def load_discovery_report(path: Path) -> dict[str, Any]:
@@ -64,6 +75,7 @@ def validate_discovery_bindings(
 ) -> list[str]:
     errors: list[str] = []
     records = {str(item.get("report_id")): item for item in context.get("discovery_reports", []) if isinstance(item, dict) and item.get("report_id")}
+    context_run_id = str(context.get("run_id", ""))
     supplied: dict[str, tuple[Path, dict[str, Any]]] = {}
     for path in report_paths:
         try:
@@ -96,13 +108,19 @@ def validate_discovery_bindings(
     report_journey_statuses: dict[str, str] = {}
     report_variant_statuses: dict[tuple[str, str], str] = {}
     report_gap_states: dict[str, str] = {}
-    for report_id, record in records.items():
+    for report_id, record in sorted(records.items()):
+        record_run_id = str(record.get("run_id", ""))
+        if record_run_id != context_run_id:
+            errors.append(f"Discovery report '{report_id}' does not belong to context run '{context_run_id}'.")
         if str(record.get("source_id")) not in live_source_ids:
             errors.append(f"Discovery report '{report_id}' must bind to a live_website source.")
         pair = supplied.get(report_id)
         if pair is None:
             continue
         path, report = pair
+        report_run_id = str(report.get("run_id", ""))
+        if report_run_id and report_run_id != record_run_id:
+            errors.append(f"Discovery run identifier mismatch for '{report_id}'.")
         digest = sha256_file(path)
         if digest != str(record.get("sha256")):
             errors.append(f"Discovery report hash mismatch for '{report_id}'.")
@@ -134,13 +152,35 @@ def validate_discovery_bindings(
             if not isinstance(journey, dict):
                 continue
             journey_id = str(journey.get("journey_id", ""))
-            report_journey_statuses[journey_id] = str(journey.get("status", ""))
+            journey_status = str(journey.get("status", ""))
+            existing_journey_status = report_journey_statuses.get(journey_id)
+            report_journey_statuses[journey_id] = (
+                merge_evidence_coverage_statuses([existing_journey_status, journey_status])
+                if existing_journey_status
+                else journey_status
+            )
             for variant in journey.get("variant_coverage", []):
                 if isinstance(variant, dict) and variant.get("variant_id"):
-                    report_variant_statuses[(journey_id, str(variant["variant_id"]))] = str(variant.get("status", ""))
+                    key = (journey_id, str(variant["variant_id"]))
+                    variant_status = str(variant.get("status", ""))
+                    existing_variant_status = report_variant_statuses.get(key)
+                    report_variant_statuses[key] = (
+                        merge_evidence_coverage_statuses([existing_variant_status, variant_status])
+                        if existing_variant_status
+                        else variant_status
+                    )
         for gap in report.get("coverage_gaps", []):
             if isinstance(gap, dict) and gap.get("gap_id") and gap.get("evidence_state"):
-                report_gap_states[str(gap["gap_id"])] = str(gap["evidence_state"])
+                gap_id = str(gap["gap_id"])
+                gap_state = str(gap["evidence_state"])
+                existing_gap_state = report_gap_states.get(gap_id)
+                if existing_gap_state and existing_gap_state != gap_state:
+                    errors.append(
+                        f"Coverage gap '{gap_id}' has conflicting factual states: "
+                        f"'{existing_gap_state}' and '{gap_state}'."
+                    )
+                else:
+                    report_gap_states[gap_id] = gap_state
 
     mapped_hints: set[str] = set()
     for opportunity in context.get("measurement_opportunities", []):
@@ -181,7 +221,9 @@ def validate_discovery_bindings(
         context_status = str(coverage.get("status", ""))
         if context_status == "observed" and report_status in {"partial", "not_tested", "externally_blocked", "blocked"}:
             errors.append(
-                f"Journey '{journey_id}' is marked observed although rendered discovery recorded '{report_status}'. Use confirmed with other evidence or retain the factual boundary."
+                f"Journey '{journey_id}' is marked observed although rendered discovery "
+                f"recorded '{report_status}'. Use confirmed with other evidence or retain "
+                "the factual boundary."
             )
         if context_status in {"externally_blocked", "blocked"} and report_status == "not_tested":
             errors.append(f"Journey '{journey_id}' was not tested and cannot be relabelled externally blocked.")

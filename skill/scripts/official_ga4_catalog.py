@@ -4,6 +4,8 @@ import html
 import re
 from typing import Any
 
+from contract_utils import normalize_text
+
 
 def clean_html(value: str) -> str:
     value = re.sub(r"<br\s*/?>", " ", value, flags=re.IGNORECASE)
@@ -85,7 +87,7 @@ def parse_catalog_html(page: str) -> list[dict[str, Any]]:
 
 
 def normalize(value: Any) -> str:
-    return " ".join(str(value or "").split()).strip().casefold()
+    return normalize_text(value)
 
 
 def normalize_type(value: Any) -> str:

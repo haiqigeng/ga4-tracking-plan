@@ -16,6 +16,9 @@ request is a journey-coverage problem, not a request to crawl every URL.
    business journey, page archetype, route family, and interaction family.
    Repeated product or article URLs do not count as new
    coverage unless they expose a materially different template or behavior.
+   Keep `unknown` as its own journey. When its evidence or candidate priority
+   is material, target it in another round or record a concrete boundary;
+   never silently file it under content navigation.
 3. Render at least one representative of every material group. Inspect menus,
    forms, filters, sorting, variants, promotions, carts, account entry,
    customer service, post-purchase, and conversion paths when present.
@@ -24,9 +27,11 @@ request is a journey-coverage problem, not a request to crawl every URL.
    investigation. Never confirm a paid order, payment, contract, appointment,
    or other irreversible commitment.
 5. Generate and execute one bounded recipe for every material safe funnel
-   variant, not merely the first form found for a journey. Record the outcome
-   against that exact variant. Success on a standard quote form does not prove
-   success on a two-step landing-page quote form.
+   variant and each distinct locally relevant form purpose, including forms
+   initially hidden behind a local tab or modal, not
+   merely the first form found for a journey. Record the outcome against that
+   exact variant and form. Success on a standard quote form does not prove
+   success on a two-step landing-page quote form or a sibling contact tab.
 6. The rendered helper inspects the coverage ledger after each round and
    automatically continues with unvisited material families until closure or
    the explicit maximum-round boundary. A page limit ends only one round.
@@ -48,6 +53,12 @@ outside the sampling budget, `partial` for evidence that covers only part of a
 journey, and `externally_blocked` for an evidenced CAPTCHA, access, browser, or
 technical barrier. Analyst resolutions such as excluded or confirmed
 elsewhere are separate fields; they must not rewrite the factual state.
+
+For a finite control, retain the declared option count, captured unique count,
+technical values, localized labels, and evidence URLs. Mark it complete only
+when all observable options were captured and relevant instances expose the
+same stable set. Use `incomplete` when a control was truncated or instances
+disagree, and `over_50` when the observable domain exceeds the workbook limit.
 
 ## Measurement-Opportunity Ledger
 

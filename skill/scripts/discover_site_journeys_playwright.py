@@ -11,7 +11,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
+from uuid import uuid4
 
+from browser_capture import data_layer_capture_init_script, measurement_evidence_script
 from browser_environment import inspect_browser_environment, load_playwright_sync_api, resolve_browser_channel
 from discover_site_journeys import (
     USER_AGENT,
@@ -28,6 +30,7 @@ from discover_site_journeys import (
     summarize_journeys,
 )
 from discovery_contract import validate_discovery_report
+from discovery_quality import aggregate_coverage_statuses, relevant_forms
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIREMENTS = ROOT / "requirements.txt"
@@ -37,6 +40,10 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Create a rendered-DOM URL and journey discovery JSON for dynamic websites with Playwright.")
     parser.add_argument("url", help="Website root URL, for example https://www.example.com/")
     parser.add_argument("--output", "-o", type=Path, required=True, help="Output JSON path.")
+    parser.add_argument(
+        "--run-id",
+        help="Optional shared fresh-task ID in run_<32 lowercase hex> format for separately captured reports.",
+    )
     parser.add_argument("--limit", type=int, default=75, help="Maximum rendered pages to inspect.")
     parser.add_argument(
         "--max-rounds",
@@ -150,33 +157,7 @@ SAFE_SUBMISSION_KINDS = {
 COLLECT_HOST_PATTERN = re.compile(r"(?:^|\.)(?:google-analytics\.com|analytics\.google\.com)$", re.I)
 
 
-CAPTURE_INIT_SCRIPT = r"""
-(() => {
-  const sensitiveKey = /(?:^|_)(?:email|e_mail|phone|mobile|first_name|last_name|firstname|lastname|address|postal|postcode|zip|user_id|customer_id|password)(?:$|_)/i;
-  const sanitize = (value, key = "", depth = 0) => {
-    if (sensitiveKey.test(key)) return "[redacted]";
-    if (depth > 6) return "[depth-limited]";
-    if (value === null || ["string", "number", "boolean"].includes(typeof value)) return value;
-    if (Array.isArray(value)) return value.slice(0, 25).map(item => sanitize(item, key, depth + 1));
-    if (typeof value === "object") {
-      const result = {};
-      Object.entries(value).slice(0, 50).forEach(([childKey, child]) => {
-        result[childKey] = sanitize(child, childKey, depth + 1);
-      });
-      return result;
-    }
-    return `[${typeof value}]`;
-  };
-  window.dataLayer = Array.isArray(window.dataLayer) ? window.dataLayer : [];
-  const originalPush = window.dataLayer.push.bind(window.dataLayer);
-  window.dataLayer.push = (...items) => {
-    items.forEach(item => {
-      try { window.__ga4DiscoveryCapture(sanitize(item)); } catch (_) {}
-    });
-    return originalPush(...items);
-  };
-})();
-"""
+CAPTURE_INIT_SCRIPT = data_layer_capture_init_script("__ga4DiscoveryCapture")
 
 
 def candidate_priority(
@@ -196,7 +177,7 @@ def candidate_priority(
         observed_count = int(observed_templates.get(template, 0))
     elif observed_templates is not None and template in observed_templates:
         observed_count = 1
-    if observed_count == 0:
+    if observed_count == 0 and template != "unknown":
         score += 2_000
     else:
         # Breadth before repetition: after a representative template is seen,
@@ -335,7 +316,7 @@ def candidate_family(url: str, text: str = "") -> str:
 def _capability_context(page: dict[str, Any]) -> dict[str, Any]:
     surfaces = page.get("page_surfaces", {}) if isinstance(page.get("page_surfaces"), dict) else {}
     counts = surfaces.get("semantic_counts", {}) if isinstance(surfaces.get("semantic_counts"), dict) else {}
-    forms = [item for item in page.get("forms", []) if isinstance(item, dict)]
+    forms = relevant_forms(page)
     controls = [item for item in page.get("interactive_controls", []) if isinstance(item, dict)]
     control_parts = [
         " ".join(
@@ -569,16 +550,6 @@ def _interaction_run_coverage(run: dict[str, Any]) -> tuple[str | None, str | No
     return None, None
 
 
-def _aggregate_variant_coverage_status(records: list[dict[str, Any]]) -> str:
-    if records and all(record["status"] == "observed" for record in records):
-        return "observed"
-    if records and all(record["status"] == "externally_blocked" for record in records):
-        return "externally_blocked"
-    if records and all(record["status"] == "not_tested" for record in records):
-        return "not_tested"
-    return "partial"
-
-
 def journey_coverage_ledger(
     pages: list[dict[str, Any]],
     candidates: list[dict[str, str]],
@@ -594,7 +565,7 @@ def journey_coverage_ledger(
             journey_id,
             {
                 "journey_id": journey_id,
-                "material": journey_id != "content_navigation",
+                "material": journey_id not in {"content_navigation", "unknown"},
                 "status": "not_tested",
                 "entry_points": set(),
                 "states_covered": set(),
@@ -611,7 +582,7 @@ def journey_coverage_ledger(
             variant_id,
             {
                 "variant_id": variant_id,
-                "material": infer_journey(template) != "content_navigation",
+                "material": infer_journey(template) not in {"content_navigation", "unknown"},
                 "status": "not_tested",
                 "entry_points": set(),
                 "states_covered": set(),
@@ -645,7 +616,7 @@ def journey_coverage_ledger(
         if not page.get("fetch_error"):
             item["states_covered"].add("entry")
             variant_item["states_covered"].add("entry")
-            needs_interaction = template in SAFE_SUBMISSION_KINDS and bool(page.get("forms"))
+            needs_interaction = template in SAFE_SUBMISSION_KINDS and bool(relevant_forms(page))
             variant_item["status"] = "not_tested" if needs_interaction else "observed"
             if page.get("forms") or page.get("interactive_controls"):
                 item["states_covered"].add("progression")
@@ -664,7 +635,7 @@ def journey_coverage_ledger(
             variant_id,
             {
                 "variant_id": variant_id,
-                "material": journey_id != "content_navigation",
+                "material": journey_id not in {"content_navigation", "unknown"},
                 "status": "not_tested",
                 "entry_points": {start_url} if start_url else set(),
                 "states_covered": set(),
@@ -682,7 +653,12 @@ def journey_coverage_ledger(
             item["states_covered"].add(state)
             variant_item["states_covered"].add(state)
         if run_status:
-            variant_item["status"] = run_status
+            current_status = str(variant_item.get("status", "not_tested"))
+            variant_item["status"] = (
+                run_status
+                if current_status == "not_tested"
+                else aggregate_coverage_statuses([current_status, run_status])
+            )
     for candidate in material_unvisited:
         url = str(candidate.get("url", ""))
         template = str(candidate.get("template", infer_template(url)))
@@ -726,7 +702,9 @@ def journey_coverage_ledger(
         variant_rows.sort(key=lambda record: str(record["variant_id"]))
         material_variants = [record for record in variant_rows if record["material"]]
         assessed_variants = material_variants or variant_rows
-        item["status"] = _aggregate_variant_coverage_status(assessed_variants)
+        item["status"] = aggregate_coverage_statuses(
+            [str(record["status"]) for record in assessed_variants]
+        )
         item["states_covered"] = {
             state
             for record in variant_rows
@@ -836,11 +814,24 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
                 const main = document.querySelector("main, [role='main'], article");
                 const mainText = main ? text(main.innerText).slice(0, 5000) : "";
                 const countVisible = selector => [...document.querySelectorAll(selector)].filter(visible).length;
+                const localControls = main
+                    ? [...main.querySelectorAll("form, [role='tab'], button, [data-product-id], [class*='product-card' i], [itemtype*='Product']")]
+                        .filter(visible)
+                    : [];
+                const componentEvidence = localControls.slice(0, 40).map(element => text(
+                    element.getAttribute("aria-label") || element.getAttribute("title") ||
+                    element.getAttribute("name") || element.id || element.innerText
+                )).filter(Boolean);
+                const productCardCount = main
+                    ? [...main.querySelectorAll("[data-product-id], [class*='product-card' i], [itemtype*='Product']")].filter(visible).length
+                    : 0;
+                if (productCardCount > 1) componentEvidence.push("product listing category");
                 return {
                     title: text(document.title).slice(0, 300),
                     headings: [...document.querySelectorAll("main h1, main h2, [role='main'] h1, [role='main'] h2, article h1, article h2, body > h1")]
                         .filter(visible).map(element => text(element.innerText)).filter(Boolean).slice(0, 30),
                     main_text: mainText,
+                    component_evidence: componentEvidence,
                     semantic_counts: {
                         form: countVisible("form"),
                         tab: countVisible("[role='tab']"),
@@ -872,6 +863,7 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
     forms = page.eval_on_selector_all(
         "form",
         r"""elements => {
+            const visible = element => !!(element && (element.offsetWidth || element.offsetHeight || element.getClientRects().length));
             const esc = value => (window.CSS && CSS.escape) ? CSS.escape(value) : value.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
             const attr = value => String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
             const selectorFor = element => {
@@ -911,6 +903,8 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
                 id: element.id || "",
                 name: element.getAttribute("name") || "",
                 selector: selectorFor(element),
+                visible: visible(element),
+                inside_main: !!element.closest("main, [role='main'], article"),
                 fields: [...element.querySelectorAll("input, select, textarea")].slice(0, 50).map(field => ({
                     name: field.getAttribute("name") || "",
                     id: field.id || "",
@@ -922,18 +916,18 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
                     disabled: !!field.disabled,
                     autocomplete: field.getAttribute("autocomplete") || "",
                     option_values: field.tagName === "SELECT"
-                        ? [...field.options].slice(0, 50).map(option => option.value || option.textContent.trim())
+                        ? [...field.options].filter(option => !option.disabled && String(option.value || "").trim()).slice(0, 50).map(option => option.value)
                         : (["radio", "checkbox"].includes((field.type || "").toLowerCase())
                             ? [field.value || labelFor(field)].filter(Boolean)
                             : []),
                     option_count: field.tagName === "SELECT"
-                        ? field.options.length
+                        ? [...field.options].filter(option => !option.disabled && String(option.value || "").trim()).length
                         : (["radio", "checkbox"].includes((field.type || "").toLowerCase()) && field.name
                             ? [...element.querySelectorAll("input[type='radio'], input[type='checkbox']")]
                                 .filter(candidate => candidate.name === field.name).length
                             : 0),
                     option_labels: field.tagName === "SELECT"
-                        ? [...field.options].slice(0, 50).map(option => option.textContent.trim() || option.value)
+                        ? [...field.options].filter(option => !option.disabled && String(option.value || "").trim()).slice(0, 50).map(option => option.textContent.trim() || option.value)
                         : (["radio", "checkbox"].includes((field.type || "").toLowerCase())
                             ? [labelFor(field) || field.value].filter(Boolean)
                             : [])
@@ -996,6 +990,7 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
     controls = page.eval_on_selector_all(
         "select, input[type='checkbox'], input[type='radio'], [role='combobox'], [role='listbox'], [role='radiogroup'], [role='tablist'], [role='tab'], [role='option'], [role='radio'], [role='checkbox'], [role='menuitemradio'], [data-option-group], [aria-pressed], button[data-value]",
         r"""elements => {
+            const visible = element => !!(element && (element.offsetWidth || element.offsetHeight || element.getClientRects().length));
             const esc = value => (window.CSS && CSS.escape) ? CSS.escape(value) : value.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
             const attr = value => String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
             const selectorFor = element => {
@@ -1050,49 +1045,21 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
                     name: element.getAttribute("name") || element.getAttribute("data-name") || "",
                     id: element.id || "",
                     selector: selectorFor(element),
+                    visible: visible(element),
+                    inside_main: !!element.closest("main, [role='main'], article"),
                     label: labelFor(element),
                     value: element.value || element.getAttribute("data-value") || element.getAttribute("aria-label") || "",
-                    option_count: allOptions.length,
-                    option_values: options.map(option => option.value || option.getAttribute("data-value") ||
+                    option_count: allOptions.filter(option => !option.disabled && String(option.value || option.getAttribute("data-value") ||
+                        option.getAttribute("aria-label") || option.textContent.trim()).trim()).length,
+                    option_values: options.filter(option => !option.disabled).map(option => option.value || option.getAttribute("data-value") ||
                         option.getAttribute("aria-label") || option.textContent.trim()).filter(Boolean),
-                    option_labels: options.map(option => labelFor(option) || option.value || option.getAttribute("data-value") || "").filter(Boolean)
+                    option_labels: options.filter(option => !option.disabled).map(option => labelFor(option) || option.value || option.getAttribute("data-value") || "").filter(Boolean)
                 };
             });
         }""",
     )
     try:
-        measurement_evidence = page.evaluate(
-            """() => {
-            const sensitiveKey = /(?:^|_)(?:email|e_mail|phone|mobile|first_name|last_name|firstname|lastname|address|postal|postcode|zip|user_id|customer_id)(?:$|_)/i;
-            const sanitize = (value, key = "", depth = 0) => {
-                if (sensitiveKey.test(key)) return "[redacted]";
-                if (depth > 6) return "[depth-limited]";
-                if (value === null || ["string", "number", "boolean"].includes(typeof value)) return value;
-                if (Array.isArray(value)) return value.slice(0, 25).map(item => sanitize(item, key, depth + 1));
-                if (typeof value === "object") {
-                    const result = {};
-                    Object.entries(value).slice(0, 50).forEach(([childKey, child]) => {
-                        result[childKey] = sanitize(child, childKey, depth + 1);
-                    });
-                    return result;
-                }
-                return `[${typeof value}]`;
-            };
-            const dataLayer = Array.isArray(window.dataLayer) ? window.dataLayer : [];
-            const pushes = dataLayer.slice(-100).map(value => sanitize(value));
-            const resources = performance.getEntriesByType("resource").map(entry => entry.name || "");
-            const corpus = [document.documentElement.innerHTML, ...resources].join("\\n");
-            const unique = values => [...new Set(values)];
-            return {
-                data_layer_present: Array.isArray(window.dataLayer),
-                data_layer_push_count: dataLayer.length,
-                data_layer_pushes: pushes,
-                gtm_container_ids: unique(corpus.match(/GTM-[A-Z0-9]+/gi) || []).sort(),
-                google_tag_ids: unique(corpus.match(/GT-[A-Z0-9]+/gi) || []).sort(),
-                ga4_measurement_ids: unique(corpus.match(/G-[A-Z0-9]{6,}/gi) || []).sort()
-            };
-            }"""
-        )
+        measurement_evidence = page.evaluate(measurement_evidence_script())
     except Exception as error:
         measurement_evidence = {"capture_error": f"{type(error).__name__}: {error}"}
     clean_links = [
@@ -1106,6 +1073,7 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
             "title": page_surfaces.get("title", ""),
             "headings": page_surfaces.get("headings", []),
             "main": page_surfaces.get("main_text", ""),
+            "components": page_surfaces.get("component_evidence", []),
         },
     )
     record = {
@@ -1238,7 +1206,7 @@ def build_auto_interaction_recipes(
     limit: int | None = 12,
 ) -> list[dict[str, Any]]:
     recipes: list[dict[str, Any]] = []
-    seen_variants: set[str] = set()
+    seen_forms: set[tuple[str, str]] = set()
     for page in pages:
         if page.get("fetch_error") or not page.get("forms"):
             continue
@@ -1248,55 +1216,58 @@ def build_auto_interaction_recipes(
             continue
         journey_id = infer_journey(template)
         variant_id = journey_variant_id(template, str(page.get("url", "")))
-        if variant_id in seen_variants:
-            continue
-        form = next(
-            (
-                item
-                for item in page.get("forms", [])
-                if isinstance(item, dict)
-                and not UNSAFE_ACTION_PATTERN.search(
-                    " ".join(
-                        [
-                            str(item.get("action", "")),
-                            str(item.get("name", "")),
-                            str(item.get("id", "")),
-                            *[str(control.get("label", "")) for control in item.get("submit_controls", []) if isinstance(control, dict)],
-                        ]
-                    )
-                )
-            ),
-            None,
-        )
-        if form is None:
-            continue
-        fields = [
-            {
-                "selector": str(field.get("selector", "")),
-                "kind": _synthetic_kind(field),
-                "type": field.get("type"),
-                "required": bool(field.get("required")),
-                "option_values": field.get("option_values", []),
-            }
-            for field in form.get("fields", [])
-            if isinstance(field, dict) and not field.get("disabled")
-        ]
-        recipes.append(
-            {
-                "recipe_id": _identifier(f"auto_{variant_id}", maximum=119),
-                "journey_id": journey_id,
-                "variant_id": variant_id,
-                "start_url": str(page.get("url")),
-                "template": template,
-                "submission_kind": submission_kind,
-                "form_selector": str(form.get("selector", "form")),
-                "fields": fields,
-                "maximum_steps": 5,
-            }
-        )
-        seen_variants.add(variant_id)
-        if limit is not None and len(recipes) >= max(0, limit):
-            break
+        for form in relevant_forms(page):
+            form_selector = str(form.get("selector", "form"))
+            form_key = (variant_id, form_selector)
+            if form_key in seen_forms:
+                continue
+            form_signature = " ".join(
+                [
+                    str(form.get("action", "")),
+                    str(form.get("name", "")),
+                    str(form.get("id", "")),
+                    *[
+                        str(control.get("label", ""))
+                        for control in form.get("submit_controls", [])
+                        if isinstance(control, dict)
+                    ],
+                ]
+            )
+            if UNSAFE_ACTION_PATTERN.search(form_signature):
+                continue
+            fields = [
+                {
+                    "selector": str(field.get("selector", "")),
+                    "kind": _synthetic_kind(field),
+                    "type": field.get("type"),
+                    "required": bool(field.get("required")),
+                    "option_values": field.get("option_values", []),
+                }
+                for field in form.get("fields", [])
+                if isinstance(field, dict) and not field.get("disabled")
+            ]
+            form_id = _identifier(
+                str(form.get("id") or form.get("name") or form_selector),
+                maximum=60,
+            )
+            recipes.append(
+                {
+                    "recipe_id": _identifier(f"auto_{variant_id}_{form_id}", maximum=119),
+                    "journey_id": journey_id,
+                    "variant_id": variant_id,
+                    "form_id": form_id,
+                    "start_url": str(page.get("url")),
+                    "template": template,
+                    "submission_kind": submission_kind,
+                    "form_selector": form_selector,
+                    "initially_visible": bool(form.get("visible", True)),
+                    "fields": fields,
+                    "maximum_steps": 5,
+                }
+            )
+            seen_forms.add(form_key)
+            if limit is not None and len(recipes) >= max(0, limit):
+                return recipes
     return recipes
 
 
@@ -1340,7 +1311,7 @@ def _visible_form_snapshot(page: Any, preferred_selector: str) -> dict[str, Any]
             (forms.nth(index) for index in range(forms.count()) if forms.nth(index).is_visible()),
             None,
         )
-        if form is None:
+        if form is None and preferred_selector.strip() in {"", "form"}:
             all_forms = page.locator("form")
             form = next(
                 (all_forms.nth(index) for index in range(all_forms.count()) if all_forms.nth(index).is_visible()),
@@ -1851,11 +1822,18 @@ def finite_value_candidates(pages: list[dict[str, Any]]) -> list[dict[str, Any]]
         template = str(page.get("template", "content_or_other"))
         journey_id = infer_journey(template)
         variant_id = journey_variant_id(template, str(page.get("url", "")))
-        controls: list[dict[str, Any]] = []
-        controls.extend(item for item in page.get("interactive_controls", []) if isinstance(item, dict))
-        for form in page.get("forms", []):
-            if isinstance(form, dict):
-                controls.extend(item for item in form.get("fields", []) if isinstance(item, dict))
+        controls = [
+            item
+            for item in page.get("interactive_controls", [])
+            if isinstance(item, dict)
+            and (bool(item.get("visible", True)) or int(item.get("option_count") or 0) > 0)
+            and (
+                bool(item.get("inside_main", True))
+                or not page.get("page_surfaces", {}).get("main_text")
+            )
+        ]
+        for form in relevant_forms(page):
+            controls.extend(item for item in form.get("fields", []) if isinstance(item, dict))
         for control in controls:
             raw_values = [str(value).strip() for value in control.get("option_values", []) if str(value).strip()]
             raw_labels = [str(value).strip() for value in control.get("option_labels", []) if str(value).strip()]
@@ -1874,14 +1852,13 @@ def finite_value_candidates(pages: list[dict[str, Any]]) -> list[dict[str, Any]]
                     "variant_id": variant_id,
                     "source_label": descriptor or "Finite choice",
                     "values": {},
-                    "observed_value_count": 0,
+                    "declared_counts": [],
+                    "instance_value_sets": [],
                     "evidence_urls": set(),
                 },
             )
-            candidate["observed_value_count"] = max(
-                int(candidate["observed_value_count"]),
-                int(control.get("option_count") or len(raw_values)),
-            )
+            candidate["declared_counts"].append(int(control.get("option_count") or len(raw_values)))
+            candidate["instance_value_sets"].append(tuple(sorted(set(raw_values))))
             for index, value in enumerate(raw_values):
                 label = raw_labels[index] if index < len(raw_labels) else value
                 candidate["values"].setdefault(value, label)
@@ -1890,23 +1867,84 @@ def finite_value_candidates(pages: list[dict[str, Any]]) -> list[dict[str, Any]]
     result: list[dict[str, Any]] = []
     for candidate in candidates.values():
         ordered = sorted(candidate.pop("values").items(), key=lambda item: item[0].casefold())
-        observed_value_count = max(int(candidate.pop("observed_value_count")), len(ordered))
+        retained = ordered[:50]
+        declared_counts = [int(value) for value in candidate.pop("declared_counts")]
+        instance_sets = [tuple(values) for values in candidate.pop("instance_value_sets")]
+        captured_value_count = len(retained)
+        observed_value_count = max([len(ordered), *declared_counts])
+        every_instance_captured = all(
+            len(values) == declared_count
+            for values, declared_count in zip(instance_sets, declared_counts, strict=True)
+        )
+        stable_instances = len(set(instance_sets)) <= 1
+        if observed_value_count > 50:
+            capture_status = "over_50"
+        elif every_instance_captured and stable_instances and captured_value_count == observed_value_count:
+            capture_status = "complete"
+        else:
+            capture_status = "incomplete"
         result.append(
             {
                 **candidate,
-                "complete": observed_value_count <= 50,
+                "capture_status": capture_status,
+                "complete": capture_status == "complete",
                 "observed_value_count": observed_value_count,
-                "values": [{"value": value, "label": label} for value, label in ordered[:50]],
+                "captured_value_count": captured_value_count,
+                "values": [{"value": value, "label": label} for value, label in retained],
                 "evidence_urls": sorted(value for value in candidate["evidence_urls"] if value)[:25],
             }
         )
     return sorted(result, key=lambda item: str(item["candidate_id"]))
 
 
+def _interaction_gap_id(prefix: str, record: dict[str, Any]) -> str:
+    identity = str(record.get("recipe_id") or record.get("variant_id") or "variant")
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:10]
+    stem = _identifier(f"{prefix}_{record.get('variant_id', 'variant')}", maximum=68)
+    return f"{stem}_{digest}"[:79]
+
+
+def interaction_coverage_gaps(
+    unexecuted_recipes: list[dict[str, Any]],
+    interaction_runs: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    gaps = [
+        {
+            "gap_id": _interaction_gap_id("interaction_not_executed", recipe),
+            "journey_id": recipe["journey_id"],
+            "variant_id": recipe["variant_id"],
+            "material": True,
+            "evidence_state": "not_tested",
+            "description": (
+                "Safe synthetic interaction was not executed for this material funnel form; "
+                "success, failure, and gated states remain unconfirmed."
+            ),
+            "candidate_urls": [recipe["start_url"]],
+        }
+        for recipe in unexecuted_recipes
+    ]
+    gaps.extend(
+        {
+            "gap_id": _interaction_gap_id("interaction_incomplete", run),
+            "journey_id": str(run.get("journey_id")),
+            "variant_id": str(run.get("variant_id")),
+            "material": True,
+            "evidence_state": "externally_blocked" if run.get("outcome") == "blocked" else "partial",
+            "description": "The safe synthetic form run was partial, blocked, or stopped before a consequential action.",
+            "candidate_urls": [str(run.get("start_url"))],
+        }
+        for run in interaction_runs
+        if run.get("outcome") != "completed"
+    )
+    return gaps
+
+
 def main() -> int:
     args = parse_args()
     if args.limit <= 0 or args.max_rounds <= 0 or args.interaction_limit < 0:
         raise SystemExit("--limit and --max-rounds must be positive; --interaction-limit cannot be negative.")
+    if args.run_id and not re.fullmatch(r"run_[a-f0-9]{32}", args.run_id):
+        raise SystemExit("--run-id must use run_<32 lowercase hex> format.")
     root_url = canonical_url(args.url if "://" in args.url else f"https://{args.url}")
     sync_playwright = require_playwright()
     browser_environment = inspect_browser_environment()
@@ -2170,42 +2208,14 @@ def main() -> int:
     unexecuted_recipes = all_recipes[args.interaction_limit :]
     if args.no_auto_interact:
         unexecuted_recipes = all_recipes
-    for recipe in unexecuted_recipes:
-        coverage_gaps.append(
-            {
-                "gap_id": _identifier(f"interaction_not_executed_{recipe['variant_id']}", maximum=79),
-                "journey_id": recipe["journey_id"],
-                "variant_id": recipe["variant_id"],
-                "material": True,
-                "evidence_state": "not_tested",
-                "description": (
-                    "Safe synthetic interaction was not executed for this material funnel variant; "
-                    "success, failure, and gated states remain unconfirmed."
-                ),
-                "candidate_urls": [recipe["start_url"]],
-            }
-        )
-    incomplete_runs = [run for run in automatic_interaction_runs if run.get("outcome") != "completed"]
-    for run in incomplete_runs:
-        coverage_gaps.append(
-            {
-                "gap_id": _identifier(f"interaction_incomplete_{run.get('variant_id', run.get('recipe_id', 'variant'))}", maximum=79),
-                "journey_id": str(run.get("journey_id")),
-                "variant_id": str(run.get("variant_id")),
-                "material": True,
-                "evidence_state": (
-                    "externally_blocked"
-                    if run.get("outcome") == "blocked"
-                    else "partial"
-                ),
-                "description": "The safe synthetic journey run was partial, blocked, or stopped before a consequential action.",
-                "candidate_urls": [str(run.get("start_url"))],
-            }
-        )
+    coverage_gaps.extend(
+        interaction_coverage_gaps(unexecuted_recipes, automatic_interaction_runs)
+    )
     if coverage_gaps and outcome == "completed":
         outcome = "partial"
         delivery_notice = "Rendered discovery has explicit coverage boundaries; resolve them before claiming complete website coverage."
     generated_at = datetime.now(timezone.utc).isoformat()
+    run_id = args.run_id or f"run_{uuid4().hex}"
     host_slug = re.sub(
         r"[^a-z0-9]+",
         "_",
@@ -2213,7 +2223,8 @@ def main() -> int:
     ).strip("_")
     report_id = (f"discovery_{host_slug}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}")[:119].rstrip("_")
     output = {
-        "discovery_version": "1.2.0",
+        "discovery_version": "1.3.0",
+        "run_id": run_id,
         "report_id": report_id,
         "generated_at": generated_at,
         "root_url": root_url,

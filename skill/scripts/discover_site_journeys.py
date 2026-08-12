@@ -41,11 +41,26 @@ class SignalParser(HTMLParser):
         self.links: list[LinkSignal] = []
         self.forms: list[dict[str, str]] = []
         self.buttons: list[str] = []
+        self.title_parts: list[str] = []
+        self.headings: list[str] = []
+        self.main_parts: list[str] = []
         self._active_link: str | None = None
         self._active_text: list[str] = []
+        self._title_depth = 0
+        self._heading_depth = 0
+        self._main_depth = 0
+        self._ignored_depth = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attr = {key.lower(): value or "" for key, value in attrs}
+        if tag == "title":
+            self._title_depth += 1
+        if tag in {"h1", "h2"}:
+            self._heading_depth += 1
+        if tag in {"main", "article"}:
+            self._main_depth += 1
+        if tag in {"header", "footer", "nav", "aside"}:
+            self._ignored_depth += 1
         if tag == "a" and attr.get("href"):
             self._active_link = urljoin(self.base_url, attr["href"])
             self._active_text = []
@@ -66,12 +81,28 @@ class SignalParser(HTMLParser):
     def handle_data(self, data: str) -> None:
         if self._active_link:
             self._active_text.append(data)
+        if self._title_depth:
+            self.title_parts.append(data)
+        if self._heading_depth and not self._ignored_depth:
+            value = clean_text(data)
+            if value:
+                self.headings.append(value)
+        if self._main_depth and not self._ignored_depth:
+            self.main_parts.append(data)
 
     def handle_endtag(self, tag: str) -> None:
         if tag == "a" and self._active_link:
             self.links.append(LinkSignal(self._active_link, clean_text(" ".join(self._active_text)), self.base_url))
             self._active_link = None
             self._active_text = []
+        if tag == "title" and self._title_depth:
+            self._title_depth -= 1
+        if tag in {"h1", "h2"} and self._heading_depth:
+            self._heading_depth -= 1
+        if tag in {"main", "article"} and self._main_depth:
+            self._main_depth -= 1
+        if tag in {"header", "footer", "nav", "aside"} and self._ignored_depth:
+            self._ignored_depth -= 1
 
 
 def clean_text(value: str) -> str:
@@ -254,6 +285,12 @@ ARCHETYPE_ROUTE_PATTERNS: dict[str, tuple[str, ...]] = {
     "configurator": (r"/(?:configurateur|configurator)(?:/|$)",),
 }
 
+ARCHETYPE_WEAK_ROUTE_PATTERNS: dict[str, tuple[str, ...]] = {
+    # Short commerce aliases are useful supporting evidence but are too
+    # ambiguous to classify a page without a second local signal.
+    "listing": (r"/c/[^/]+/?$",),
+}
+
 
 def classify_page_archetype(
     url: str,
@@ -294,6 +331,10 @@ def classify_page_archetype(
         if any(re.search(pattern, normalized_path) for pattern in patterns):
             scores[template] += 12
             reasons[template].append("route pattern")
+    for template, patterns in ARCHETYPE_WEAK_ROUTE_PATTERNS.items():
+        if any(re.search(pattern, normalized_path) for pattern in patterns):
+            scores[template] += 4
+            reasons[template].append("weak route pattern")
     for surface_name, value, weight in weighted_surfaces:
         if not value:
             continue
@@ -351,7 +392,7 @@ def infer_journey(template: str) -> str:
         "configurator": "configuration",
         "support_or_contact": "support_contact",
         "post_purchase": "post_purchase_service",
-        "unknown": "content_navigation",
+        "unknown": "unknown",
     }
     return mapping.get(template, "content_navigation")
 
@@ -364,9 +405,23 @@ def parse_page(url: str) -> dict[str, Any]:
     parser = SignalParser(url)
     parser.feed(text)
     links = [asdict(link) for link in parser.links if same_host(link.url, url)]
+    surfaces = {
+        "title": clean_text(" ".join(parser.title_parts)),
+        "headings": parser.headings[:30],
+        "main": re.sub(r"\s+", " ", " ".join(parser.main_parts)).strip()[:5000],
+        "components": " ".join(
+            [
+                *[f"form {form.get('id', '')} {form.get('name', '')}" for form in parser.forms],
+                *parser.buttons,
+            ]
+        ),
+    }
+    classification = classify_page_archetype(url, surfaces)
     return {
         "url": url,
-        "template": infer_template(url),
+        "template": classification["primary"],
+        "classification_diagnostic": classification,
+        "page_surfaces": surfaces,
         "content_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
         "links": links[:100],
         "forms": parser.forms[:25],

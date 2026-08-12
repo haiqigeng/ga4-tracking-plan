@@ -235,7 +235,7 @@ def _event_tab_assignments(
             non_reusable_mappings.append((mapping, existing))
     remaining = [event for event in events if str(event.get("event_name", "")) not in assigned]
     reused_count = 0
-    for (mapping, existing), event in zip(reusable_mappings, remaining):
+    for (mapping, existing), event in zip(reusable_mappings, remaining, strict=False):
         assignments.append((mapping, event, existing))
         assigned.add(str(event.get("event_name", "")))
         reused_count += 1

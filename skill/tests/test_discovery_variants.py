@@ -12,14 +12,21 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-from build_analysis_context_seed import build_analysis_context_seed
+from build_analysis_context_seed import (
+    build_analysis_context_seed,
+    build_analysis_context_seed_from_reports,
+)
+from contract_utils import sha256_file
 from discover_site_journeys_playwright import (
     build_auto_interaction_recipes,
     discovery_exit_code,
     finite_value_candidates,
+    interaction_coverage_gaps,
     journey_coverage_ledger,
     measurement_opportunity_hints,
 )
+from discovery_contract import validate_discovery_bindings
+from discovery_quality import merge_discovery_reports
 from validate_analysis_context import validate_analysis_context
 
 
@@ -137,8 +144,130 @@ class DiscoveryVariantTests(unittest.TestCase):
         self.assertTrue(project["complete"])
         self.assertEqual([item["value"] for item in project["values"]], ["door", "shutter", "window"])
         self.assertFalse(large["complete"])
+        self.assertEqual(project["capture_status"], "complete")
+        self.assertEqual(large["capture_status"], "over_50")
         self.assertEqual(large["observed_value_count"], 51)
         self.assertEqual(len(large["values"]), 50)
+
+    def test_finite_values_do_not_claim_completeness_when_instances_disagree(self) -> None:
+        pages = [
+            {
+                "url": "https://example.com/products/a",
+                "template": "product_detail",
+                "forms": [],
+                "interactive_controls": [
+                    {
+                        "name": "item_color",
+                        "option_count": 2,
+                        "option_values": ["red", "blue"],
+                        "option_labels": ["Red", "Blue"],
+                    }
+                ],
+            },
+            {
+                "url": "https://example.com/products/b",
+                "template": "product_detail",
+                "forms": [],
+                "interactive_controls": [
+                    {
+                        "name": "item_color",
+                        "option_count": 2,
+                        "option_values": ["red"],
+                        "option_labels": ["Red"],
+                    }
+                ],
+            },
+        ]
+        candidate = finite_value_candidates(pages)[0]
+        self.assertEqual(candidate["capture_status"], "incomplete")
+        self.assertFalse(candidate["complete"])
+
+    def test_finite_value_union_above_fifty_retains_a_schema_safe_sample(self) -> None:
+        pages = [
+            {
+                "url": f"https://example.com/products/{page_index}",
+                "template": "product_detail",
+                "forms": [],
+                "interactive_controls": [
+                    {
+                        "name": "item_color",
+                        "option_count": 30,
+                        "option_values": [
+                            f"color_{page_index}_{value_index}"
+                            for value_index in range(30)
+                        ],
+                        "option_labels": [
+                            f"Color {page_index} {value_index}"
+                            for value_index in range(30)
+                        ],
+                    }
+                ],
+            }
+            for page_index in range(2)
+        ]
+        candidate = finite_value_candidates(pages)[0]
+        self.assertEqual(candidate["capture_status"], "over_50")
+        self.assertEqual(candidate["observed_value_count"], 60)
+        self.assertEqual(candidate["captured_value_count"], 50)
+        self.assertEqual(len(candidate["values"]), 50)
+
+    def test_all_relevant_forms_in_one_variant_receive_distinct_recipes(self) -> None:
+        page = lead_page("https://example.com/contact")
+        page["template"] = "support_or_contact"
+        page["forms"] = [
+            {
+                "selector": "#contact-card",
+                "visible": True,
+                "inside_main": True,
+                "name": "contact_card",
+                "fields": [{"selector": "#message-card", "name": "message", "type": "text"}],
+                "submit_controls": [{"selector": "#send-card", "label": "Send contact card request"}],
+            },
+            {
+                "selector": "#contact-topup",
+                "visible": False,
+                "inside_main": True,
+                "name": "contact_topup",
+                "fields": [{"selector": "#message-topup", "name": "message", "type": "text"}],
+                "submit_controls": [{"selector": "#send-topup", "label": "Send contact topup request"}],
+            },
+            {
+                "selector": "#contact-help",
+                "visible": False,
+                "inside_main": True,
+                "name": "contact_help",
+                "fields": [{"selector": "#message-help", "name": "message", "type": "text"}],
+                "submit_controls": [{"selector": "#send-help", "label": "Send contact help request"}],
+            },
+            {
+                "selector": "#contact-merchant",
+                "visible": False,
+                "inside_main": True,
+                "name": "contact_merchant",
+                "fields": [{"selector": "#message-merchant", "name": "message", "type": "text"}],
+                "submit_controls": [{"selector": "#send-merchant", "label": "Send contact merchant request"}],
+            },
+        ]
+        recipes = build_auto_interaction_recipes([page], limit=None)
+        self.assertEqual(len(recipes), 4)
+        self.assertEqual(len({recipe["recipe_id"] for recipe in recipes}), 4)
+
+    def test_sibling_form_boundaries_receive_distinct_coverage_gap_ids(self) -> None:
+        page = lead_page("https://example.com/contact")
+        page["forms"] = [
+            {**page["forms"][0], "selector": "#sales", "form_context": "sales"},
+            {**page["forms"][0], "selector": "#support", "form_context": "support"},
+        ]
+        recipes = build_auto_interaction_recipes([page], limit=None)
+        gaps = interaction_coverage_gaps(recipes, [])
+        self.assertEqual(len(gaps), 2)
+        self.assertEqual(len({gap["gap_id"] for gap in gaps}), 2)
+        self.assertEqual({gap["variant_id"] for gap in gaps}, {recipes[0]["variant_id"]})
+
+        incomplete_runs = [{**recipe, "outcome": "partial"} for recipe in recipes]
+        incomplete_gaps = interaction_coverage_gaps([], incomplete_runs)
+        self.assertEqual(len(incomplete_gaps), 2)
+        self.assertEqual(len({gap["gap_id"] for gap in incomplete_gaps}), 2)
 
     def test_seed_preserves_language_precedence_target_state_and_hint_materiality(self) -> None:
         report = json.loads((ROOT / "references" / "example-discovery-report.json").read_text(encoding="utf-8"))
@@ -170,6 +299,120 @@ class DiscoveryVariantTests(unittest.TestCase):
             if item["discovery_hint_ids"] == ["filter_candidate_fixture"]
         )
         self.assertFalse(candidate_opportunity["material"])
+
+    def test_context_and_discovery_report_share_one_run_identifier(self) -> None:
+        report = json.loads((ROOT / "references" / "example-discovery-report.json").read_text(encoding="utf-8"))
+        report.update({"discovery_version": "1.3.0", "run_id": "run_" + "a" * 32})
+        with tempfile.TemporaryDirectory() as directory:
+            report_path = Path(directory) / "discovery.json"
+            report_path.write_text(json.dumps(report), encoding="utf-8")
+            context = build_analysis_context_seed(report, report_path)
+            self.assertEqual(context["run_id"], report["run_id"])
+            self.assertEqual(context["discovery_reports"][0]["run_id"], report["run_id"])
+            context["discovery_reports"][0]["run_id"] = "run_" + "b" * 32
+            errors = validate_discovery_bindings(context, [report_path], require_live_report=True)
+        self.assertTrue(any("does not belong to context run" in error for error in errors))
+
+    def test_legacy_discovery_does_not_gain_fabricated_run_provenance(self) -> None:
+        report = json.loads((ROOT / "references" / "example-discovery-report.json").read_text(encoding="utf-8"))
+        report["discovery_version"] = "1.2.0"
+        report.pop("run_id")
+        with tempfile.TemporaryDirectory() as directory:
+            report_path = Path(directory) / "legacy.json"
+            report_path.write_text(json.dumps(report), encoding="utf-8")
+            context = build_analysis_context_seed(report, report_path)
+        self.assertNotIn("run_id", context)
+        self.assertNotIn("context_version", context)
+        self.assertNotIn("run_id", context["discovery_reports"][0])
+
+    def test_multiple_discovery_reports_require_explicit_shared_run_provenance(self) -> None:
+        report = json.loads((ROOT / "references" / "example-discovery-report.json").read_text(encoding="utf-8"))
+        report["discovery_version"] = "1.2.0"
+        report.pop("run_id")
+        second = copy.deepcopy(report)
+        second["report_id"] = "discovery_example_com_legacy_second"
+        with tempfile.TemporaryDirectory() as directory:
+            first_path = Path(directory) / "first.json"
+            second_path = Path(directory) / "second.json"
+            with self.assertRaisesRegex(ValueError, "shared run_id"):
+                build_analysis_context_seed_from_reports(
+                    [(report, first_path), (second, second_path)]
+                )
+
+    def test_multiple_reports_merge_independently_of_input_order(self) -> None:
+        report = json.loads((ROOT / "references" / "example-discovery-report.json").read_text(encoding="utf-8"))
+        report.update({"discovery_version": "1.3.0", "run_id": "run_" + "a" * 32})
+        second = copy.deepcopy(report)
+        second["report_id"] = "discovery_example_com_fixture_second"
+        with tempfile.TemporaryDirectory() as directory:
+            first_path = Path(directory) / "first.json"
+            second_path = Path(directory) / "second.json"
+            first_path.write_text(json.dumps(report), encoding="utf-8")
+            second_path.write_text(json.dumps(second), encoding="utf-8")
+            context = build_analysis_context_seed(report, first_path)
+            second_record = copy.deepcopy(context["discovery_reports"][0])
+            second_record.update(
+                {
+                    "report_id": second["report_id"],
+                    "reference": str(second_path),
+                    "sha256": sha256_file(second_path),
+                }
+            )
+            context["discovery_reports"].append(second_record)
+            forward = validate_discovery_bindings(
+                context,
+                [first_path, second_path],
+                require_live_report=True,
+            )
+            reversed_context = copy.deepcopy(context)
+            reversed_context["discovery_reports"].reverse()
+            backward = validate_discovery_bindings(
+                reversed_context,
+                [second_path, first_path],
+                require_live_report=True,
+            )
+            seeded_forward = build_analysis_context_seed_from_reports(
+                [(report, first_path), (second, second_path)]
+            )
+            seeded_backward = build_analysis_context_seed_from_reports(
+                [(second, second_path), (report, first_path)]
+            )
+        self.assertEqual(forward, [])
+        self.assertEqual(backward, [])
+        self.assertEqual(validate_analysis_context(context), [])
+        for seeded in (seeded_forward, seeded_backward):
+            seeded.pop("created_at")
+        self.assertEqual(seeded_forward, seeded_backward)
+
+    def test_targeted_report_can_close_an_earlier_not_tested_variant(self) -> None:
+        first = json.loads((ROOT / "references" / "example-discovery-report.json").read_text(encoding="utf-8"))
+        first.update({"discovery_version": "1.3.0", "run_id": "run_" + "a" * 32})
+        journey = first["journey_coverage_ledger"][0]
+        journey["status"] = "not_tested"
+        journey["variant_coverage"][0]["status"] = "not_tested"
+        first["coverage_gaps"] = [
+            {
+                "gap_id": "product_detail_not_tested",
+                "journey_id": journey["journey_id"],
+                "variant_id": journey["variant_coverage"][0]["variant_id"],
+                "material": True,
+                "evidence_state": "not_tested",
+                "description": "The product detail variant was not tested.",
+                "candidate_urls": journey["entry_points"],
+            }
+        ]
+        second = copy.deepcopy(first)
+        second["report_id"] = "discovery_example_com_targeted_closure"
+        second["journey_coverage_ledger"][0]["status"] = "observed"
+        second["journey_coverage_ledger"][0]["variant_coverage"][0]["status"] = "observed"
+        second["coverage_gaps"] = []
+        merged = merge_discovery_reports([first, second])
+        self.assertEqual(merged["journey_coverage_ledger"][0]["status"], "observed")
+        self.assertEqual(
+            merged["journey_coverage_ledger"][0]["variant_coverage"][0]["status"],
+            "observed",
+        )
+        self.assertEqual(merged["coverage_gaps"], [])
 
     def test_delivery_requires_an_exact_boundary_for_each_partial_material_variant(self) -> None:
         context = json.loads((ROOT / "references" / "example-analysis-context.json").read_text(encoding="utf-8"))

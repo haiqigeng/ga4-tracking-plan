@@ -15,6 +15,9 @@
     "value_domains"
   ],
   "properties": {
+    "context_version": {"const": "1.0.0"},
+    "run_id": {"type": "string", "pattern": "^run_[a-f0-9]{32}$"},
+    "created_at": {"type": "string", "format": "date-time"},
     "target_state": {
       "enum": ["as_is", "to_be", "hybrid"]
     },
@@ -124,6 +127,7 @@
         ],
         "properties": {
           "report_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,119}$"},
+          "run_id": {"type": "string", "pattern": "^run_[a-f0-9]{32}$"},
           "source_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
           "reference": {"type": "string", "minLength": 1},
           "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},

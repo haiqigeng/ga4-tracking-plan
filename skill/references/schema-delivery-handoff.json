@@ -5,7 +5,8 @@
   "additionalProperties": false,
   "required": ["handoff_version", "generated_at", "skill", "plan", "approval", "discovery_reports", "upstream_evidence", "artifacts"],
   "properties": {
-    "handoff_version": {"const": "1.0.0"},
+    "handoff_version": {"enum": ["1.0.0", "1.1.0"]},
+    "run_id": {"type": "string", "pattern": "^run_[a-f0-9]{32}$"},
     "generated_at": {"type": "string", "format": "date-time"},
     "skill": {
       "type": "object",
@@ -56,6 +57,7 @@
         "required": ["report_id", "source_id", "sha256", "outcome", "hint_ids", "journey_ids"],
         "properties": {
           "report_id": {"type": "string", "minLength": 1},
+          "run_id": {"type": "string", "pattern": "^run_[a-f0-9]{32}$"},
           "source_id": {"type": "string", "minLength": 1},
           "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
           "outcome": {"enum": ["completed", "partial", "blocked"]},
@@ -88,5 +90,21 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"handoff_version": {"const": "1.1.0"}},
+        "required": ["handoff_version"]
+      },
+      "then": {
+        "required": ["run_id"],
+        "properties": {
+          "discovery_reports": {
+            "items": {"required": ["run_id"]}
+          }
+        }
+      }
+    }
+  ]
 }
