@@ -57,6 +57,11 @@ Read only the relevant scenario reference:
 - Treat every evidence source according to what it can prove. Distinguish live
   behavior, intended future design, business requirements, current tracking,
   technical data capability, and historical contracts.
+- For a new or fresh run, create the source manifest only from artifacts
+  explicitly supplied for that task and evidence generated during that run.
+  Never reuse another client's plans, inferred values, or prior discovery
+  merely because they remain in the session or filesystem. Retain hashes and
+  discovery timestamps so provenance can be checked.
 - Build an evidence-backed view of how the business creates value before
   designing measurement. Cover material entry points, alternate journey
   shapes, success, failure, empty, and post-conversion states without turning
@@ -71,7 +76,16 @@ Read only the relevant scenario reference:
   variant must map to the coverage ledger. Never let one successful variant
   close a different route family, funnel shape, or component implementation.
   Treat structural hints as candidates until analyst reasoning establishes
-  materiality; do not turn every detected control into a mandatory event.
+  materiality. Every bounded interaction-family hint still needs an explicit
+  measure or exclude decision; do not turn every detected control into a
+  mandatory event.
+- Classify rendered pages from weighted route, title, heading, main-content,
+  and component evidence. Exclude global header/footer controls from page
+  purpose, use whole-word multilingual matching, and retain `unknown` plus
+  competing candidates when evidence is ambiguous.
+- Keep factual discovery state separate from analyst resolution. `not_tested`
+  is not an external blocker; use `externally_blocked` only for an evidenced
+  access or execution barrier and never relabel sampling limits as blocked.
 - Include only manually implemented measurement in the tracking plan. Do not
   include automatic or enhanced-measurement events, native/no-push rows, or
   related implementation guidance.
@@ -126,6 +140,11 @@ Read only the relevant scenario reference:
 - Include official `customer_type` on `purchase` as a conditional parameter:
   send `new` or `returning` only when the confirmed order can classify it
   reliably, and omit it when uncertain.
+- Include the defining official choice on its own checkout step:
+  `payment_type` on `add_payment_info` and `shipping_tier` on
+  `add_shipping_info`. When the same concept is deliberately carried into an
+  event that does not prescribe it, classify that use as custom and retain the
+  explicit custom decision.
 - Keep evidence, confidence, source conflict, ownership, registration,
   privacy, cardinality, and agent reasoning out of the default visible
   workbook. Surface a concise exception only when it changes implementation.
@@ -141,6 +160,10 @@ Read only the relevant scenario reference:
   event-tab edits into canonical JSON; require canonical edits for structural
   changes. Detect evidence drift and business-change impact for analyst review
   without mutating or approving the plan automatically.
+- For a supplied template, assign an explicit semantic role to its parameter
+  registry. Default to all parameters actually used; use a custom-only view
+  only when the template owner confirms that meaning. Validate every mapped
+  semantic region against the canonical model after saving.
 
 ## Adaptive Workflow
 
@@ -151,13 +174,16 @@ Read only the relevant scenario reference:
    conflicts, hashes where available, and safe-test boundaries.
 3. Explore real public and safely accessible gated journeys in the rendered
    website. Use stratified sitemap and rendered-link candidates, then run
-   targeted rounds for uncovered journey families, templates, interactions,
+   targeted rounds for uncovered journey families, page archetypes, and
+   bounded interaction families,
    success, failure, empty, and post-conversion states. Use controlled
    synthetic interaction recipes for every material safe funnel variant.
-   Record incomplete boundaries without inventing behavior or treating a
-   sample cap or another variant's success as completeness. A valid partial
+   Record `not_tested`, `partial`, and `externally_blocked` boundaries without
+   inventing behavior or treating a sample cap or another variant's success
+   as completeness. A valid partial
    discovery report remains usable input and must continue into analyst
-   resolution rather than aborting the workflow.
+   resolution rather than aborting the workflow. Require an explicit
+   measure/exclude decision for every generated interaction-family hint.
 4. Build the business-value and journey-variant model, then create an internal
    measurement-opportunity ledger covering every material outcome,
    progression signal, and actionable diagnostic. Resolve every opportunity
@@ -177,8 +203,8 @@ Read only the relevant scenario reference:
    every warning before delivery.
 8. Build the atomic delivery through the supplied template or
    `assets/default-tracking-plan.xlsx`. Validate the rendered workbook,
-   supplied-template fidelity, per-event schemas, machine contracts, hashes,
-   and approval state.
+   non-overlapping merged-cell structure, supplied-template fidelity,
+   per-event schemas, machine contracts, hashes, and approval state.
 9. When a previous plan exists, also import and compare it, then deliver a
    complete updated plan plus a concise change log. Never deliver an addendum
    as the only current source of truth.

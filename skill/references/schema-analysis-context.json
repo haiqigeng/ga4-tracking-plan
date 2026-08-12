@@ -127,6 +127,7 @@
           "source_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
           "reference": {"type": "string", "minLength": 1},
           "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "generated_at": {"type": "string", "format": "date-time"},
           "outcome": {"enum": ["completed", "partial", "blocked"]},
           "hint_ids": {
             "type": "array",
@@ -169,7 +170,7 @@
           },
           "material": {"type": "boolean"},
           "status": {
-            "enum": ["observed", "confirmed", "planned", "partial", "blocked"]
+            "enum": ["observed", "confirmed", "planned", "partial", "not_tested", "externally_blocked", "blocked"]
           },
           "evidence_refs": {
             "type": "array",
@@ -222,7 +223,7 @@
               "properties": {
                 "variant_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
                 "material": {"type": "boolean"},
-                "status": {"enum": ["observed", "confirmed", "planned", "partial", "blocked"]},
+                "status": {"enum": ["observed", "confirmed", "planned", "partial", "not_tested", "externally_blocked", "blocked"]},
                 "evidence_refs": {
                   "type": "array",
                   "uniqueItems": true,
@@ -258,6 +259,9 @@
           "material": {"type": "boolean"},
           "resolution": {
             "enum": ["confirmed_elsewhere", "excluded", "blocked", "unresolved"]
+          },
+          "evidence_state": {
+            "enum": ["not_tested", "partial", "externally_blocked"]
           },
           "description": {"type": "string", "minLength": 1},
           "evidence_refs": {
@@ -309,13 +313,27 @@
           },
           "material": {"type": "boolean"},
           "evidence_status": {
-            "enum": ["observed", "confirmed", "planned", "blocked"]
+            "enum": ["observed", "confirmed", "planned", "not_tested", "externally_blocked", "blocked"]
           },
           "evidence_refs": {
             "type": "array",
             "minItems": 1,
             "uniqueItems": true,
             "items": {"type": "string", "minLength": 1}
+          },
+          "evidence_locations": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source_id", "locator"],
+              "properties": {
+                "source_id": {"type": "string", "minLength": 1},
+                "locator": {"type": "string", "minLength": 1},
+                "component": {"type": "string", "minLength": 1}
+              }
+            }
           },
           "business_question": {"type": "string", "minLength": 1},
           "official_candidate": {"type": "string", "minLength": 1},

@@ -335,7 +335,11 @@ def build_delivery(args: argparse.Namespace) -> Path:
             fidelity_path = internal / "template-fidelity.json"
             _write_json(fidelity_path, fidelity)
             artifacts.append((fidelity_path, "supplied_template_fidelity"))
-        workbook_errors = validate_workbook(workbook_path, plan)
+        workbook_errors = validate_workbook(
+            workbook_path,
+            plan,
+            mapping if args.template else None,
+        )
         if workbook_errors:
             raise ValueError("Rendered workbook gate failed:\n" + "\n".join(f"- {error}" for error in workbook_errors))
         artifacts.append((workbook_path, "human_tracking_plan_workbook"))

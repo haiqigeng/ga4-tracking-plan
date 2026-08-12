@@ -59,6 +59,12 @@ Do not add all optional parameters mechanically. Missing source data does not
 remove a mandatory parameter; it creates an implementation dependency that
 belongs in the source logic, not in `requirement`.
 
+Two optional official parameters are operational analysis anchors for their
+own checkout steps: include `payment_type` on `add_payment_info` and
+`shipping_tier` on `add_shipping_info`. They represent the defining selection
+made when those events fire. Do not globally promote every optional official
+parameter into a mandatory tracking-plan field.
+
 `requirement` has only:
 
 - `required`
@@ -158,6 +164,9 @@ Use a precise generation, normalization, or source rule instead.
   to the confirmed order. `shipping_tier` and `payment_type` are custom on
   `purchase` when used there because they are not prescribed purchase
   parameters.
+- A parameter may therefore be official on one event and a justified custom
+  carry-through on another. Keep one compatible name, type, destination, and
+  value rule, and retain the custom decision on the non-prescribed use.
 - Include official `customer_type` on `purchase` as conditional. Use only
   `new` or `returning` when the confirmed transaction can be classified
   reliably; omit the value when classification is uncertain.

@@ -241,6 +241,15 @@ def catalog_parameters(record: dict[str, Any]) -> dict[tuple[str, str], dict[str
     }
 
 
+OFFICIAL_ANALYSIS_ANCHORS: dict[str, tuple[tuple[str, str], ...]] = {
+    # These optional official parameters express the defining choice made at
+    # the corresponding step. Omitting them makes the event materially less
+    # useful even though the collection protocol permits omission.
+    "add_payment_info": (("payment_type", "event"),),
+    "add_shipping_info": (("shipping_tier", "event"),),
+}
+
+
 def check_official_event(
     plan: dict[str, Any],
     event: dict[str, Any],
@@ -310,6 +319,18 @@ def check_official_event(
                 "OFFICIAL_REQUIRED_PARAMETER_MISSING",
                 f"{base}.parameters",
                 f"Required official parameter '{key[0]}' ({key[1]} scope) is missing.",
+            )
+    for key in OFFICIAL_ANALYSIS_ANCHORS.get(name, ()):
+        if key not in selected:
+            issue(
+                issues,
+                "error",
+                "OFFICIAL_ANALYSIS_ANCHOR_MISSING",
+                f"{base}.parameters",
+                (
+                    f"Include official parameter '{key[0]}' ({key[1]} scope): it captures the defining "
+                    f"choice made when '{name}' is emitted. Preserve its official optional/conditional semantics."
+                ),
             )
     selected_names = {name for name, _scope in selected}
     if "value" in selected_names and ("currency", "event") in prescribed and ("currency", "event") not in selected:
@@ -957,6 +978,7 @@ def check_plan_parameter_consistency_and_budgets(
                 "definition": normalize(parameter.get("definition")),
                 "value_rule": normalize(parameter.get("value_rule")),
                 "allowed_values": {json.dumps(value, ensure_ascii=False, sort_keys=True) for value in parameter.get("allowed_values", [])},
+                "has_custom_decision": isinstance(parameter.get("custom_decision"), dict),
             }
             previous = semantics.get(key)
             if previous is None:
@@ -971,13 +993,18 @@ def check_plan_parameter_consistency_and_budgets(
                         (f"Parameter {name} at {scope} scope has inconsistent type or destination across events."),
                     )
                 if previous["classification"] != signature["classification"]:
-                    issue(
-                        issues,
-                        "warning",
-                        "PARAMETER_CLASSIFICATION_VARIATION",
-                        f"$.events[{event_index}].parameters",
-                        (f"Parameter {name} at {scope} scope changes classification across events; confirm it remains one semantic concept."),
+                    fallback_pair = {previous["classification"], signature["classification"]} == {"official", "custom"}
+                    justified_fallback = fallback_pair and (
+                        previous["has_custom_decision"] or signature["has_custom_decision"]
                     )
+                    if not justified_fallback:
+                        issue(
+                            issues,
+                            "warning",
+                            "PARAMETER_CLASSIFICATION_VARIATION",
+                            f"$.events[{event_index}].parameters",
+                            (f"Parameter {name} at {scope} scope changes classification across events; confirm it remains one semantic concept."),
+                        )
                 if previous["value_rule"] != signature["value_rule"]:
                     issue(
                         issues,

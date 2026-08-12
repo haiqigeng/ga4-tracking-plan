@@ -198,7 +198,7 @@ def classify_regions(
             )
             >= 3
         ):
-            parameter_reference = candidate
+            parameter_reference = {**candidate, "semantic_role": "all_used_parameters"}
     return event_matrix, parameter_reference, data_layer_table
 
 
@@ -276,10 +276,16 @@ def inspect(path: Path) -> dict[str, Any]:
         review.append("No semantic Event Matrix region was recognized.")
     if not parameter_reference:
         review.append("No semantic Parameter Reference region was recognized.")
+    elif "custom dimension" in normalize(parameter_reference.get("sheet", "")):
+        review.append(
+            "The recognized parameter sheet is named like a custom-dimensions registry. "
+            "The mapping defaults to semantic_role=all_used_parameters; change it to "
+            "custom_parameters_only only when the template owner explicitly confirms that contract."
+        )
     if not event_tabs and not data_layer_table:
         review.append("No event-tab or dataLayer-table region was recognized; do not add sections without template approval.")
     return {
-        "mapping_version": "1.0",
+        "mapping_version": "1.1",
         "template": {
             "path": str(path.resolve()),
             "sha256": sha256(path),

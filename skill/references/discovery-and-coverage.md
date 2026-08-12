@@ -9,8 +9,12 @@ request is a journey-coverage problem, not a request to crawl every URL.
    robots, all reachable sitemap branches, navigation, footer, and rendered
    links. Preserve link text and component evidence even when the URL was
    already found in a sitemap.
-2. Group candidates by business journey, page template, route family, and
-   interaction family. Repeated product or article URLs do not count as new
+2. Classify page purpose from weighted route, title, headings, main content,
+   and local component evidence. Ignore global header/footer copy, use
+   whole-word multilingual matching, and retain an `unknown` result with
+   competing candidates when evidence is ambiguous. Group candidates by
+   business journey, page archetype, route family, and interaction family.
+   Repeated product or article URLs do not count as new
    coverage unless they expose a materially different template or behavior.
 3. Render at least one representative of every material group. Inspect menus,
    forms, filters, sorting, variants, promotions, carts, account entry,
@@ -26,14 +30,24 @@ request is a journey-coverage problem, not a request to crawl every URL.
 6. The rendered helper inspects the coverage ledger after each round and
    automatically continues with unvisited material families until closure or
    the explicit maximum-round boundary. A page limit ends only one round.
-7. Stop only when each material journey, variant, and interaction is observed,
-   confirmed by another source, deliberately excluded, or bounded with a
-   concrete gap. Never translate `partial` into `complete` in the delivery
-message.
+7. Inventory bounded interaction families such as tabbed forms, locator
+   selection, coupon application, FAQ accordions, meaningful downloads,
+   business-process errors, modals, and filter/sort application. Record one
+   decision per family and variant, not one event per control.
+8. Stop only when each material journey, variant, and interaction family is
+   observed, confirmed by another source, deliberately excluded, or bounded
+   with a concrete gap. Never translate `partial` into `complete` in the
+   delivery message.
 
 A structurally valid `partial` report is successful discovery output: continue
 with it, expose its explicit gaps, and resolve them in the analysis context.
 Only `blocked`, where no usable rendered evidence exists, stops the pipeline.
+
+Use factual boundary states precisely: `not_tested` for work not attempted or
+outside the sampling budget, `partial` for evidence that covers only part of a
+journey, and `externally_blocked` for an evidenced CAPTCHA, access, browser, or
+technical barrier. Analyst resolutions such as excluded or confirmed
+elsewhere are separate fields; they must not rewrite the factual state.
 
 ## Measurement-Opportunity Ledger
 
@@ -63,16 +77,20 @@ test that prevents both missing custom events and click-inventory inflation.
 Discovery hints have two materiality states. `material` means the rendered
 journey itself establishes an outcome or progression that needs an explicit
 analyst decision. `candidate` means a heuristic found a potentially useful
-control or diagnostic. Candidates still need a measure/exclude decision, but
-they do not block delivery merely because the pattern was detected; the
-analyst promotes them only when a real business question justifies it.
+control or diagnostic. Candidates do not imply measurement, but every
+generated candidate must still receive a measure/exclude decision before
+delivery. The analyst measures it only when a real business question justifies
+it; exclusion is a valid closure.
 
 Run `build_analysis_context_seed.py` against the original discovery report.
 It creates one unresolved opportunity for every hint and records the exact
 report hash and inventories. Delivery must receive that same report and blocks
 on a hash mismatch, an omitted hint, journey, or variant, or an unresolved
-material opportunity. This is the mechanical closure between exploration and
-analyst reasoning; it does not automate the measure/exclude decision.
+opportunity. This is the mechanical closure between exploration and analyst
+reasoning; it does not automate the measure/exclude decision. Once a decision
+is made, seed placeholders are invalid. A manually added measured opportunity
+based on live evidence must retain an exact URL, route, component, or evidence
+locator.
 
 ## Common Whole-Site Families
 

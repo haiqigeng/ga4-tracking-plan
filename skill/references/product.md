@@ -90,8 +90,9 @@ The result is ready when:
    and post-conversion states are covered or their unresolved boundary is
    stated without fabricated site behavior.
 2. Every material journey has a resolved measurement-opportunity ledger, every
-   measured opportunity maps to an event, and every non-context event maps back
-   to a concrete opportunity.
+   generated interaction-family candidate has an explicit measure/exclude
+   decision, every measured opportunity maps to an event, and every
+   non-context event maps back to a concrete opportunity.
 3. Official semantics are current and correctly applied.
 4. Custom semantics have a concrete official gap and business need.
 5. Each event contains only its own parameters.
@@ -109,14 +110,16 @@ The result is ready when:
    User-ID is mapped as a GA4 configuration setting rather than an event
    parameter or user property.
 13. Material journey coverage and every finite or dynamic value-domain decision are backed by the
-    validated analysis context; sample caps and blocked states are explicit.
+    validated analysis context; not-tested, partial, and externally blocked
+    states are explicit and distinct from analyst resolution.
 14. Every discovery hint and journey is hash-bound to an explicit opportunity
     or coverage row, and every controlled finite value has one localized label
     in the selected workbook language.
 15. The rendered workbook, event schemas, expected-events contract, official
     check, and hash-stamped handoff all validate as one delivery.
 16. Visible workbook edits cannot be silently overridden by an older embedded
-    model, and supplied-template content outside mapped regions is unchanged.
+    model, supplied-template content outside mapped regions is unchanged, and
+    every mapped semantic region matches the canonical model.
 
 ## Non-Goals
 

@@ -10,9 +10,17 @@ print settings. Map tracking-plan semantics into the corresponding regions.
 - Do not add tabs, columns, or redesigned sections without approval.
 - Use semantic table and field mappings rather than a fixed list of unrelated
   cell writes.
+- Assign the mapped parameter registry `all_used_parameters` by default. Use
+  `custom_parameters_only` only when the template's intended semantic role is
+  explicitly confirmed; a sheet title alone is not sufficient evidence.
 - Keep a before/after fidelity report internal.
 - If essential information has no legitimate location, report the exact
   conflict instead of silently redesigning the workbook.
+- After saving, validate the Event Matrix, parameter registry, mapped event
+  tabs, and dataLayer regions against the same canonical event objects.
+- Reject overlapping merged-cell ranges after saving; Excel repairs such
+  overlaps by removing records even when a Python workbook reader accepts the
+  package.
 
 ## Default Template
 
@@ -99,6 +107,8 @@ content. If visible cells change, import must either reconcile supported
 event-tab edits into canonical JSON or stop with exact conflicts. Event names,
 journey membership, locations, parameter identity or scope, wrapper structure,
 and dataLayer keys are structural and must be changed in canonical JSON.
+Report structural conflicts precisely; do not auto-merge ambiguous additions,
+removals, or renames merely because they were visible in a workbook.
 
 Internal `business_question` values justify the event model during design and
 coherence review. Do not expose them as a default workbook column or section.

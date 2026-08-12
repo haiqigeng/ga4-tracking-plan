@@ -111,6 +111,12 @@
           "type": "string",
           "const": "event"
         },
+        "code_format": {
+          "enum": ["javascript_fragment", "html_script"]
+        },
+        "initialize_data_layer": {
+          "type": "boolean"
+        },
         "wrappers": {
           "type": "object",
           "additionalProperties": false,

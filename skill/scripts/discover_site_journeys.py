@@ -6,6 +6,7 @@ import json
 import math
 import re
 import time
+import unicodedata
 from dataclasses import asdict, dataclass
 from html.parser import HTMLParser
 from pathlib import Path
@@ -176,70 +177,159 @@ def parse_sitemap(
     return locations[:limit]
 
 
-def infer_template(url: str, text: str = "") -> str:
-    path = urlparse(url).path.lower()
-    corpus = f"{path} {text}".casefold()
+def normalize_signal_text(value: Any) -> str:
+    """Normalize multilingual page evidence without enabling substring matches."""
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(character for character in text if not unicodedata.combining(character))
+    return re.sub(r"[^a-z0-9]+", " ", text.casefold()).strip()
+
+
+def signal_contains_phrase(value: Any, phrase: str) -> bool:
+    corpus = normalize_signal_text(value)
+    normalized_phrase = normalize_signal_text(phrase)
+    if not corpus or not normalized_phrase:
+        return False
+    expression = r"(?<![a-z0-9])" + re.escape(normalized_phrase).replace(r"\ ", r"\s+") + r"(?![a-z0-9])"
+    return re.search(expression, corpus) is not None
+
+
+ARCHETYPE_PHRASES: dict[str, tuple[str, ...]] = {
+    "checkout": ("checkout", "paiement", "payment", "finaliser commande", "passer commande"),
+    "cart": ("cart", "panier", "basket"),
+    "post_purchase": (
+        "order history",
+        "mes commandes",
+        "historique commande",
+        "retour commande",
+        "return order",
+        "annuler commande",
+        "cancel order",
+        "remboursement",
+        "refund",
+    ),
+    "account": ("account", "mon compte", "espace client", "login", "connexion", "sign up", "inscription"),
+    "lead_form": ("demande de devis", "devis", "quote", "estimate", "estimation", "mon projet", "simulation"),
+    "appointment": ("rendez vous", "appointment", "booking", "reservation"),
+    "catalogue": ("catalogue", "catalog", "brochure"),
+    "newsletter": ("newsletter", "infolettre", "lettre d information"),
+    "wishlist": ("wishlist", "favori", "favorite", "liste d envies"),
+    "promotion": ("promotion", "promo", "offre speciale", "soldes", "discount", "bon plan"),
+    "store_locator": (
+        "store locator",
+        "localisateur",
+        "trouver un magasin",
+        "trouver une station",
+        "point de vente",
+        "points de vente",
+        "station service",
+        "magasin",
+        "agence",
+        "showroom",
+    ),
+    "configurator": ("configurateur", "configurator", "personnaliser", "customize"),
+    "support_or_contact": ("contact", "nous contacter", "help", "aide", "faq", "service client"),
+    "search_results": ("search results", "resultats de recherche", "recherche", "search"),
+    "product_detail": ("fiche produit", "product detail", "produit", "product"),
+    "listing": ("category", "categorie", "collection", "boutique", "filter", "filtre", "sort", "trier"),
+}
+
+
+ARCHETYPE_ROUTE_PATTERNS: dict[str, tuple[str, ...]] = {
+    "product_detail": (r"/(?:p|products?|produits?)/[^/]+/?$",),
+    "listing": (
+        r"/(?:products?|produits?)/?$",
+        r"/(?:category|categorie|collection|boutique)(?:/|$)",
+    ),
+    "store_locator": (r"/(?:store-locator|localisateur|magasins?|agences?|showrooms?|points?-de-vente|stations?-service)(?:/|$)",),
+    "support_or_contact": (r"/(?:contact|aide|help|faq|service-client)(?:/|$)",),
+    "post_purchase": (r"/(?:order-history|mes-commandes|retours?|returns?|remboursements?|refunds?)(?:/|$)",),
+    "lead_form": (r"/(?:devis|quote|estimate|estimation|mon-projet|simulation)(?:/|$)",),
+    "appointment": (r"/(?:rendez-vous|appointment|booking|reservation)(?:/|$)",),
+    "catalogue": (r"/(?:catalogue|catalog|brochure)(?:/|$)",),
+    "account": (r"/(?:account|compte|login|connexion|inscription|sign-up)(?:/|$)",),
+    "checkout": (r"/(?:checkout|paiement|payment|commande)(?:/|$)",),
+    "cart": (r"/(?:cart|panier|basket)(?:/|$)",),
+    "search_results": (r"/(?:search|recherche)(?:/|$)",),
+    "promotion": (r"/(?:promotions?|promo|soldes|offres-speciales?)(?:/|$)",),
+    "configurator": (r"/(?:configurateur|configurator)(?:/|$)",),
+}
+
+
+def classify_page_archetype(
+    url: str,
+    surfaces: dict[str, Any] | None = None,
+    *,
+    text: str = "",
+) -> dict[str, Any]:
+    """Classify the page purpose from weighted local surfaces.
+
+    Global header/footer copy is deliberately ignored. The result retains
+    competing candidates so uncertain pages become an exploration target
+    instead of being silently forced into a wrong journey.
+    """
+    path = urlparse(url).path or "/"
     if path in {"", "/"}:
-        return "homepage"
-    if any(token in corpus for token in ["checkout", "commande", "payment", "paiement"]):
-        return "checkout"
-    if any(token in corpus for token in ["cart", "panier", "basket"]):
-        return "cart"
-    if any(
-        token in corpus
-        for token in [
-            "order-history",
-            "order history",
-            "mes commandes",
-            "historique commande",
-            "return",
-            "retour",
-            "cancel order",
-            "annuler commande",
-            "refund",
-            "remboursement",
-        ]
-    ):
-        return "post_purchase"
-    if any(token in corpus for token in ["account", "compte", "login", "connexion", "sign up", "inscription"]):
-        return "account"
-    if any(token in corpus for token in ["devis", "quote", "estimate", "estimation", "mon-projet", "simulation"]):
-        return "lead_form"
-    if any(token in corpus for token in ["rendez-vous", "appointment", "booking", "reservation"]):
-        return "appointment"
-    if any(token in corpus for token in ["catalogue", "catalog", "brochure"]):
-        return "catalogue"
-    if any(token in corpus for token in ["newsletter", "infolettre", "lettre d'information"]):
-        return "newsletter"
-    if any(token in corpus for token in ["wishlist", "favori", "favorite", "liste d'envies"]):
-        return "wishlist"
-    if any(token in corpus for token in ["promotion", "promo", "offre", "soldes", "discount"]):
-        return "promotion"
-    if any(token in corpus for token in ["magasin", "store", "agence", "showroom"]):
-        return "store_locator"
-    if any(token in corpus for token in ["configurateur", "configurator", "personnaliser", "customize"]):
-        return "configurator"
-    if any(token in corpus for token in ["contact", "help", "aide", "faq", "service-client"]):
-        return "support_or_contact"
-    if any(token in corpus for token in ["search", "recherche"]):
-        return "search_results"
-    if re.search(r"/p/|/product|/produit", path):
-        return "product_detail"
-    if any(
-        token in corpus
-        for token in [
-            "category",
-            "categorie",
-            "collection",
-            "boutique",
-            "filter",
-            "filtre",
-            "sort",
-            "trier",
-        ]
-    ):
-        return "listing"
-    return "content_or_other"
+        return {
+            "primary": "homepage",
+            "confidence": "high",
+            "candidates": [{"template": "homepage", "score": 100, "reasons": ["root route"]}],
+        }
+
+    provided = surfaces or {}
+    weighted_surfaces: tuple[tuple[str, Any, int], ...] = (
+        ("title", provided.get("title", ""), 6),
+        ("headings", provided.get("headings", ""), 6),
+        ("main", provided.get("main", provided.get("main_text", "")), 2),
+        ("components", provided.get("components", ""), 3),
+        # Backward-compatible text is intentionally weak because historical
+        # callers passed every visible control, including global navigation.
+        ("legacy_text", text, 1),
+    )
+    scores = {template: 0 for template in ARCHETYPE_PHRASES}
+    reasons: dict[str, list[str]] = {template: [] for template in ARCHETYPE_PHRASES}
+    decomposed_path = unicodedata.normalize("NFKD", path)
+    decomposed_path = "".join(character for character in decomposed_path if not unicodedata.combining(character))
+    normalized_path = re.sub(r"[^a-z0-9/]+", "-", decomposed_path.casefold())
+    for template, patterns in ARCHETYPE_ROUTE_PATTERNS.items():
+        if any(re.search(pattern, normalized_path) for pattern in patterns):
+            scores[template] += 12
+            reasons[template].append("route pattern")
+    for surface_name, value, weight in weighted_surfaces:
+        if not value:
+            continue
+        if isinstance(value, (list, tuple, set)):
+            value = " ".join(str(item) for item in value)
+        for template, phrases in ARCHETYPE_PHRASES.items():
+            matches = [phrase for phrase in phrases if signal_contains_phrase(value, phrase)]
+            if not matches:
+                continue
+            scores[template] += weight + min(2, len(matches) - 1)
+            reasons[template].append(f"{surface_name}: {', '.join(matches[:3])}")
+
+    ranked = sorted(
+        (
+            {"template": template, "score": score, "reasons": reasons[template]}
+            for template, score in scores.items()
+            if score > 0
+        ),
+        key=lambda item: (-int(item["score"]), str(item["template"])),
+    )
+    top_score = int(ranked[0]["score"]) if ranked else 0
+    second_score = int(ranked[1]["score"]) if len(ranked) > 1 else 0
+    ambiguous = second_score >= 5 and top_score - second_score < 2
+    primary = str(ranked[0]["template"]) if top_score >= 5 and not ambiguous else "unknown"
+    confidence = "high" if primary != "unknown" and top_score >= 12 and top_score - second_score >= 4 else ("medium" if primary != "unknown" else "low")
+    return {
+        "primary": primary,
+        "confidence": confidence,
+        "candidates": ranked[:5],
+    }
+
+
+def infer_template(url: str, text: str = "") -> str:
+    """Compatibility wrapper for URL and concise link-label candidates."""
+    surfaces = {"headings": text} if text else None
+    return str(classify_page_archetype(url, surfaces)["primary"])
 
 
 def infer_journey(template: str) -> str:
@@ -261,6 +351,7 @@ def infer_journey(template: str) -> str:
         "configurator": "configuration",
         "support_or_contact": "support_contact",
         "post_purchase": "post_purchase_service",
+        "unknown": "content_navigation",
     }
     return mapping.get(template, "content_navigation")
 

@@ -81,7 +81,7 @@ class DiscoveryVariantTests(unittest.TestCase):
         lead = next(item for item in ledger if item["journey_id"] == "lead_generation")
         statuses = {variant["variant_id"]: variant["status"] for variant in lead["variant_coverage"]}
         self.assertEqual(statuses[recipes[0]["variant_id"]], "observed")
-        self.assertEqual(statuses[recipes[1]["variant_id"]], "partial")
+        self.assertEqual(statuses[recipes[1]["variant_id"]], "not_tested")
         self.assertEqual(lead["status"], "partial")
 
     def test_contextual_hints_are_not_deduplicated_across_journeys(self) -> None:

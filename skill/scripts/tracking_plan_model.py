@@ -299,14 +299,23 @@ def compact_value(value: Any) -> str:
     return str(value)
 
 
-def datalayer_code(event: dict[str, Any]) -> str:
+def datalayer_code(
+    event: dict[str, Any],
+    convention: dict[str, Any] | None = None,
+) -> str:
     data_layer = event.get("data_layer", {})
-    lines = ["window.dataLayer = window.dataLayer || [];"]
+    convention = convention or {}
+    lines: list[str] = []
+    if convention.get("initialize_data_layer", True):
+        lines.append("window.dataLayer = window.dataLayer || [];")
     for key in data_layer.get("clear", []):
         lines.append(f"window.dataLayer.push({json.dumps({str(key): None}, ensure_ascii=False)});")
     push = data_layer.get("push", {})
     lines.append("window.dataLayer.push(" + json.dumps(push, ensure_ascii=False, indent=2) + ");")
-    return "\n".join(lines)
+    rendered = "\n".join(lines)
+    if convention.get("code_format", "javascript_fragment") == "html_script":
+        return "<script>\n" + "\n".join(f"    {line}" if line else "" for line in rendered.splitlines()) + "\n</script>"
+    return rendered
 
 
 def flatten_push_paths(value: Any, prefix: str = "") -> set[str]:
@@ -353,7 +362,12 @@ def path_exists(value: Any, path: str) -> bool:
     return True
 
 
-def parameter_reference_rows(plan: dict[str, Any]) -> list[dict[str, Any]]:
+def parameter_reference_rows(
+    plan: dict[str, Any],
+    semantic_role: str = "all_used_parameters",
+) -> list[dict[str, Any]]:
+    if semantic_role not in {"all_used_parameters", "custom_parameters_only"}:
+        raise ValueError(f"Unknown parameter-reference semantic role: {semantic_role}")
     grouped: dict[tuple[str, str], dict[str, Any]] = {}
     for event in plan.get("events", []):
         if not isinstance(event, dict):
@@ -375,11 +389,20 @@ def parameter_reference_rows(plan: dict[str, Any]) -> list[dict[str, Any]]:
                     "rule": value_rule_text(parameter, plan),
                     "possible_values_or_example": possible_values_or_example(parameter),
                     "events": [],
+                    "_classifications": set(),
                 }
             if event_name not in grouped[key]["events"]:
                 grouped[key]["events"].append(event_name)
+            grouped[key]["_classifications"].add(str(parameter.get("classification", "")))
+    selected = [
+        row
+        for row in grouped.values()
+        if semantic_role == "all_used_parameters" or "custom" in row["_classifications"]
+    ]
+    for row in selected:
+        row.pop("_classifications", None)
     return sorted(
-        grouped.values(),
+        selected,
         key=lambda row: (str(row["name"]), str(row["scope"]), " | ".join(row["events"])),
     )
 

@@ -125,7 +125,7 @@ def _event_matrix_value(plan: dict[str, Any], event: dict[str, Any], field: str)
             for parameter in event.get("parameters", [])
             if isinstance(parameter, dict)
         ),
-        "datalayer": datalayer_code(event),
+        "datalayer": datalayer_code(event, plan.get("data_layer_convention")),
         "notes": event.get("notes", ""),
     }
     return values.get(field, "")
@@ -205,7 +205,7 @@ def _fill_event_tab(
     if mapping.get("data_layer_cell"):
         set_cell_value(
             sheet[str(mapping["data_layer_cell"])],
-            datalayer_code(event),
+            datalayer_code(event, plan.get("data_layer_convention")),
         )
 
 
@@ -352,7 +352,10 @@ def adapt(
     _fill_region(
         workbook,
         parameter_reference,
-        parameter_reference_rows(plan),
+        parameter_reference_rows(
+            plan,
+            str(parameter_reference.get("semantic_role", "all_used_parameters")),
+        ),
         lambda item, field: _reference_value(plan, item, field),
     )
     if data_layer_table:

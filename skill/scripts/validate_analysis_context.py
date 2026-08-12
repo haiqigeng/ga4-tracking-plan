@@ -37,6 +37,10 @@ LIKELY_FINITE_PARAMETERS = {
     "page_type",
     "user_status",
 }
+PLACEHOLDER_OPPORTUNITY_PATTERN = re.compile(
+    r"(?:pending analyst review|pending_official_evaluation|what decision should the observed)",
+    re.I,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -107,6 +111,118 @@ def _plan_parameters(
     return result
 
 
+def _validate_semantic_domain_duplicates(
+    domains: list[dict[str, Any]],
+    issues: list[Issue],
+) -> None:
+    semantic_domains: dict[str, str] = {}
+    semantic_keys = (
+        "parameter_name",
+        "scope",
+        "kind",
+        "normalization",
+        "value_language",
+        "complete",
+        "values",
+        "value_labels",
+        "label_generation_rule",
+        "rule",
+        "dynamic_reason",
+    )
+    for index, domain in enumerate(domains):
+        payload = {key: domain.get(key) for key in semantic_keys if key in domain}
+        signature = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        previous_id = semantic_domains.get(signature)
+        if previous_id:
+            issue(
+                issues,
+                "error",
+                "VALUE_DOMAIN_SEMANTIC_DUPLICATE",
+                f"$.value_domains[{index}]",
+                (
+                    f"Value domain '{domain.get('domain_id')}' duplicates '{previous_id}'. "
+                    "Merge their applicable event names and evidence into one reusable domain."
+                ),
+            )
+        else:
+            semantic_domains[signature] = str(domain.get("domain_id", ""))
+
+
+def _validate_opportunity_provenance(
+    opportunity: dict[str, Any],
+    index: int,
+    hint_ids: set[str],
+    known_sources: set[str],
+    live_source_ids: set[str],
+    delivery: bool,
+    issues: list[Issue],
+) -> None:
+    locations = [item for item in opportunity.get("evidence_locations", []) if isinstance(item, dict)]
+    unknown_location_sources = sorted(
+        {
+            str(location.get("source_id", ""))
+            for location in locations
+            if str(location.get("source_id", "")) not in known_sources
+        }
+    )
+    if unknown_location_sources:
+        issue(
+            issues,
+            "error",
+            "OPPORTUNITY_LOCATION_UNKNOWN_EVIDENCE",
+            f"$.measurement_opportunities[{index}].evidence_locations",
+            "Unknown evidence source IDs: " + ", ".join(unknown_location_sources),
+        )
+    if delivery and hint_ids and opportunity.get("decision") == "unresolved":
+        issue(
+            issues,
+            "error",
+            "DISCOVERY_OPPORTUNITY_UNRESOLVED",
+            f"$.measurement_opportunities[{index}]",
+            (
+                f"Discovery-backed opportunity '{opportunity.get('opportunity_id')}' still needs an explicit "
+                "measure or exclude decision. Candidate does not mean silently optional."
+            ),
+        )
+    if delivery and opportunity.get("decision") != "unresolved":
+        prose = " ".join(
+            str(opportunity.get(key, ""))
+            for key in ("business_question", "official_candidate", "decision_reason")
+        )
+        if PLACEHOLDER_OPPORTUNITY_PATTERN.search(prose):
+            issue(
+                issues,
+                "error",
+                "OPPORTUNITY_PLACEHOLDER_TEXT",
+                f"$.measurement_opportunities[{index}]",
+                "A decided opportunity still contains seed placeholder text; replace it with the actual business and official-semantics decision.",
+            )
+    live_refs = set(str(value) for value in opportunity.get("evidence_refs", [])) & live_source_ids
+    if delivery and opportunity.get("decision") == "measure" and not hint_ids and live_refs and not locations:
+        issue(
+            issues,
+            "error",
+            "MEASURED_LIVE_OPPORTUNITY_LOCATION_MISSING",
+            f"$.measurement_opportunities[{index}].evidence_locations",
+            "A manually added live-site opportunity needs an exact URL, route, component, or evidence locator.",
+        )
+
+
+def _validate_gap_evidence_state(gap: dict[str, Any], issues: list[Issue]) -> None:
+    if gap.get("evidence_state") != "not_tested" or gap.get("resolution") != "blocked":
+        return
+    issue(
+        issues,
+        "error",
+        "UNTESTED_GAP_MISLABELLED_BLOCKED",
+        "$.coverage_gaps",
+        (
+            f"Coverage gap '{gap.get('gap_id')}' was not tested, so it cannot be closed as blocked. "
+            "Test it, exclude it with an analyst reason, or leave it unresolved."
+        ),
+    )
+
+
 def validate_analysis_context(
     context: dict[str, Any],
     plan: dict[str, Any] | None = None,
@@ -149,7 +265,14 @@ def validate_analysis_context(
                 f"Duplicate {label} IDs: {', '.join(duplicate_values)}.",
             )
 
+    _validate_semantic_domain_duplicates(domains, issues)
+
     known_sources = set(source_ids)
+    live_source_ids = {
+        str(item.get("source_id", ""))
+        for item in sources
+        if item.get("source_type") == "live_website"
+    }
     language_decision = context.get("language_decision", {})
     unknown_language_refs = sorted(set(str(value) for value in language_decision.get("evidence_refs", [])) - known_sources)
     if unknown_language_refs:
@@ -295,6 +418,15 @@ def validate_analysis_context(
                 f"$.measurement_opportunities[{index}].discovery_hint_ids",
                 "Unknown discovery hint IDs: " + ", ".join(unknown_hints),
             )
+        _validate_opportunity_provenance(
+            opportunity,
+            index,
+            hint_ids,
+            known_sources,
+            live_source_ids,
+            delivery,
+            issues,
+        )
         variant_id = str(opportunity.get("variant_id", ""))
         journey_id = str(opportunity.get("journey_id", ""))
         if variant_id and variant_id not in known_discovery_variants and discovery_reports:
@@ -374,6 +506,7 @@ def validate_analysis_context(
         gaps_by_journey.setdefault(gap_journey_id, []).append(gap)
         if gap_variant_id:
             gaps_by_variant.setdefault((gap_journey_id, gap_variant_id), []).append(gap)
+        _validate_gap_evidence_state(gap, issues)
         if delivery and gap.get("material") is True and gap.get("resolution") == "unresolved":
             issue(
                 issues,
@@ -396,7 +529,7 @@ def validate_analysis_context(
                 f"$.journey_coverage[{index}].evidence_refs",
                 f"Journey '{journey_id}' with status '{status}' needs evidence.",
             )
-        if delivery and material and status in {"partial", "blocked"}:
+        if delivery and material and status in {"partial", "not_tested", "externally_blocked", "blocked"}:
             resolved = any(
                 gap.get("resolution") in {"confirmed_elsewhere", "excluded", "blocked"}
                 for gap in gaps_by_journey.get(journey_id, [])
@@ -440,7 +573,7 @@ def validate_analysis_context(
                     variant_path,
                     f"Material variant '{variant_id}' needs an explicit measurement-opportunity decision.",
                 )
-            if delivery and variant_material and variant_status in {"partial", "blocked"}:
+            if delivery and variant_material and variant_status in {"partial", "not_tested", "externally_blocked", "blocked"}:
                 variant_resolved = any(
                     gap.get("resolution") in {"confirmed_elsewhere", "excluded", "blocked"}
                     for gap in gaps_by_variant.get((journey_id, variant_id), [])

@@ -17,12 +17,14 @@ from discover_site_journeys import (
     USER_AGENT,
     SourceError,
     canonical_url,
+    classify_page_archetype,
     clean_text,
     discover_robots,
     infer_journey,
     infer_template,
     parse_sitemap,
     same_host,
+    signal_contains_phrase,
     summarize_journeys,
 )
 from discovery_contract import validate_discovery_report
@@ -186,8 +188,8 @@ def candidate_priority(
     url = str(candidate.get("url", ""))
     if canonical_url(url) == canonical_url(root_url):
         return 10_000
-    corpus = f"{url} {candidate.get('text', '')}".casefold()
-    score = max((weight for token, weight in JOURNEY_TOKENS.items() if token in corpus), default=250)
+    corpus = f"{url} {candidate.get('text', '')}"
+    score = max((weight for token, weight in JOURNEY_TOKENS.items() if signal_contains_phrase(corpus, token)), default=250)
     template = infer_template(url, str(candidate.get("text", "")))
     observed_count = 0
     if isinstance(observed_templates, dict):
@@ -313,7 +315,7 @@ def family_for_template(template: str, url: str) -> str:
         "configurator",
     }:
         return f"{template}:{_route_variant(url)}"
-    if template == "content_or_other":
+    if template in {"content_or_other", "unknown"}:
         return f"{template}:{_route_variant(url)}"
     return template
 
@@ -328,6 +330,253 @@ def journey_variant_id(template: str, url: str) -> str:
 
 def candidate_family(url: str, text: str = "") -> str:
     return family_for_template(infer_template(url, text), url)
+
+
+def _capability_context(page: dict[str, Any]) -> dict[str, Any]:
+    surfaces = page.get("page_surfaces", {}) if isinstance(page.get("page_surfaces"), dict) else {}
+    counts = surfaces.get("semantic_counts", {}) if isinstance(surfaces.get("semantic_counts"), dict) else {}
+    forms = [item for item in page.get("forms", []) if isinstance(item, dict)]
+    controls = [item for item in page.get("interactive_controls", []) if isinstance(item, dict)]
+    control_parts = [
+        " ".join(
+            [
+                str(item.get("type", "")),
+                str(item.get("name", "")),
+                str(item.get("id", "")),
+                str(item.get("label", "")),
+                " ".join(str(value) for value in item.get("option_labels", [])),
+            ]
+        )
+        for item in controls
+    ]
+    form_parts = [
+        " ".join(
+            [
+                str(form.get("id", "")),
+                str(form.get("name", "")),
+                *[
+                    " ".join(str(field.get(key, "")) for key in ("name", "id", "label"))
+                    for field in form.get("fields", [])
+                    if isinstance(field, dict)
+                ],
+            ]
+        )
+        for form in forms
+    ]
+    corpus = " ".join(
+        [
+            str(surfaces.get("title", "")),
+            " ".join(str(value) for value in surfaces.get("headings", [])),
+            str(surfaces.get("main_text", "")),
+            *control_parts,
+            *form_parts,
+        ]
+    )
+    return {
+        "url": str(page.get("url", "")),
+        "template": str(page.get("template", "unknown")),
+        "counts": counts,
+        "forms": forms,
+        "controls": controls,
+        "corpus": corpus,
+        "tab_count": int(counts.get("tab", 0) or 0) + sum(str(item.get("type", "")) == "tab" for item in controls),
+        "tablist_count": int(counts.get("tablist", 0) or 0) + sum(str(item.get("type", "")) == "tablist" for item in controls),
+    }
+
+
+def _semantic_count(context: dict[str, Any], name: str) -> int:
+    return int(context["counts"].get(name, 0) or 0)
+
+
+def _has_local_phrase(context: dict[str, Any], phrases: tuple[str, ...]) -> bool:
+    return any(signal_contains_phrase(context["corpus"], phrase) for phrase in phrases)
+
+
+def _capability(
+    context: dict[str, Any],
+    family: str,
+    category: str,
+    materiality: str,
+    reason: str,
+    evidence: list[str],
+) -> dict[str, Any]:
+    digest = hashlib.sha256(f"{family}|{context['url']}".encode("utf-8")).hexdigest()[:10]
+    return {
+        "capability_id": _identifier(f"capability_{family}_{digest}", maximum=119),
+        "family": family,
+        "category": category,
+        "materiality": materiality,
+        "reason": reason,
+        "evidence": sorted(set(evidence)),
+    }
+
+
+def _tabbed_form_capability(context: dict[str, Any]) -> dict[str, Any] | None:
+    if not context["forms"] or (context["tab_count"] < 2 and context["tablist_count"] < 1):
+        return None
+    return _capability(
+        context,
+        "tabbed_form",
+        "outcome",
+        "material",
+        "Distinct form tabs can represent different intents or outcomes and require an explicit shared-versus-separate measurement decision.",
+        [f"forms:{len(context['forms'])}", f"tabs:{max(context['tab_count'], _semantic_count(context, 'tab'))}"],
+    )
+
+
+def _locator_capability(context: dict[str, Any]) -> dict[str, Any] | None:
+    locator_language = _has_local_phrase(context, ("sur la carte", "on the map", "selectionnez une station", "select a store"))
+    if context["template"] != "store_locator" or not (_semantic_count(context, "map") or _semantic_count(context, "locator_result") or locator_language):
+        return None
+    return _capability(
+        context,
+        "locator_selection",
+        "interaction",
+        "material",
+        "A locator result or map selection is a distinct decision point after the search itself.",
+        [f"maps:{_semantic_count(context, 'map')}", f"results:{_semantic_count(context, 'locator_result')}"],
+    )
+
+
+def _faq_capability(context: dict[str, Any]) -> dict[str, Any] | None:
+    has_accordion = _semantic_count(context, "details") or _semantic_count(context, "accordion")
+    has_faq_context = context["template"] == "support_or_contact" or _has_local_phrase(context, ("faq",))
+    if not has_accordion or not has_faq_context:
+        return None
+    return _capability(
+        context,
+        "faq_accordion",
+        "interaction",
+        "candidate",
+        "FAQ expansion may reveal unresolved support needs, but should be measured only when the resulting question is useful.",
+        [f"details:{_semantic_count(context, 'details')}", f"accordions:{_semantic_count(context, 'accordion')}"],
+    )
+
+
+def _coupon_capability(context: dict[str, Any]) -> dict[str, Any] | None:
+    if not _has_local_phrase(context, ("code promo", "promotion code", "coupon", "voucher")):
+        return None
+    return _capability(
+        context,
+        "coupon_application",
+        "diagnostic",
+        "material" if context["template"] in {"cart", "checkout"} else "candidate",
+        "Coupon submission success and failure can explain conversion friction and discount use.",
+        ["local control or field mentions a coupon/promotion code"],
+    )
+
+
+def _counted_capability(
+    context: dict[str, Any],
+    count_name: str,
+    family: str,
+    category: str,
+    reason: str,
+    evidence_label: str,
+) -> dict[str, Any] | None:
+    count = _semantic_count(context, count_name)
+    if not count:
+        return None
+    return _capability(context, family, category, "candidate", reason, [f"{evidence_label}:{count}"])
+
+
+def _error_capability(context: dict[str, Any]) -> dict[str, Any] | None:
+    error_language = _has_local_phrase(
+        context,
+        ("payment failed", "paiement refuse", "erreur de paiement", "une erreur est survenue"),
+    )
+    if not _semantic_count(context, "error") and not error_language:
+        return None
+    return _capability(
+        context,
+        "meaningful_error",
+        "diagnostic",
+        "material",
+        "An observed business-process error can explain funnel loss and requires an explicit diagnostic decision.",
+        [f"visible_error_regions:{_semantic_count(context, 'error')}"],
+    )
+
+
+def _filter_capability(context: dict[str, Any]) -> dict[str, Any] | None:
+    if not _has_local_phrase(context, ("filter", "filtre", "sort", "trier", "tri")):
+        return None
+    return _capability(
+        context,
+        "filter_sort",
+        "interaction",
+        "candidate",
+        "Applied filters or sorting may explain discovery behavior without requiring one event per control.",
+        ["local filter or sort control"],
+    )
+
+
+def _configurator_capability(context: dict[str, Any]) -> dict[str, Any] | None:
+    if context["template"] != "configurator" or not (context["forms"] or context["controls"]):
+        return None
+    return _capability(
+        context,
+        "configurator_progression",
+        "progression",
+        "material",
+        "Meaningful configurator progression and completion require an explicit measurement decision.",
+        [f"forms:{len(context['forms'])}", f"controls:{len(context['controls'])}"],
+    )
+
+
+def detect_interaction_capabilities(page: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return one evidence record per family, never one event per control."""
+    context = _capability_context(page)
+    capabilities = [
+        _tabbed_form_capability(context),
+        _locator_capability(context),
+        _faq_capability(context),
+        _coupon_capability(context),
+        _counted_capability(
+            context,
+            "dialog",
+            "modal_dialog",
+            "interaction",
+            "A modal can contain a material gated choice or form; its business purpose must be reviewed before measurement.",
+            "dialogs",
+        ),
+        _counted_capability(
+            context,
+            "download",
+            "download",
+            "outcome",
+            "A download can be a meaningful outcome such as an application, brochure, or document acquisition.",
+            "download_links",
+        ),
+        _error_capability(context),
+        _filter_capability(context),
+        _configurator_capability(context),
+    ]
+    return sorted(
+        (item for item in capabilities if item is not None),
+        key=lambda item: str(item["family"]),
+    )
+
+
+def _interaction_run_coverage(run: dict[str, Any]) -> tuple[str | None, str | None]:
+    if run.get("outcome") == "completed":
+        return "observed", "success"
+    if run.get("observed_state") == "failure":
+        return "partial", "failure"
+    if run.get("outcome") == "blocked":
+        return "externally_blocked", None
+    if run.get("outcome") in {"partial", "stopped_before_consequential_action"}:
+        return "partial", None
+    return None, None
+
+
+def _aggregate_variant_coverage_status(records: list[dict[str, Any]]) -> str:
+    if records and all(record["status"] == "observed" for record in records):
+        return "observed"
+    if records and all(record["status"] == "externally_blocked" for record in records):
+        return "externally_blocked"
+    if records and all(record["status"] == "not_tested" for record in records):
+        return "not_tested"
+    return "partial"
 
 
 def journey_coverage_ledger(
@@ -346,7 +595,7 @@ def journey_coverage_ledger(
             {
                 "journey_id": journey_id,
                 "material": journey_id != "content_navigation",
-                "status": "blocked",
+                "status": "not_tested",
                 "entry_points": set(),
                 "states_covered": set(),
                 "variants": set(),
@@ -363,7 +612,7 @@ def journey_coverage_ledger(
             {
                 "variant_id": variant_id,
                 "material": infer_journey(template) != "content_navigation",
-                "status": "blocked",
+                "status": "not_tested",
                 "entry_points": set(),
                 "states_covered": set(),
                 "evidence_urls": set(),
@@ -397,10 +646,12 @@ def journey_coverage_ledger(
             item["states_covered"].add("entry")
             variant_item["states_covered"].add("entry")
             needs_interaction = template in SAFE_SUBMISSION_KINDS and bool(page.get("forms"))
-            variant_item["status"] = "partial" if needs_interaction else "observed"
+            variant_item["status"] = "not_tested" if needs_interaction else "observed"
             if page.get("forms") or page.get("interactive_controls"):
                 item["states_covered"].add("progression")
                 variant_item["states_covered"].add("progression")
+        else:
+            variant_item["status"] = "externally_blocked"
     for run in interaction_runs or []:
         if not isinstance(run, dict):
             continue
@@ -414,7 +665,7 @@ def journey_coverage_ledger(
             {
                 "variant_id": variant_id,
                 "material": journey_id != "content_navigation",
-                "status": "blocked",
+                "status": "not_tested",
                 "entry_points": {start_url} if start_url else set(),
                 "states_covered": set(),
                 "evidence_urls": set(),
@@ -426,20 +677,12 @@ def journey_coverage_ledger(
         if run.get("actions"):
             item["states_covered"].add("progression")
             variant_item["states_covered"].add("progression")
-        if run.get("outcome") == "completed":
-            item["states_covered"].add("success")
-            variant_item["states_covered"].add("success")
-            variant_item["status"] = "observed"
-        elif run.get("observed_state") == "failure":
-            item["states_covered"].add("failure")
-            variant_item["states_covered"].add("failure")
-            variant_item["status"] = "partial"
-        elif run.get("outcome") in {
-            "partial",
-            "blocked",
-            "stopped_before_consequential_action",
-        }:
-            variant_item["status"] = "partial"
+        run_status, state = _interaction_run_coverage(run)
+        if state:
+            item["states_covered"].add(state)
+            variant_item["states_covered"].add(state)
+        if run_status:
+            variant_item["status"] = run_status
     for candidate in material_unvisited:
         url = str(candidate.get("url", ""))
         template = str(candidate.get("template", infer_template(url)))
@@ -447,7 +690,7 @@ def journey_coverage_ledger(
         variant_item = variant(item, template, url)
         item["unvisited_material_candidates"].add(url)
         variant_item["unvisited_material_candidates"].add(url)
-        variant_item["status"] = "partial"
+        variant_item["status"] = "not_tested"
     for candidate in blocked_candidates:
         url = str(candidate.get("url", ""))
         template = str(
@@ -465,6 +708,8 @@ def journey_coverage_ledger(
         variant_item["unvisited_material_candidates"].add(url)
         if variant_item["status"] == "observed":
             variant_item["status"] = "partial"
+        elif variant_item["status"] == "not_tested":
+            variant_item["status"] = "externally_blocked"
     result: list[dict[str, Any]] = []
     for item in groups.values():
         variant_rows = []
@@ -481,12 +726,7 @@ def journey_coverage_ledger(
         variant_rows.sort(key=lambda record: str(record["variant_id"]))
         material_variants = [record for record in variant_rows if record["material"]]
         assessed_variants = material_variants or variant_rows
-        if assessed_variants and all(record["status"] == "observed" for record in assessed_variants):
-            item["status"] = "observed"
-        elif assessed_variants and all(record["status"] == "blocked" for record in assessed_variants):
-            item["status"] = "blocked"
-        else:
-            item["status"] = "partial"
+        item["status"] = _aggregate_variant_coverage_status(assessed_variants)
         item["states_covered"] = {
             state
             for record in variant_rows
@@ -587,6 +827,40 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
 
     privacy_acceptance = accept_privacy_statement(page)
     reveal_lazy_content(page)
+
+    try:
+        page_surfaces = page.evaluate(
+            r"""() => {
+                const text = value => String(value || "").replace(/\s+/g, " ").trim();
+                const visible = element => !!(element && (element.offsetWidth || element.offsetHeight || element.getClientRects().length));
+                const main = document.querySelector("main, [role='main'], article");
+                const mainText = main ? text(main.innerText).slice(0, 5000) : "";
+                const countVisible = selector => [...document.querySelectorAll(selector)].filter(visible).length;
+                return {
+                    title: text(document.title).slice(0, 300),
+                    headings: [...document.querySelectorAll("main h1, main h2, [role='main'] h1, [role='main'] h2, article h1, article h2, body > h1")]
+                        .filter(visible).map(element => text(element.innerText)).filter(Boolean).slice(0, 30),
+                    main_text: mainText,
+                    semantic_counts: {
+                        form: countVisible("form"),
+                        tab: countVisible("[role='tab']"),
+                        tablist: countVisible("[role='tablist']"),
+                        dialog: countVisible("dialog, [role='dialog'], [aria-modal='true']"),
+                        details: countVisible("details"),
+                        accordion: countVisible("[aria-expanded][aria-controls]"),
+                        map: countVisible("[data-map], [id*='map' i], [class*='map' i], iframe[src*='maps' i]"),
+                        locator_result: countVisible("[data-store-id], [data-station-id], [class*='store-result' i], [class*='station-result' i], [class*='locator-result' i]"),
+                        download: countVisible("a[download], a[href$='.pdf' i], a[href$='.doc' i], a[href$='.docx' i], a[href$='.zip' i], a[href*='download' i]"),
+                        video: countVisible("video, iframe[src*='youtube' i], iframe[src*='vimeo' i]"),
+                        error: countVisible("[role='alert'], [aria-invalid='true'], .error, .erreur, [class*='error-message' i]")
+                    }
+                };
+            }"""
+        )
+        if not isinstance(page_surfaces, dict):
+            page_surfaces = {}
+    except Exception:
+        page_surfaces = {}
 
     links = page.eval_on_selector_all(
         "a[href]",
@@ -826,24 +1100,19 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
         for item in links
         if isinstance(item, dict) and item.get("url") and same_host(str(item["url"]), root_url)
     ]
-    rendered_corpus = " ".join(
-        [
-            *(clean_text(str(button)) for button in buttons[:50]),
-            *(
-                clean_text(str(form.get("id", ""))) + " " + clean_text(str(form.get("name", "")))
-                for form in (forms[:25] if isinstance(forms, list) else [])
-                if isinstance(form, dict)
-            ),
-            *(
-                clean_text(str(control.get("label", ""))) + " " + clean_text(str(control.get("name", "")))
-                for control in (controls[:100] if isinstance(controls, list) else [])
-                if isinstance(control, dict)
-            ),
-        ]
+    classification = classify_page_archetype(
+        url,
+        {
+            "title": page_surfaces.get("title", ""),
+            "headings": page_surfaces.get("headings", []),
+            "main": page_surfaces.get("main_text", ""),
+        },
     )
     record = {
         "url": url,
-        "template": infer_template(url, rendered_corpus),
+        "template": classification["primary"],
+        "classification_diagnostic": classification,
+        "page_surfaces": page_surfaces,
         "language": str(page.evaluate("() => document.documentElement.lang || ''") or ""),
         "links": clean_links[:100],
         "forms": forms[:25] if isinstance(forms, list) else [],
@@ -853,14 +1122,18 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
         "privacy_statement_accepted": privacy_acceptance,
         "measurement_evidence": (measurement_evidence if isinstance(measurement_evidence, dict) else {}),
     }
+    record["interaction_capabilities"] = detect_interaction_capabilities(record)
     structure = {
         "url": record["url"],
         "template": record["template"],
+        "classification_diagnostic": record["classification_diagnostic"],
+        "page_surfaces": record["page_surfaces"],
         "links": record["links"],
         "forms": record["forms"],
         "buttons": record["buttons"],
         "button_controls": record["button_controls"],
         "interactive_controls": record["interactive_controls"],
+        "interaction_capabilities": record["interaction_capabilities"],
     }
     record["rendered_structure_sha256"] = hashlib.sha256(
         json.dumps(
@@ -1314,6 +1587,7 @@ def measurement_opportunity_hints(
         category: str,
         reason: str,
         materiality: str,
+        capability_ids: list[str] | None = None,
     ) -> None:
         template = str(page.get("template", ""))
         journey_id = infer_journey(template)
@@ -1332,10 +1606,12 @@ def measurement_opportunity_hints(
                 "materiality": materiality,
                 "evidence_urls": set(),
                 "evidence_structure_hashes": set(),
+                "capability_ids": set(),
                 "reason": reason,
                 "requires_interactive_review": True,
             },
         )
+        hint["capability_ids"].update(str(value) for value in (capability_ids or []) if value)
         hint["evidence_urls"].add(str(page.get("url", "")))
         structure_hash = str(page.get("rendered_structure_sha256", ""))
         if structure_hash:
@@ -1455,10 +1731,12 @@ def measurement_opportunity_hints(
         if template in baseline:
             hint_key, category, reason = baseline[template]
             add(hint_key, page, category, reason, "material")
+        surfaces = page.get("page_surfaces", {}) if isinstance(page.get("page_surfaces"), dict) else {}
         corpus_parts = [
             str(page.get("url", "")),
-            *[str(value) for value in page.get("buttons", [])],
-            *[str(link.get("text", "")) for link in page.get("links", []) if isinstance(link, dict)],
+            str(surfaces.get("title", "")),
+            " ".join(str(value) for value in surfaces.get("headings", [])),
+            str(surfaces.get("main_text", "")),
             *[
                 " ".join(
                     [
@@ -1471,10 +1749,85 @@ def measurement_opportunity_hints(
                 if isinstance(control, dict)
             ],
         ]
+        if not surfaces:
+            # Compatibility for imported/static evidence that predates local
+            # page surfaces. Rendered v1.2 reports always use the scoped branch.
+            corpus_parts.extend(str(value) for value in page.get("buttons", []))
+            corpus_parts.extend(
+                str(link.get("text", ""))
+                for link in page.get("links", [])
+                if isinstance(link, dict)
+            )
         corpus = " ".join(corpus_parts).casefold()
         for hint_key, category, pattern, reason in signal_patterns:
             if re.search(pattern, corpus, re.I):
                 add(hint_key, page, category, reason, "candidate")
+        capability_hints = {
+            "tabbed_form": (
+                "tabbed_form_outcomes",
+                "outcome",
+                "Distinct form tabs need an explicit decision on shared versus separate progression and success measurement.",
+            ),
+            "locator_selection": (
+                "locator_result_selection",
+                "interaction",
+                "Selection of a locator result or map marker is a separate decision point after search.",
+            ),
+            "faq_accordion": (
+                "faq_content_usage",
+                "interaction",
+                "FAQ expansion may answer a support question and needs a measure-or-exclude decision at family level.",
+            ),
+            "coupon_application": (
+                "coupon_application_outcome",
+                "diagnostic",
+                "Coupon success and failure may explain discount use and checkout friction.",
+            ),
+            "modal_dialog": (
+                "modal_business_outcome",
+                "interaction",
+                "The modal's business purpose must be evaluated before deciding whether its outcome merits measurement.",
+            ),
+            "download": (
+                "meaningful_download_outcome",
+                "outcome",
+                "A meaningful application, brochure, or document download may be a business outcome.",
+            ),
+            "meaningful_error": (
+                "business_process_error",
+                "diagnostic",
+                "An observed business-process error may explain abandonment and requires an explicit decision.",
+            ),
+            "filter_sort": (
+                "filter_and_sort_usage",
+                "interaction",
+                "Applied filters or sorting may explain product or content discovery.",
+            ),
+            "configurator_progression": (
+                "configuration_progression_and_completion",
+                "progression",
+                "Meaningful configuration progression and completion require an explicit decision.",
+            ),
+        }
+        capabilities = page.get("interaction_capabilities")
+        if not isinstance(capabilities, list):
+            capabilities = detect_interaction_capabilities(page)
+        for capability in capabilities:
+            if not isinstance(capability, dict):
+                continue
+            family = str(capability.get("family", ""))
+            mapped = capability_hints.get(family)
+            if not mapped:
+                continue
+            hint_key, category, reason = mapped
+            add(
+                hint_key,
+                page,
+                category,
+                reason,
+                str(capability.get("materiality", "candidate")),
+                [str(capability.get("capability_id", ""))],
+            )
 
     result: list[dict[str, Any]] = []
     for hint in hints.values():
@@ -1483,6 +1836,7 @@ def measurement_opportunity_hints(
                 **hint,
                 "evidence_urls": sorted(hint["evidence_urls"])[:10],
                 "evidence_structure_hashes": sorted(hint["evidence_structure_hashes"])[:10],
+                "capability_ids": sorted(hint["capability_ids"]),
             }
         )
     return sorted(result, key=lambda item: str(item["hint_id"]))
@@ -1787,6 +2141,7 @@ def main() -> int:
             {
                 "gap_id": "material_candidates_not_rendered",
                 "material": True,
+                "evidence_state": "not_tested",
                 "description": (f"{len(material_unvisited)} prioritized candidate URLs remain unvisited within the reported sample."),
                 "candidate_urls": [item["url"] for item in material_unvisited],
             }
@@ -1796,6 +2151,7 @@ def main() -> int:
             {
                 "gap_id": "sitemap_candidate_cap_reached",
                 "material": True,
+                "evidence_state": "not_tested",
                 "description": (f"The sitemap candidate universe reached the configured cap of {args.sitemap_limit} URLs."),
             }
         )
@@ -1804,6 +2160,7 @@ def main() -> int:
             {
                 "gap_id": "robots_blocked_material_candidates",
                 "material": True,
+                "evidence_state": "externally_blocked",
                 "description": (f"{len(blocked_candidates)} candidate URLs were blocked by robots.txt and require interactive or other confirming evidence."),
                 "candidate_urls": [item["url"] for item in blocked_candidates[:50]],
             }
@@ -1820,6 +2177,7 @@ def main() -> int:
                 "journey_id": recipe["journey_id"],
                 "variant_id": recipe["variant_id"],
                 "material": True,
+                "evidence_state": "not_tested",
                 "description": (
                     "Safe synthetic interaction was not executed for this material funnel variant; "
                     "success, failure, and gated states remain unconfirmed."
@@ -1835,6 +2193,11 @@ def main() -> int:
                 "journey_id": str(run.get("journey_id")),
                 "variant_id": str(run.get("variant_id")),
                 "material": True,
+                "evidence_state": (
+                    "externally_blocked"
+                    if run.get("outcome") == "blocked"
+                    else "partial"
+                ),
                 "description": "The safe synthetic journey run was partial, blocked, or stopped before a consequential action.",
                 "candidate_urls": [str(run.get("start_url"))],
             }
@@ -1850,7 +2213,7 @@ def main() -> int:
     ).strip("_")
     report_id = (f"discovery_{host_slug}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}")[:119].rstrip("_")
     output = {
-        "discovery_version": "1.1.0",
+        "discovery_version": "1.2.0",
         "report_id": report_id,
         "generated_at": generated_at,
         "root_url": root_url,

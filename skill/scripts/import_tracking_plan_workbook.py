@@ -824,7 +824,7 @@ def _reconcile_standard_visible_edits(
                 )
 
         code = _cell_value(sheet, code_row, 1)
-        if code != datalayer_code(event):
+        if code != datalayer_code(event, plan.get("data_layer_convention")):
             parsed = _extract_data_layer(
                 code,
                 event_name,

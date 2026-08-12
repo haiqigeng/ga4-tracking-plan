@@ -42,6 +42,12 @@ Treat sources as first-class only for what they can establish:
 | Previous tracking plan | Historical or approved contract |
 | Analytics export | Current data use and implementation symptoms |
 
+For a fresh task, start a new source manifest. Include only artifacts supplied
+for that task and evidence generated during the current run; do not import
+client-specific plans, values, or conclusions from session history or nearby
+files. Record hashes where available and preserve each rendered report's
+generation timestamp.
+
 Internally record whether evidence describes `as_is`, `to_be`, or both. When
 sources conflict, resolve the conflict according to the plan's target state and
 keep the difference in the internal analysis context. Do not assign generic
@@ -94,8 +100,8 @@ Build a candidate universe before sampling. Seed it from the root, supplied
 journey URLs, robots and sitemaps, then rendered links. Prioritize materially
 different funnels and page templates rather than link order. Report the page
 and sitemap caps, candidate count, unvisited high-priority URLs, and an
-observed/partial/blocked ledger. A cap or material unvisited candidate prevents
-a completeness claim.
+observed/partial/not-tested/externally-blocked ledger. A cap or material
+unvisited candidate prevents a completeness claim.
 
 Rendered discovery generates and executes bounded recipes for every distinct
 material safe form variant by default. It accepts the privacy statement, fills synthetic value
@@ -111,7 +117,9 @@ Keep hint identity contextual. The same filter pattern on a product listing
 and a catalogue interface represents two separate candidates, even if the
 underlying heuristic key is identical. Structural heuristics remain
 non-material candidates until a business question promotes them; journey
-outcomes and material funnel progressions remain material decisions.
+outcomes and material funnel progressions remain material decisions. Detection
+never mandates an event, but every generated family-level candidate requires
+an explicit measure or exclude decision.
 
 Do not automatically turn a blocked capability into a visible event
 recommendation. Include an unobserved journey only when user, business,
@@ -137,9 +145,11 @@ For each journey, determine:
 - concrete questions or decisions the resulting data must support;
 - implementation components and data sources.
 
-Classify what is observed live, confirmed by another source, planned, or
-blocked so an unvisited state is never silently treated as observed behavior.
-Capture this distinction internally rather than adding workbook columns.
+Classify what is observed live, confirmed by another source, planned, partial,
+not tested, or externally blocked so an unvisited state is never silently
+treated as observed behavior. Keep factual evidence state separate from the
+analyst's resolution and capture both internally rather than adding workbook
+columns.
 
 Separate business outcomes, progression signals, and diagnostics. Avoid click
 inventories and event-per-element designs.
@@ -189,6 +199,10 @@ Use JSON-style quoted keys in every human example. Clear stale wrapper state
 when the client implementation requires it. Never generate an event row
 without a complete example, except a context push intentionally lacking an
 `"event"` key.
+
+The canonical convention may render either a JavaScript fragment or an HTML
+`<script>` block and may explicitly control dataLayer initialization. This is
+a small formatting choice, not a separate workflow mode.
 
 ## 7. Validate And Render
 

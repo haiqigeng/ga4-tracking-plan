@@ -93,6 +93,9 @@ def validate_discovery_bindings(
     known_hints: dict[str, tuple[str, str]] = {}
     known_journeys: set[str] = set()
     known_variants: set[str] = set()
+    report_journey_statuses: dict[str, str] = {}
+    report_variant_statuses: dict[tuple[str, str], str] = {}
+    report_gap_states: dict[str, str] = {}
     for report_id, record in records.items():
         if str(record.get("source_id")) not in live_source_ids:
             errors.append(f"Discovery report '{report_id}' must bind to a live_website source.")
@@ -114,6 +117,8 @@ def validate_discovery_bindings(
             errors.append(f"Discovery variant inventory mismatch for '{report_id}'.")
         if str(report.get("outcome")) != str(record.get("outcome")):
             errors.append(f"Discovery outcome mismatch for '{report_id}'.")
+        if record.get("generated_at") and str(report.get("generated_at")) != str(record.get("generated_at")):
+            errors.append(f"Discovery generation timestamp mismatch for '{report_id}'.")
         for hint in report.get("measurement_opportunity_hints", []):
             if isinstance(hint, dict) and hint.get("hint_id"):
                 hint_id = str(hint["hint_id"])
@@ -125,6 +130,17 @@ def validate_discovery_bindings(
                 known_hints[hint_id] = hint_context
         known_journeys.update(journeys)
         known_variants.update(variants)
+        for journey in report.get("journey_coverage_ledger", []):
+            if not isinstance(journey, dict):
+                continue
+            journey_id = str(journey.get("journey_id", ""))
+            report_journey_statuses[journey_id] = str(journey.get("status", ""))
+            for variant in journey.get("variant_coverage", []):
+                if isinstance(variant, dict) and variant.get("variant_id"):
+                    report_variant_statuses[(journey_id, str(variant["variant_id"]))] = str(variant.get("status", ""))
+        for gap in report.get("coverage_gaps", []):
+            if isinstance(gap, dict) and gap.get("gap_id") and gap.get("evidence_state"):
+                report_gap_states[str(gap["gap_id"])] = str(gap["evidence_state"])
 
     mapped_hints: set[str] = set()
     for opportunity in context.get("measurement_opportunities", []):
@@ -157,4 +173,38 @@ def validate_discovery_bindings(
     missing_variants = sorted(known_variants - covered_variants)
     if missing_variants:
         errors.append("Discovered journey variants missing from journey_coverage: " + ", ".join(missing_variants))
+    for coverage in context.get("journey_coverage", []):
+        if not isinstance(coverage, dict):
+            continue
+        journey_id = str(coverage.get("journey_id", ""))
+        report_status = report_journey_statuses.get(journey_id)
+        context_status = str(coverage.get("status", ""))
+        if context_status == "observed" and report_status in {"partial", "not_tested", "externally_blocked", "blocked"}:
+            errors.append(
+                f"Journey '{journey_id}' is marked observed although rendered discovery recorded '{report_status}'. Use confirmed with other evidence or retain the factual boundary."
+            )
+        if context_status in {"externally_blocked", "blocked"} and report_status == "not_tested":
+            errors.append(f"Journey '{journey_id}' was not tested and cannot be relabelled externally blocked.")
+        for variant in coverage.get("variant_coverage", []):
+            if not isinstance(variant, dict):
+                continue
+            variant_id = str(variant.get("variant_id", ""))
+            report_variant_status = report_variant_statuses.get((journey_id, variant_id))
+            context_variant_status = str(variant.get("status", ""))
+            if context_variant_status == "observed" and report_variant_status in {"partial", "not_tested", "externally_blocked", "blocked"}:
+                errors.append(
+                    f"Variant '{variant_id}' is marked observed although rendered discovery recorded '{report_variant_status}'."
+                )
+            if context_variant_status in {"externally_blocked", "blocked"} and report_variant_status == "not_tested":
+                errors.append(f"Variant '{variant_id}' was not tested and cannot be relabelled externally blocked.")
+    for gap in context.get("coverage_gaps", []):
+        if not isinstance(gap, dict):
+            continue
+        gap_id = str(gap.get("gap_id", ""))
+        report_state = report_gap_states.get(gap_id)
+        context_state = str(gap.get("evidence_state", ""))
+        if report_state and context_state and report_state != context_state:
+            errors.append(
+                f"Coverage gap '{gap_id}' changed factual evidence_state from '{report_state}' to '{context_state}'."
+            )
     return errors

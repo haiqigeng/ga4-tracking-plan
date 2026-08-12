@@ -221,6 +221,25 @@ The skill does not:
 
 ## Versioning
 
+Version `2.6.0` keeps canonical plan schema `5.0.0` while correcting the
+coverage and evidence regressions found in repeated whole-site runs. Rendered
+page purpose now uses surface-weighted, whole-word multilingual classification
+that excludes global chrome and retains ambiguous candidates as unknown.
+Discovery report `1.2.0` inventories bounded interaction families, separates
+not-tested, partial, and externally blocked evidence, and requires every hint
+to receive an explicit measure/exclude decision without creating a click
+inventory. Delivery rejects seed placeholders, unsupported live-opportunity
+locations, factual-state rewrites, and semantically duplicate value domains.
+Official checkout anchors require `payment_type` on `add_payment_info` and
+`shipping_tier` on `add_shipping_info`, while a justified official-to-custom
+carry-through remains coherent across events. Supplied-template mappings now
+declare their parameter-registry role and validate mapped semantic parity.
+The dataLayer renderer adds only two opt-in formatting controls: JavaScript
+fragment versus HTML script block, and explicit initialization. Default
+workbooks now keep title merges within their real table width, and delivery
+validation rejects overlapping merged-cell ranges before Excel can repair the
+file on opening.
+
 Version `2.5.0` keeps canonical plan schema `5.0.0` and completes the operational
 closure that `2.4.0` started. Rendered discovery now runs automatic targeted
 rounds, captures evidence-backed website language, and safely progresses

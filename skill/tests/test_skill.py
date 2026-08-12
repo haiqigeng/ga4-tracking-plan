@@ -675,6 +675,10 @@ class TrackingPlanSkillTests(unittest.TestCase):
         result = inspect(ASSET)
         self.assertTrue(result["regions"]["event_matrix"])
         self.assertTrue(result["regions"]["parameter_reference"])
+        self.assertEqual(
+            result["regions"]["parameter_reference"]["semantic_role"],
+            "all_used_parameters",
+        )
         self.assertTrue(result["regions"]["event_tabs"])
         release = json.loads((ROOT / "release.json").read_text(encoding="utf-8-sig"))
         workbook = load_workbook(ASSET, read_only=True)
@@ -694,8 +698,16 @@ class TrackingPlanSkillTests(unittest.TestCase):
             mapping = inspect(source)
             workbook = adapt(updated, source, mapping)
             workbook.save(output)
+            self.assertEqual(validate_workbook(output, updated, mapping), [])
             reopened = load_workbook(output, data_only=False)
             imported = import_workbook(output)
+            matrix = mapping["regions"]["event_matrix"]
+            reopened[matrix["sheet"]].cell(
+                int(matrix["data_start_row"]),
+                int(matrix["columns"]["definition"]),
+            ).value = "Tampered visible definition"
+            reopened.save(output)
+            mapped_errors = validate_workbook(output, updated, mapping)
         self.assertIn(
             "Fire only once per form instance.",
             str(reopened["begin_quote"]["B7"].value),
@@ -705,6 +717,12 @@ class TrackingPlanSkillTests(unittest.TestCase):
             str(reopened["begin_quote"]["A16"].value),
         )
         self.assertEqual(imported, updated)
+        self.assertTrue(
+            any(
+                "Event Matrix!" in error or "Mapped Event Matrix differs" in error
+                for error in mapped_errors
+            )
+        )
 
     def test_skill_has_one_adaptive_workflow_not_scope_tiers(self) -> None:
         text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -967,6 +985,19 @@ class TrackingPlanSkillTests(unittest.TestCase):
             path = Path(directory) / "plan.xlsx"
             build_workbook(self.plan).save(path)
             self.assertEqual(validate_workbook(path, self.plan), [])
+
+    def test_rendered_workbook_gate_rejects_overlapping_merged_ranges(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.xlsx"
+            workbook = build_workbook(self.plan)
+            workbook["Parameter Reference"].merge_cells("A1:G1")
+            workbook.save(path)
+            self.assertTrue(
+                any(
+                    error.startswith('Overlapping merged ranges in "Parameter Reference"')
+                    for error in validate_workbook(path, self.plan)
+                )
+            )
 
     def test_semantic_diff_covers_convention_purpose_and_path(self) -> None:
         updated = copy.deepcopy(self.plan)

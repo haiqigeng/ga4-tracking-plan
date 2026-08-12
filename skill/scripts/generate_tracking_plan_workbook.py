@@ -204,7 +204,7 @@ def fill_parameter_reference(wb, plan: dict[str, Any]) -> None:
         "Definitions and values for parameters actually used by the event specifications."
         if workbook_language(plan) == "en"
         else "Définitions et valeurs des variables réellement utilisées par les spécifications.",
-        7,
+        6,
     )
     headers = [
         label(plan, "variable"),
@@ -349,7 +349,7 @@ def fill_event_sheet(
             set_cell_value(ws.cell(12, column), "")
     data_layer_title_row = 13 + max(1, len(parameters))
     add_section(ws, data_layer_title_row, label(plan, "datalayer"), 7)
-    add_code_block(ws, data_layer_title_row + 1, datalayer_code(event), 7)
+    add_code_block(ws, data_layer_title_row + 1, datalayer_code(event, plan.get("data_layer_convention")), 7)
     maybe_add_screenshot(ws, data_layer_title_row + 3, event, screenshot_dir)
     ws.auto_filter.ref = f"A11:G{11 + max(1, len(parameters))}"
 

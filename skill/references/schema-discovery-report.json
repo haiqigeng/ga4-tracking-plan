@@ -18,7 +18,7 @@
     "automatic_interaction_runs"
   ],
   "properties": {
-    "discovery_version": {"const": "1.1.0"},
+    "discovery_version": {"enum": ["1.1.0", "1.2.0"]},
     "report_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,119}$"},
     "generated_at": {"type": "string", "format": "date-time"},
     "root_url": {"type": "string", "format": "uri", "pattern": "^https?://"},
@@ -83,6 +83,44 @@
         "properties": {
           "url": {"type": "string", "format": "uri"},
           "template": {"type": "string", "minLength": 1},
+          "classification_diagnostic": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["primary", "confidence", "candidates"],
+            "properties": {
+              "primary": {"type": "string", "minLength": 1},
+              "confidence": {"enum": ["high", "medium", "low"]},
+              "candidates": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["template", "score", "reasons"],
+                  "properties": {
+                    "template": {"type": "string", "minLength": 1},
+                    "score": {"type": "integer", "minimum": 1},
+                    "reasons": {"type": "array", "items": {"type": "string", "minLength": 1}}
+                  }
+                }
+              }
+            }
+          },
+          "interaction_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["capability_id", "family", "category", "materiality", "reason", "evidence"],
+              "properties": {
+                "capability_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,119}$"},
+                "family": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+                "category": {"enum": ["outcome", "progression", "diagnostic", "interaction", "context"]},
+                "materiality": {"enum": ["material", "candidate"]},
+                "reason": {"type": "string", "minLength": 1},
+                "evidence": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+              }
+            }
+          },
           "language": {"type": "string"},
           "rendered_structure_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
           "rendered_dom_sha256": {"type": "string", "pattern": "^(?:[a-f0-9]{64})?$"}
@@ -126,6 +164,11 @@
             "items": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
           },
           "reason": {"type": "string", "minLength": 1},
+          "capability_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,119}$"}
+          },
           "requires_interactive_review": {"type": "boolean"}
         }
       }
@@ -148,7 +191,7 @@
         "properties": {
           "journey_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
           "material": {"type": "boolean"},
-          "status": {"enum": ["observed", "partial", "blocked"]},
+          "status": {"enum": ["observed", "partial", "not_tested", "externally_blocked", "blocked"]},
           "entry_points": {"type": "array", "items": {"type": "string", "format": "uri"}},
           "states_covered": {
             "type": "array",
@@ -173,7 +216,7 @@
               "properties": {
                 "variant_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
                 "material": {"type": "boolean"},
-                "status": {"enum": ["observed", "partial", "blocked"]},
+                "status": {"enum": ["observed", "partial", "not_tested", "externally_blocked", "blocked"]},
                 "entry_points": {"type": "array", "items": {"type": "string", "format": "uri"}},
                 "states_covered": {
                   "type": "array",
@@ -188,7 +231,23 @@
         }
       }
     },
-    "coverage_gaps": {"type": "array", "items": {"type": "object"}},
+    "coverage_gaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["gap_id", "material", "description"],
+        "properties": {
+          "gap_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "journey_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "variant_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "material": {"type": "boolean"},
+          "description": {"type": "string", "minLength": 1},
+          "evidence_state": {"enum": ["not_tested", "partial", "externally_blocked"]},
+          "candidate_urls": {"type": "array", "items": {"type": "string", "format": "uri"}}
+        }
+      }
+    },
     "automatic_interaction_runs": {
       "type": "array",
       "items": {
@@ -244,5 +303,20 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"discovery_version": {"const": "1.2.0"}},
+        "required": ["discovery_version"]
+      },
+      "then": {
+        "properties": {
+          "coverage_gaps": {
+            "items": {"required": ["evidence_state"]}
+          }
+        }
+      }
+    }
+  ]
 }
