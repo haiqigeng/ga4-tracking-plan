@@ -2497,7 +2497,7 @@ def main() -> int:
             "This helper stratifies sitemap branches, preserves rendered link signals, and automatically continues targeted rounds while material candidate families remain.",
             "It accepts a visible privacy statement and safely progresses representative non-transactional forms with clearly synthetic data by default.",
             "It stops at CAPTCHA, payment, order, appointment confirmation, contract, deletion, and other consequential boundaries instead of claiming completion.",
-            "Use build_analysis_context_seed.py so every hint becomes an explicit measure, exclude, or unresolved analyst decision.",
+            "Use build_analysis_context_seed.py so every hint becomes an explicit measure, covered-elsewhere, exclude, or unresolved analyst decision.",
             "Technical measurement evidence is internal input. Sensitive-looking dataLayer values are redacted while field structure is retained.",
             "Never claim site-specific gated capabilities from this rendered-DOM inventory. If interactive access fails, record the coverage gap; applicable official or recurrent sector outcomes may remain visibly recommended with to-confirm website data and precise success conditions.",
         ],

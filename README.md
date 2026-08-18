@@ -35,6 +35,9 @@ large, quick, enterprise, or event-count mode.
   investigation unless the user opts out;
 - combines website, user, business, Figma, GTM, dataLayer, backend, previous
   plan, and analytics evidence according to what each source can prove;
+- consumes an optional measurement framework as non-governing business input
+  that prioritizes investigation without replacing independent discovery or
+  prescribing GA4 implementation;
 - starts from business journeys and analysis decisions, not click inventories;
 - resolves every selected official event and parameter against current Google
   documentation;
@@ -225,6 +228,19 @@ The skill does not:
 - maximize event or parameter counts.
 
 ## Versioning
+
+Version `2.8.0` keeps canonical plan schema `5.0.0` and adds optional,
+non-governing measurement-framework intake without changing the adaptive
+tracking-plan workflow. A supplied framework now prioritizes investigation,
+seeds business questions and material journey candidates, and requires an
+explicit disposition for applicable material journey or web-measurement
+references.
+Rendered, design, and technical discovery remain independent and may confirm,
+refine, reject, redirect, or extend the upstream evidence. Analysis-context
+`1.1.0` adds a source-bound intake summary and the `covered_elsewhere`
+opportunity decision for needs that belong to native analytics, backend or
+business systems, joins, or another tracking-plan scope. Framework governance
+stays internal and does not add workbook columns or alter standalone runs.
 
 Version `2.7.1` is a focused quality release on canonical plan schema `5.0.0`.
 Synthetic interaction coverage is now reconciled by exact recipe and form

@@ -22,6 +22,21 @@ Use one adaptive workflow and one quality standard. Do not create execution
 tiers for small, large, simple, standard, enterprise, or complete plans.
 Activate only the capabilities relevant to the actual task.
 
+## Optional Measurement-Framework Intake
+
+A supplied measurement framework is structured upstream business evidence,
+not an implementation authority. Use it to prioritize investigation, establish
+a presumption of materiality for applicable journeys and requirements, and
+formulate business questions and semantic facts to verify. The framework
+creates a duty to investigate and decide, not a duty to implement.
+
+The tracking-plan skill remains responsible for independent live, design, and
+technical discovery; scope applicability; official GA4 evaluation; event and
+parameter design; triggers; value domains; dataLayer specifications; and the
+final human deliverable. Framework absence never proves that an independently
+discovered journey is immaterial, and framework presence never proves that a
+journey exists or belongs in client-side GA4.
+
 ## Primary Users
 
 - Web analysts must be able to understand, double-check, edit, compare, and
@@ -90,8 +105,9 @@ The result is ready when:
    and post-conversion states are covered or their unresolved boundary is
    stated without fabricated site behavior.
 2. Every material journey has a resolved measurement-opportunity ledger, every
-   generated interaction-family candidate has an explicit measure/exclude
-   decision, every measured opportunity maps to an event, and every
+   generated interaction-family candidate has an explicit measure,
+   covered-elsewhere, or exclude decision, every measured opportunity maps to
+   an event, and every
    non-context event maps back to a concrete opportunity.
 3. Official semantics are current and correctly applied.
 4. Custom semantics have a concrete official gap and business need.
@@ -122,6 +138,10 @@ The result is ready when:
 16. Visible workbook edits cannot be silently overridden by an older embedded
     model, supplied-template content outside mapped regions is unchanged, and
     every mapped semantic region matches the canonical model.
+17. When a measurement framework is supplied, every applicable material
+    journey or web-measurement requirement is investigated and dispositioned,
+    while the normal discovery process remains able to add needs absent from
+    that framework.
 
 ## Non-Goals
 

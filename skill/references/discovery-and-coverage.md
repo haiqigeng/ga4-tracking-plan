@@ -22,6 +22,9 @@ request is a journey-coverage problem, not a request to crawl every URL.
 3. Render at least one representative of every material group. Inspect menus,
    forms, filters, sorting, variants, promotions, carts, account entry,
    customer service, post-purchase, and conversion paths when present.
+   A supplied measurement framework may raise a candidate's investigation
+   priority, but it never removes the obligation to construct and inspect the
+   independent candidate universe.
 4. Use safe synthetic values and complete accessible non-financial flows by
    default unless the user opts out. Accept the privacy statement needed for
    investigation. Never confirm a paid order, payment, contract, appointment,
@@ -76,9 +79,12 @@ the journeys. Examples include:
 - lead funnel progression and backend-confirmed success.
 
 For each opportunity, record the business question, evidence, official
-candidate, fit decision, and final measure/exclude decision. An official event
-name is not required for an opportunity to deserve measurement. Conversely, a
-visible control is not enough: exclude noise that supports no decision.
+candidate, fit decision, and final measure, covered-elsewhere, exclude, or
+unresolved decision. Use covered-elsewhere when the need is material but its
+reliable collection belongs to native analytics, a backend or business system,
+a join, or another tracking-plan scope. An official event name is not required
+for an opportunity to deserve measurement. Conversely, a visible control is
+not enough: exclude noise that supports no decision.
 
 Every material journey must reference its opportunity IDs. Every measured
 opportunity must map to one or more canonical events, and every non-context
@@ -89,19 +95,29 @@ Discovery hints have two materiality states. `material` means the rendered
 journey itself establishes an outcome or progression that needs an explicit
 analyst decision. `candidate` means a heuristic found a potentially useful
 control or diagnostic. Candidates do not imply measurement, but every
-generated candidate must still receive a measure/exclude decision before
-delivery. The analyst measures it only when a real business question justifies
-it; exclusion is a valid closure.
+generated candidate must still receive a measure, covered-elsewhere, or
+exclude decision before delivery. The analyst measures it only when a real
+business question justifies it; another collection boundary or exclusion is a
+valid closure.
 
 Run `build_analysis_context_seed.py` against the original discovery report.
 It creates one unresolved opportunity for every hint and records the exact
 report hash and inventories. Delivery must receive that same report and blocks
 on a hash mismatch, an omitted hint, journey, or variant, or an unresolved
 opportunity. This is the mechanical closure between exploration and analyst
-reasoning; it does not automate the measure/exclude decision. Once a decision
+reasoning; it does not automate the measure, covered-elsewhere, or exclude
+decision. Once a decision
 is made, seed placeholders are invalid. A manually added measured opportunity
 based on live evidence must retain an exact URL, route, component, or evidence
 locator.
+
+When a measurement framework is supplied, treat its applicable material
+journeys and web-measurement requirements as mandatory investigation
+candidates. Bind each to an existing opportunity through a structured source
+locator and give it an explicit disposition. Do not require objectives or KPIs
+to map one-to-one to events. Do not let an upstream reference create an event
+without independent evidence and GA4 evaluation, and do not let framework
+silence suppress a material live, design, or technical finding.
 
 ## Common Whole-Site Families
 

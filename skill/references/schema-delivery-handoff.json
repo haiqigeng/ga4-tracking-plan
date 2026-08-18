@@ -45,7 +45,17 @@
           "reference": {"type": "string", "minLength": 1},
           "evidence_role": {"type": "string", "minLength": 1},
           "state": {"enum": ["as_is", "to_be", "both"]},
-          "sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}
+          "sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+          "framework_intake": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["artifact_format", "quality_status"],
+            "properties": {
+              "artifact_format": {"enum": ["canonical_json", "markdown_only"]},
+              "schema_version": {"type": "string", "minLength": 1},
+              "quality_status": {"enum": ["pass", "pass_with_exceptions", "fail", "unknown"]}
+            }
+          }
         }
       }
     },

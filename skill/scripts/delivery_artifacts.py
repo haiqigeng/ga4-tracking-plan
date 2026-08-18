@@ -209,6 +209,17 @@ def build_handoff(
             "evidence_role": source.get("evidence_role"),
             "state": source.get("state"),
             **({"sha256": source.get("sha256")} if source.get("sha256") else {}),
+            **(
+                {
+                    "framework_intake": {
+                        key: source["framework_intake"].get(key)
+                        for key in ("artifact_format", "schema_version", "quality_status")
+                        if source["framework_intake"].get(key) is not None
+                    }
+                }
+                if isinstance(source.get("framework_intake"), dict)
+                else {}
+            ),
         }
         for source in analysis_context.get("sources", [])
         if isinstance(source, dict)

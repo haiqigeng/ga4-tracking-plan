@@ -15,7 +15,7 @@
     "value_domains"
   ],
   "properties": {
-    "context_version": {"const": "1.0.0"},
+    "context_version": {"enum": ["1.0.0", "1.1.0"]},
     "run_id": {"type": "string", "pattern": "^run_[a-f0-9]{32}$"},
     "created_at": {"type": "string", "format": "date-time"},
     "target_state": {
@@ -81,6 +81,7 @@
               "technical_specification",
               "previous_tracking_plan",
               "analytics_export",
+              "measurement_framework",
               "other"
             ]
           },
@@ -106,8 +107,69 @@
           "conflicts": {
             "type": "array",
             "items": {"type": "string", "minLength": 1}
+          },
+          "framework_intake": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "artifact_format",
+              "quality_status",
+              "applicable_material_refs"
+            ],
+            "properties": {
+              "artifact_format": {
+                "enum": ["canonical_json", "markdown_only"]
+              },
+              "schema_version": {"type": "string", "minLength": 1},
+              "quality_status": {
+                "enum": ["pass", "pass_with_exceptions", "fail", "unknown"]
+              },
+              "applicable_material_refs": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 240
+                }
+              },
+              "applicability_reason": {"type": "string", "minLength": 1}
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {"artifact_format": {"const": "canonical_json"}},
+                  "required": ["artifact_format"]
+                },
+                "then": {"required": ["schema_version"]}
+              },
+              {
+                "if": {
+                  "properties": {"applicable_material_refs": {"maxItems": 0}},
+                  "required": ["applicable_material_refs"]
+                },
+                "then": {"required": ["applicability_reason"]}
+              }
+            ]
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {"source_type": {"const": "measurement_framework"}},
+              "required": ["source_type"]
+            },
+            "then": {
+              "required": ["framework_intake"],
+              "properties": {
+                "evidence_role": {"const": "business_requirement"}
+              }
+            },
+            "else": {
+              "not": {"required": ["framework_intake"]}
+            }
+          }
+        ]
       }
     },
     "discovery_reports": {
@@ -344,7 +406,7 @@
           "business_question": {"type": "string", "minLength": 1},
           "official_candidate": {"type": "string", "minLength": 1},
           "official_fit": {"enum": ["fit", "gap", "not_applicable"]},
-          "decision": {"enum": ["measure", "exclude", "unresolved"]},
+          "decision": {"enum": ["measure", "covered_elsewhere", "exclude", "unresolved"]},
           "decision_reason": {"type": "string", "minLength": 1},
           "event_names": {
             "type": "array",
@@ -376,6 +438,15 @@
           {
             "if": {
               "properties": {"decision": {"const": "exclude"}},
+              "required": ["decision"]
+            },
+            "then": {
+              "properties": {"event_names": {"maxItems": 0}}
+            }
+          },
+          {
+            "if": {
+              "properties": {"decision": {"const": "covered_elsewhere"}},
               "required": ["decision"]
             },
             "then": {

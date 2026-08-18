@@ -3,14 +3,18 @@ from __future__ import annotations
 import copy
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+
+from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
+from delivery_artifacts import build_handoff
 from discover_site_journeys import SignalParser, classify_page_archetype, infer_journey
 from discover_site_journeys_playwright import (
     build_auto_interaction_recipes,
@@ -30,6 +34,25 @@ from validate_tracking_plan import (
 class DiscoveryQualityRegressionTests(unittest.TestCase):
     def analysis_context(self) -> dict:
         return json.loads((ROOT / "references" / "example-analysis-context.json").read_text(encoding="utf-8"))
+
+    def add_framework_source(self, context: dict, *applicable_ids: str) -> None:
+        context["context_version"] = "1.1.0"
+        context["sources"].append(
+            {
+                "source_id": "measurement_framework",
+                "source_type": "measurement_framework",
+                "reference": "measurement-framework.json",
+                "evidence_role": "business_requirement",
+                "state": "to_be",
+                "supports": ["Business journeys and semantic measurement requirements"],
+                "framework_intake": {
+                    "artifact_format": "canonical_json",
+                    "schema_version": "1.1.0",
+                    "quality_status": "pass",
+                    "applicable_material_refs": list(applicable_ids),
+                },
+            }
+        )
 
     def test_contact_page_is_not_misclassified_by_carte_or_global_chrome(self) -> None:
         result = classify_page_archetype(
@@ -275,6 +298,109 @@ class DiscoveryQualityRegressionTests(unittest.TestCase):
         )
         codes = {item.code for item in validate_analysis_context(context, delivery=True)}
         self.assertIn("OPPORTUNITY_PLACEHOLDER_TEXT", codes)
+
+    def test_framework_material_item_cannot_disappear_without_a_disposition(self) -> None:
+        context = self.analysis_context()
+        self.add_framework_source(context, "requirement_backend_qualified_lead")
+        codes = {item.code for item in validate_analysis_context(context, delivery=True)}
+        self.assertIn("MEASUREMENT_FRAMEWORK_ITEM_UNDISPOSITIONED", codes)
+
+    def test_framework_requirement_can_be_covered_elsewhere_without_a_web_event(self) -> None:
+        context = self.analysis_context()
+        self.add_framework_source(context, "requirement_backend_qualified_lead")
+        opportunity = copy.deepcopy(context["measurement_opportunities"][1])
+        opportunity.update(
+            {
+                "opportunity_id": "backend_qualified_lead",
+                "name": "Backend-qualified lead outcome",
+                "category": "outcome",
+                "evidence_status": "confirmed",
+                "evidence_refs": ["measurement_framework"],
+                "evidence_locations": [
+                    {
+                        "source_id": "measurement_framework",
+                        "locator": "requirement_backend_qualified_lead",
+                    }
+                ],
+                "business_question": "Which submitted leads are later qualified by the business system?",
+                "official_candidate": "generate_lead",
+                "official_fit": "not_applicable",
+                "decision": "covered_elsewhere",
+                "decision_reason": "Qualification exists only in the backend lead-management system.",
+                "event_names": [],
+                "discovery_hint_ids": [],
+            }
+        )
+        context["measurement_opportunities"].append(opportunity)
+        context["journey_coverage"][1]["opportunity_ids"].append("backend_qualified_lead")
+        plan = json.loads((ROOT / "references" / "example-tracking-plan.json").read_text(encoding="utf-8"))
+        self.assertEqual(validate_analysis_context(context, plan, delivery=True), [])
+
+    def test_framework_does_not_bound_independent_live_opportunities(self) -> None:
+        context = self.analysis_context()
+        self.add_framework_source(context, "journey_quote_request")
+        quote = context["measurement_opportunities"][1]
+        quote["evidence_refs"].append("measurement_framework")
+        quote["evidence_locations"] = [
+            {
+                "source_id": "measurement_framework",
+                "locator": "journey_quote_request",
+            }
+        ]
+        plan = json.loads((ROOT / "references" / "example-tracking-plan.json").read_text(encoding="utf-8"))
+        self.assertEqual(validate_analysis_context(context, plan, delivery=True), [])
+        self.assertEqual(
+            context["measurement_opportunities"][0]["evidence_refs"],
+            ["live_site"],
+        )
+
+    def test_markdown_framework_uses_a_section_reference_without_fabricated_ids(self) -> None:
+        context = self.analysis_context()
+        self.add_framework_source(context, "Journeys > Quote request")
+        source = context["sources"][-1]
+        source["reference"] = "measurement-framework.md"
+        source["framework_intake"] = {
+            "artifact_format": "markdown_only",
+            "quality_status": "unknown",
+            "applicable_material_refs": ["Journeys > Quote request"],
+        }
+        quote = context["measurement_opportunities"][1]
+        quote["evidence_refs"].append("measurement_framework")
+        quote["evidence_locations"] = [
+            {
+                "source_id": "measurement_framework",
+                "locator": "Journeys > Quote request",
+            }
+        ]
+        plan = json.loads((ROOT / "references" / "example-tracking-plan.json").read_text(encoding="utf-8"))
+        self.assertEqual(validate_analysis_context(context, plan, delivery=True), [])
+
+    def test_handoff_retains_framework_status_without_exposing_reconciliation(self) -> None:
+        context = self.analysis_context()
+        self.add_framework_source(context, "journey_quote_request")
+        plan = json.loads((ROOT / "references" / "example-tracking-plan.json").read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            canonical = directory / "plan.json"
+            canonical.write_text(json.dumps(plan), encoding="utf-8")
+            handoff = build_handoff(
+                skill_version="2.8.0",
+                plan=plan,
+                analysis_context=context,
+                approval_state="draft",
+                approved_by=None,
+                artifact_paths=[(canonical, "canonical_tracking_plan")],
+                root=directory,
+            )
+        Draft202012Validator(
+            json.loads((ROOT / "references" / "schema-delivery-handoff.json").read_text(encoding="utf-8"))
+        ).validate(handoff)
+        framework = next(
+            source for source in handoff["upstream_evidence"]
+            if source["source_type"] == "measurement_framework"
+        )
+        self.assertEqual(framework["framework_intake"]["quality_status"], "pass")
+        self.assertNotIn("applicable_material_refs", framework["framework_intake"])
 
     def test_not_tested_gap_cannot_be_relabelled_as_externally_blocked(self) -> None:
         context = self.analysis_context()

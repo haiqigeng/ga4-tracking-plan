@@ -31,6 +31,8 @@ For a complete plan, read:
 
 Read only the relevant scenario reference:
 
+- supplied measurement framework:
+  `references/measurement-framework-intake.md`
 - ecommerce: `references/scenario-ecommerce.md`
 - search, listing, filtering, sorting, or merchandising discovery:
   `references/scenario-search-and-listing.md`
@@ -57,6 +59,13 @@ Read only the relevant scenario reference:
 - Treat every evidence source according to what it can prove. Distinguish live
   behavior, intended future design, business requirements, current tracking,
   technical data capability, and historical contracts.
+- When a measurement framework is supplied, use it as optional, non-governing
+  upstream business evidence. Let it seed discovery priorities, candidate
+  material journeys, business questions, and semantic facts to investigate.
+  It creates a duty to investigate and decide, not a duty to implement. Never
+  let it replace or narrow rendered, design, or technical discovery; never
+  derive GA4 events, parameters, triggers, or dataLayer structures from it
+  mechanically.
 - For a new or fresh run, use a new run ID and source inventory containing only
   explicitly supplied artifacts and current-run evidence. Never reuse another
   client's plans, values, or prior discovery merely because they remain in the
@@ -70,13 +79,13 @@ Read only the relevant scenario reference:
   is blocked when a material journey or value domain is neither covered nor
   explicitly bounded.
 - Bind every rendered discovery report to the analysis context by SHA-256.
-  Every discovery hint must map to an explicit measured, excluded, or
-  unresolved opportunity; every discovered journey and material funnel
+  Every discovery hint must map to an explicit measured, covered-elsewhere,
+  excluded, or unresolved opportunity; every discovered journey and material funnel
   variant must map to the coverage ledger. Never let one successful variant
   close a different route family, funnel shape, or component implementation.
   Treat structural hints as candidates until analyst reasoning establishes
   materiality. Every bounded interaction-family hint still needs an explicit
-  measure or exclude decision; do not turn every detected control into a
+  measure, covered-elsewhere, or exclude decision; do not turn every detected control into a
   mandatory event.
 - Classify rendered pages from weighted route, title, heading, main-content,
   and component evidence. Exclude global header/footer controls from page
@@ -175,6 +184,9 @@ Read only the relevant scenario reference:
 2. Ingest all relevant user, business, design, technical, GTM, and historical
    artifacts into the validated analysis context, including evidence roles,
    conflicts, hashes where available, and safe-test boundaries.
+   When a measurement framework is present, follow
+   `references/measurement-framework-intake.md` inside this same intake step;
+   do not activate another workflow or reduce independent discovery.
 3. Explore real public and safely accessible gated journeys in the rendered
    website. Use stratified sitemap and rendered-link candidates, then run
    targeted rounds for uncovered journey families, page archetypes, and
@@ -187,12 +199,16 @@ Read only the relevant scenario reference:
    inventing behavior or treating a sample cap or another variant's success
    as completeness. A valid partial
    discovery report remains usable input and must continue into analyst
-   resolution rather than aborting the workflow. Require an explicit
-   measure/exclude decision for every generated interaction-family hint.
+   resolution rather than aborting the workflow. Require an explicit measure,
+   covered-elsewhere, or exclude decision for every generated interaction-
+   family hint.
 4. Build the business-value and journey-variant model, then create an internal
    measurement-opportunity ledger covering every material outcome,
-   progression signal, and actionable diagnostic. Resolve every opportunity
-   as measured or deliberately excluded before choosing events.
+   progression signal, and actionable diagnostic. Give every opportunity an
+   explicit measured, covered-elsewhere, excluded, or unresolved disposition before
+   choosing events. Every applicable material framework journey or web-
+   measurement requirement needs an explicit opportunity disposition, while
+   independently discovered needs remain equally eligible for inclusion.
 5. For every measured opportunity, evaluate current official GA4 semantics
    first, including the complete event parameter table and applicable
    implementation guidance. Select the official event when it fits; otherwise
@@ -204,8 +220,9 @@ Read only the relevant scenario reference:
 7. Validate journey and measurement-opportunity coverage, official fit, scope,
    requiredness, custom gaps, dataLayer parity,
    GA4 limits, User-ID handling, purchase customer type, event-purpose and
-   trigger overlap, plan-wide coherence, and human wording. Review and resolve
-   every warning before delivery.
+   trigger overlap, plan-wide coherence, framework-intake disposition closure
+   when applicable, and human wording. Review and resolve every warning before
+   delivery.
 8. Build the atomic delivery through the supplied template or
    `assets/default-tracking-plan.xlsx`. Validate the rendered workbook,
    non-overlapping merged-cell structure, supplied-template fidelity,

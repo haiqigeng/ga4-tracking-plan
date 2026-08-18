@@ -203,7 +203,10 @@ def validate_discovery_bindings(
                 errors.append(f"Opportunity '{opportunity.get('opportunity_id')}' and hint '{hint_id}' use different journey variants.")
     missing_hints = sorted(set(known_hints) - mapped_hints)
     if missing_hints:
-        errors.append("Discovered hints without an explicit measure/exclude/unresolved opportunity: " + ", ".join(missing_hints))
+        errors.append(
+            "Discovered hints without an explicit measure/covered-elsewhere/exclude/unresolved opportunity: "
+            + ", ".join(missing_hints)
+        )
     covered_journeys = {str(item.get("journey_id")) for item in context.get("journey_coverage", []) if isinstance(item, dict)}
     missing_journeys = sorted(known_journeys - covered_journeys)
     if missing_journeys:

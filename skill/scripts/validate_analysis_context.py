@@ -181,7 +181,7 @@ def _validate_opportunity_provenance(
             f"$.measurement_opportunities[{index}]",
             (
                 f"Discovery-backed opportunity '{opportunity.get('opportunity_id')}' still needs an explicit "
-                "measure or exclude decision. Candidate does not mean silently optional."
+                "measure, covered-elsewhere, or exclude decision. Candidate does not mean silently optional."
             ),
         )
     if delivery and opportunity.get("decision") != "unresolved":
@@ -221,6 +221,125 @@ def _validate_gap_evidence_state(gap: dict[str, Any], issues: list[Issue]) -> No
             "Test it, exclude it with an analyst reason, or leave it unresolved."
         ),
     )
+
+
+def _framework_opportunity_matches(
+    opportunities: list[dict[str, Any]],
+    source_id: str,
+    required_refs: set[str],
+) -> dict[str, list[tuple[int, dict[str, Any]]]]:
+    mapped: dict[str, list[tuple[int, dict[str, Any]]]] = {}
+    for opportunity_index, opportunity in enumerate(opportunities):
+        locators = {
+            str(location.get("locator", ""))
+            for location in opportunity.get("evidence_locations", [])
+            if isinstance(location, dict)
+            and location.get("source_id") == source_id
+            and str(location.get("locator", "")) in required_refs
+        }
+        for locator in locators:
+            mapped.setdefault(locator, []).append((opportunity_index, opportunity))
+    return mapped
+
+
+def _validate_framework_match(
+    framework_ref: str,
+    matches: list[tuple[int, dict[str, Any]]],
+    source_id: str,
+    issues: list[Issue],
+) -> None:
+    missing_evidence_refs = [
+        opportunity_index
+        for opportunity_index, opportunity in matches
+        if source_id not in opportunity.get("evidence_refs", [])
+    ]
+    if missing_evidence_refs:
+        issue(
+            issues,
+            "error",
+            "MEASUREMENT_FRAMEWORK_LOCATION_NOT_EVIDENCE",
+            "$.measurement_opportunities",
+            (
+                f"Framework reference '{framework_ref}' uses a structured locator but its source is "
+                "missing from evidence_refs on opportunities: "
+                + ", ".join(str(index) for index in missing_evidence_refs)
+            ),
+        )
+    if any(opportunity.get("material") is True for _index, opportunity in matches):
+        return
+    opportunity_indexes = ", ".join(str(index) for index, _opportunity in matches)
+    issue(
+        issues,
+        "error",
+        "MEASUREMENT_FRAMEWORK_ITEM_NOT_MATERIAL",
+        "$.measurement_opportunities",
+        (
+            f"Applicable material framework reference '{framework_ref}' is mapped only to "
+            f"non-material opportunities ({opportunity_indexes})."
+        ),
+    )
+
+
+def _validate_framework_source(
+    source_index: int,
+    source: dict[str, Any],
+    opportunities: list[dict[str, Any]],
+    delivery: bool,
+    issues: list[Issue],
+) -> None:
+    source_id = str(source.get("source_id", ""))
+    intake = source.get("framework_intake", {})
+    required_refs = {
+        str(value)
+        for value in intake.get("applicable_material_refs", [])
+    }
+    mapped = _framework_opportunity_matches(opportunities, source_id, required_refs)
+    missing = sorted(required_refs - set(mapped))
+    if delivery and missing:
+        issue(
+            issues,
+            "error",
+            "MEASUREMENT_FRAMEWORK_ITEM_UNDISPOSITIONED",
+            f"$.sources[{source_index}].framework_intake.applicable_material_refs",
+            (
+                "Applicable material framework references need an exact measurement-opportunity "
+                "locator and disposition: " + ", ".join(missing)
+            ),
+        )
+    for framework_ref, matches in mapped.items():
+        _validate_framework_match(framework_ref, matches, source_id, issues)
+
+
+def _validate_measurement_framework_intake(
+    sources: list[dict[str, Any]],
+    opportunities: list[dict[str, Any]],
+    context_version: str,
+    delivery: bool,
+    issues: list[Issue],
+) -> None:
+    frameworks = [
+        (index, source)
+        for index, source in enumerate(sources)
+        if source.get("source_type") == "measurement_framework"
+    ]
+    if not frameworks:
+        return
+    if context_version != "1.1.0":
+        issue(
+            issues,
+            "error",
+            "MEASUREMENT_FRAMEWORK_CONTEXT_VERSION",
+            "$.context_version",
+            "Measurement-framework intake requires analysis-context version 1.1.0.",
+        )
+    for source_index, source in frameworks:
+        _validate_framework_source(
+            source_index,
+            source,
+            opportunities,
+            delivery,
+            issues,
+        )
 
 
 def validate_analysis_context(
@@ -309,6 +428,13 @@ def validate_analysis_context(
         if item.get("source_type") == "live_website"
     }
     language_decision = context.get("language_decision", {})
+    _validate_measurement_framework_intake(
+        sources,
+        opportunities,
+        context_version,
+        delivery,
+        issues,
+    )
     unknown_language_refs = sorted(set(str(value) for value in language_decision.get("evidence_refs", [])) - known_sources)
     if unknown_language_refs:
         issue(
@@ -493,7 +619,8 @@ def validate_analysis_context(
             "error",
             "DISCOVERY_HINT_DECISION_MISSING",
             "$.measurement_opportunities",
-            "Every discovered hint needs a measure, exclude, or unresolved decision: " + ", ".join(missing_discovery_hints),
+            "Every discovered hint needs a measure, covered-elsewhere, exclude, or unresolved decision: "
+            + ", ".join(missing_discovery_hints),
         )
     missing_discovery_journeys = sorted(known_discovery_journeys - set(coverage_ids))
     if missing_discovery_journeys:

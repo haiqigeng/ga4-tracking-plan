@@ -36,11 +36,18 @@ Treat sources as first-class only for what they can establish:
 | --- | --- |
 | Live rendered website | Current user experience, interactions, visible values |
 | User or business brief | Required outcomes, priorities, intended use |
+| Measurement framework | Candidate material journeys, objectives, KPI decision uses, semantic requirements, applicability, and stated evidence boundaries |
 | Figma or design specification | Intended future experience |
 | GTM export or dataLayer evidence | Current implementation |
 | Backend, API, CMS, or technical specification | Data capability and source logic |
 | Previous tracking plan | Historical or approved contract |
 | Analytics export | Current data use and implementation symptoms |
+
+When a measurement framework is supplied, read
+`measurement-framework-intake.md`. Consume it inside this evidence-intake
+step; do not add a framework mode or branch. It may establish business intent
+and investigation priority, but it cannot establish rendered behavior,
+technical feasibility, current collection, or final GA4 semantics.
 
 For a fresh task, generate one new run ID and source inventory. Include only
 artifacts supplied for that task and evidence generated during that run; do
@@ -127,7 +134,7 @@ underlying heuristic key is identical. Structural heuristics remain
 non-material candidates until a business question promotes them; journey
 outcomes and material funnel progressions remain material decisions. Detection
 never mandates an event, but every generated family-level candidate requires
-an explicit measure or exclude decision.
+an explicit measure, covered-elsewhere, or exclude decision.
 
 Do not automatically turn a blocked capability into a visible event
 recommendation. Include an unobserved journey only when user, business,
@@ -170,8 +177,12 @@ moment, keep both only when their distinct purposes and semantics are clear.
 
 Build the `measurement_opportunities` ledger before selecting events. Every
 material journey references at least one opportunity. Resolve each material
-opportunity as measured or deliberately excluded, and map every measured
-opportunity to its canonical event names. Use
+opportunity with an explicit measured, covered-elsewhere, excluded, or
+unresolved disposition, and map every measured opportunity to its canonical
+event names.
+When a framework is supplied, bind each applicable material framework journey
+or web-measurement requirement to a material opportunity with an exact source
+locator and explicit disposition. Use
 `references/discovery-and-coverage.md` for the closure test.
 
 ## 5. Design Events And Parameters

@@ -29,6 +29,7 @@ REQUIRED_SKILL_FILES = {
     "references/product.md",
     "references/workflow.md",
     "references/discovery-and-coverage.md",
+    "references/measurement-framework-intake.md",
     "references/official-first.md",
     "references/official-semantic-rules.md",
     "references/workbook-contract.md",
