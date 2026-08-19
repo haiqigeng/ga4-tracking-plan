@@ -1,6 +1,6 @@
 {
   "name": "ga4-tracking-plan",
-  "version": "2.9.0",
+  "version": "2.9.1",
   "schema_version": "5.0.0",
   "released_on": "2026-08-19",
   "python_requires": ">=3.11"

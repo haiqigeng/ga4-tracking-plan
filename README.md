@@ -246,6 +246,13 @@ The skill does not:
 
 ## Versioning
 
+Version `2.9.1` is a CI-portability patch with no tracking-plan workflow,
+schema, or visible-workbook change. Browser end-to-end fixtures now skip
+cleanly when the Playwright package is installed without a browser executable,
+while the dedicated browser job remains fail-closed through
+`GA4_REQUIRE_BROWSER_E2E=1` and still requires the full rendered discovery
+suite to pass.
+
 Version `2.9.0` keeps canonical plan schema `5.0.0` and strengthens two
 North-Star-critical capabilities without adding workflow modes or visible
 workbook machinery. Rendered discovery report `1.4.0` adds optional ephemeral

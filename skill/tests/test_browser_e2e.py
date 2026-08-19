@@ -225,7 +225,7 @@ class BrowserDiscoveryEndToEndTests(unittest.TestCase):
                 server.shutdown()
                 server.server_close()
                 thread.join(timeout=5)
-            if process.returncode not in {0, 1} and any(
+            if any(
                 token in f"{process.stdout}\n{process.stderr}"
                 for token in ("Executable doesn't exist", "browser build", "Playwright is required")
             ):
