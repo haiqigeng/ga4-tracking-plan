@@ -35,14 +35,27 @@ request is a journey-coverage problem, not a request to crawl every URL.
    merely the first form found for a journey. Record the outcome against that
    exact variant and form. Success on a standard quote form does not prove
    success on a two-step landing-page quote form or a sibling contact tab.
-6. The rendered helper inspects the coverage ledger after each round and
+6. When authorised access profiles are supplied, acquire only ephemeral
+   in-memory state and rerun the same candidate-building loop separately for
+   each supplied or observed role. Verify the explicit authenticated-state
+   predicate before each round, allow at most one automatic reauthentication,
+   and treat session expiry or MFA as an evidenced boundary. Never infer
+   unsupplied roles or stop discovery at the dashboard.
+   Persist only sanitised evidence: no raw form-entry values, cookies, tokens,
+   storage state or URL query values. Retain query keys and non-reversible
+   value hashes when they are needed to distinguish technical variants.
+7. The rendered helper inspects the coverage ledger after each round and
    automatically continues with unvisited material families until closure or
    the explicit maximum-round boundary. A page limit ends only one round.
-7. Inventory bounded interaction families such as tabbed forms, locator
-   selection, coupon application, FAQ accordions, meaningful downloads,
-   business-process errors, modals, and filter/sort application. Record one
-   decision per family and variant, not one event per control.
-8. Stop only when each material journey, variant, and interaction family is
+8. Inventory and safely probe one representative per relevant family and
+   state: tabs, accordions, modals, search results, filters/sort, pagination,
+   locators, configurators, iframe forms, video, deliberate contact handoffs,
+   meaningful downloads and business-process errors. Reset state between
+   probes. After a material SPA transition, rescan local links, forms,
+   controls, frames and finite values. Keep print/share and carousel rotation
+   detect-only unless a concrete question makes them material; never create a
+   generic scroll or outbound-click inventory.
+9. Stop only when each material journey, variant, role/state, and interaction family is
    observed, confirmed by another source, deliberately excluded, or bounded
    with a concrete gap. Never translate `partial` into `complete` in the
    delivery message.
@@ -56,6 +69,16 @@ outside the sampling budget, `partial` for evidence that covers only part of a
 journey, and `externally_blocked` for an evidenced CAPTCHA, access, browser, or
 technical barrier. Analyst resolutions such as excluded or confirmed
 elsewhere are separate fields; they must not rewrite the factual state.
+
+Use claim-specific evidence. `inventory_observed` needs a rendered-state
+artifact; `progression_observed` needs a before/after material state;
+`failure_observed` needs an explicit validation or business-error component;
+`submission_observed` needs a bounded action window; and
+`success_confirmed` needs a positive selector, expected route/application
+state, or allowlisted redacted backend outcome. A form disappearing, a generic
+success word, a cookie or an existing dataLayer/GA4 hit is not a positive
+business-outcome oracle. The validator reports
+`OBSERVED_WITHOUT_DIRECT_EVIDENCE` when an asserted state outruns its proof.
 
 For a finite control, retain the declared option count, captured unique count,
 technical values, localized labels, and evidence URLs. Mark it complete only

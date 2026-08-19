@@ -1,0 +1,44 @@
+{
+  "access_profiles_version": "1.0.0",
+  "profiles": [
+    {
+      "profile_id": "customer",
+      "role": "customer",
+      "entry_urls": [
+        "https://portal.example.com/dashboard"
+      ],
+      "allowed_hosts": [
+        "portal.example.com",
+        "*.sso.example.com"
+      ],
+      "access_method": "login_recipe",
+      "login_url": "https://portal.example.com/login",
+      "login_recipe": [
+        {
+          "action": "fill",
+          "selector": "#email",
+          "value_source": "environment",
+          "environment_name": "GA4_TEST_EMAIL"
+        },
+        {
+          "action": "fill",
+          "selector": "#password",
+          "value_source": "environment",
+          "environment_name": "GA4_TEST_PASSWORD"
+        },
+        {
+          "action": "click",
+          "selector": "button[type='submit']"
+        }
+      ],
+      "success_predicate": {
+        "selector_visible": "[data-authenticated='true']"
+      },
+      "consequential_action_patterns": [
+        "logout",
+        "close account"
+      ],
+      "session_disposition": "discard_after_run"
+    }
+  ]
+}

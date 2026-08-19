@@ -142,6 +142,14 @@ The result is ready when:
     journey or web-measurement requirement is investigated and dispositioned,
     while the normal discovery process remains able to add needs absent from
     that framework.
+18. Supplied or observed authenticated roles are rediscovered independently
+    after login, session and consequential boundaries are explicit, and no
+    factual progression, submission or success state outruns its direct
+    evidence.
+19. A supplied template passes a SHA-bound mapping/capacity gate, writer
+    preflight, canonical semantic parity, complete structural comparison and
+    package preservation checks; unsupported richness causes an exact refusal,
+    never silent degradation.
 
 ## Non-Goals
 

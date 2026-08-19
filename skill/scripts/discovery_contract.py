@@ -6,6 +6,7 @@ from typing import Any
 
 from contract_utils import sha256_file
 from discovery_quality import coverage_gap_identity, merge_evidence_coverage_statuses
+from journey_evidence import validate_interaction_run_evidence
 from jsonschema import Draft202012Validator, FormatChecker
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,6 +37,15 @@ def validate_discovery_report(report: dict[str, Any]) -> list[str]:
             messages.append(f"{path}: complete capture requires captured_value_count == observed_value_count <= 50")
         if status == "over_50" and observed <= 50:
             messages.append(f"{path}: over_50 requires observed_value_count above 50")
+    if report.get("discovery_version") == "1.4.0":
+        for collection in ("automatic_interaction_runs", "interaction_probe_runs"):
+            for index, run in enumerate(report.get(collection, [])):
+                if not isinstance(run, dict):
+                    continue
+                messages.extend(
+                    f"{collection}/{index}: {message}"
+                    for message in validate_interaction_run_evidence(run)
+                )
     return messages
 
 

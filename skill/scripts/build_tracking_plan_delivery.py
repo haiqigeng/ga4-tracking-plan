@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from adapt_tracking_plan_workbook import adapt
+from adapt_tracking_plan_workbook import save_adapted_workbook
 from check_official_sources import DEFAULT_CACHE, check
 from delivery_artifacts import (
     build_handoff,
@@ -20,12 +20,6 @@ from discovery_contract import load_discovery_report, validate_discovery_binding
 from generate_tracking_plan_workbook import build_workbook
 from jsonschema import Draft202012Validator, FormatChecker
 from maintenance_analysis import analyze_change_impact, detect_context_drift
-from openpyxl import load_workbook
-from template_fidelity import (
-    add_package_fidelity,
-    compare_template_fidelity,
-    workbook_fidelity_snapshot,
-)
 from tracking_plan_model import load_json
 from validate_analysis_context import validate_analysis_context
 from validate_tracking_plan import render_text, validate_plan
@@ -42,6 +36,8 @@ CONTRACTS = {
     "change-request.schema.json": ROOT / "references" / "schema-change-request.json",
     "drift-report.schema.json": ROOT / "references" / "schema-drift-report.json",
     "impact-report.schema.json": ROOT / "references" / "schema-impact-report.json",
+    "access-profiles.schema.json": ROOT / "references" / "schema-access-profiles.json",
+    "template-map.schema.json": ROOT / "references" / "schema-template-map.json",
 }
 
 
@@ -308,37 +304,27 @@ def build_delivery(args: argparse.Namespace) -> Path:
         workbook_path = staging / ("tracking-plan.xlsm" if args.template and args.template.suffix.lower() == ".xlsm" else "tracking-plan.xlsx")
         if args.template:
             mapping = load_json(args.mapping)
-            workbook = adapt(plan, args.template, mapping)
+            template_result = save_adapted_workbook(plan, args.template, mapping, workbook_path)
+            effective_mapping = template_result["effective_mapping"]
+            template_map_path = internal / "template-map.json"
+            _write_json(template_map_path, mapping)
+            artifacts.append((template_map_path, "supplied_template_mapping_and_preflight"))
         else:
             workbook = build_workbook(
                 plan,
                 changes=changes,
                 screenshot_dir=args.screenshot_dir,
             )
-        workbook.save(workbook_path)
+            workbook.save(workbook_path)
         if args.template:
-            reopened = load_workbook(
-                workbook_path,
-                data_only=False,
-                read_only=False,
-                keep_links=True,
-                keep_vba=workbook_path.suffix.lower() == ".xlsm",
-            )
-            fidelity = compare_template_fidelity(
-                workbook._ga4_template_fidelity_before,
-                workbook_fidelity_snapshot(reopened),
-                workbook._ga4_template_fidelity_authorized,
-            )
-            fidelity = add_package_fidelity(fidelity, args.template, workbook_path)
-            if fidelity["violations"]:
-                raise ValueError("Saved supplied-template fidelity gate failed: " + ", ".join(str(item.get("kind")) for item in fidelity["violations"][:12]))
+            fidelity = template_result["fidelity"]
             fidelity_path = internal / "template-fidelity.json"
             _write_json(fidelity_path, fidelity)
             artifacts.append((fidelity_path, "supplied_template_fidelity"))
         workbook_errors = validate_workbook(
             workbook_path,
             plan,
-            mapping if args.template else None,
+            effective_mapping if args.template else None,
         )
         if workbook_errors:
             raise ValueError("Rendered workbook gate failed:\n" + "\n".join(f"- {error}" for error in workbook_errors))

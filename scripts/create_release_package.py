@@ -25,6 +25,7 @@ WRAPPER_NAMES = [
     "import_tracking_plan_workbook.py",
     "inspect_browser_environment.py",
     "inspect_tracking_plan_template.py",
+    "template_preflight.py",
     "validate_analysis_context.py",
     "validate_tracking_plan.py",
     "validate_tracking_plan_workbook.py",

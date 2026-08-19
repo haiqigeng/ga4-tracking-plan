@@ -22,6 +22,36 @@ print settings. Map tracking-plan semantics into the corresponding regions.
   overlaps by removing records even when a Python workbook reader accepts the
   package.
 
+Inspect to a validated `schema-template-map.json` bound to the exact template
+SHA-256. Each repeating region records its semantic role, sheet and fields,
+exact existing writable value cells, protected formula cells, prototype row,
+capacity, approved growth policy, table/total binding, permitted structural
+changes and overflow policy. Event-tab cloning is allowed only from an
+explicit hidden prototype. Automatic mapping may proceed when unique; equal-
+plausibility regions, formula/value conflicts, an uncertain dataLayer
+location, insufficient fixed capacity, or missing prototype require an exact
+review boundary.
+
+Before mutation, inventory formulas, names, tables, validations, conditional
+formatting, charts, drawings, images, pivots, slicers, external links, custom
+XML, macros, workbook/sheet/view and print properties. Use the ordinary writer
+only for tested-safe XLSX structures. Route supported rich Windows workbooks
+to native Excel with macros disabled, external-link updates off and
+calculation manual during mutation. If the required writer is unavailable or
+a feature is unsupported/unverified, refuse with the feature, location,
+reason and sanctioned next step. Never emit a simplified fallback.
+
+For an existing mapped cell, authorise only its intended value and, where
+declared, hyperlink. Continue comparing formula status/type, font, fill,
+border, alignment/wrapping, number format, protection and comments. An
+approved table or prototype expansion must preserve formulas, totals, table
+style, validation, conditional formatting, names, filters and row layout.
+Fidelity after saving has three independent layers: canonical semantic parity,
+complete unsampled structural comparison, and OOXML package-part/protected-
+binary comparison. A masked rendered-layout smoke test is additional evidence
+only when a deterministic renderer is available; it is never the primary
+gate.
+
 ## Default Template
 
 When no template is supplied, use `assets/default-tracking-plan.xlsx`. It has:

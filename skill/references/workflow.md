@@ -104,6 +104,20 @@ During investigation:
 - record blocked boundaries without inventing hidden pages, values, or
   triggers.
 
+When the user supplies authorised gated access, validate an optional
+`access-profiles.json` inside this same workflow. Each profile declares its
+role, entry URLs, allowed hosts, access method, environment-variable names or
+headful handoff, explicit success predicate, consequential boundaries, and
+final disposition. Keep state in memory or session scratch only; never write
+credentials, cookies, tokens, raw storage state, or synthetic identities to
+discovery, screenshots, delivery, cache, or Git. Isolate roles, verify session
+validity before every round, and permit at most one automatic
+reauthentication. A successful login starts systematic authenticated
+rediscovery; it does not close account or service coverage.
+Before persisting the discovery report, remove raw browser state and sensitive
+scalar values, strip fragments, and replace every URL query value with a
+non-reversible short hash while retaining route and query-key structure.
+
 Static HTML, sitemaps, robots files, and URL exports support coverage but do not
 replace rendered interaction.
 
@@ -127,6 +141,21 @@ contract, appointment confirmation, fulfilment, deletion, or another
 consequential boundary. Use a manually authored recipe only when the generated
 one cannot express a material safe journey. This is discovery evidence, not
 runtime certification.
+
+Track form evidence internally as inventory, progression, representative
+failure, submission, and confirmed success. Assert only the highest state with
+direct evidence. Success requires an explicit confirmation selector, expected
+route or material application state, or allowlisted redacted backend outcome;
+form disappearance and generic success text are prohibited sole oracles.
+
+Run one bounded, reset-state probe per detected interaction family and
+relevant state, not one per control. Probe safe tabs, accordions, modals,
+filters, locators, search results, pagination, configurators, iframe forms,
+media and ARIA controls; keep downloads, contact handoffs, print/share and
+carousel controls detect-only when execution adds no safe evidence. Rescan
+local forms, actions, links, frames and finite values after material SPA state
+changes. The resulting family candidate still requires analyst materiality
+and an explicit measure, covered-elsewhere, or exclude decision.
 
 Keep hint identity contextual. The same filter pattern on a product listing
 and a catalogue interface represents two separate candidates, even if the
@@ -248,6 +277,24 @@ specifications. Check:
   coherent across the full journey;
 - human readability;
 - supplied-template fidelity.
+
+For a supplied template, validate the SHA-bound `schema-template-map.json`
+before mutation. Stop on equal-plausibility mappings, formula-bearing writable
+cells, missing dataLayer locations, insufficient fixed capacity, or required
+event tabs without an explicit prototype. Run the richness preflight and
+select only a proven writer: ordinary openpyxl for safe XLSX structures,
+native Excel for supported rich Windows workbooks, otherwise an exact refusal.
+There is no reduced-fidelity fallback.
+
+Authorise existing mapped cells by property: normally value and an intended
+hyperlink only. Continue comparing formulas, types, styles, comments, number
+formats, protection, workbook/sheet properties and all unmapped content.
+Approved variable-length regions must extend the actual Excel table or copy a
+declared prototype row while preserving formulas, totals, validation,
+conditional formatting, names, filters and row layout. Clone event tabs only
+from an explicit prototype. After save, require canonical semantic parity,
+full unsampled structural comparison and package-part/protected-binary checks;
+run a masked visual smoke test only when a deterministic renderer is present.
 
 Delivery is strict: schema errors and warnings, unresolved material coverage,
 official-source failures, visible-workbook drift, generated-schema failures,

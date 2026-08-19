@@ -214,6 +214,9 @@ def _merge_variants(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         {
             "variant_id": variant_id,
+            "access_profile_id": str(_representative(variant_records).get("access_profile_id", "public")),
+            "role": str(_representative(variant_records).get("role", "public")),
+            "state_id": str(_representative(variant_records).get("state_id", "entry")),
             "material": any(record.get("material") is True for record in variant_records),
             "status": merge_evidence_coverage_statuses(
                 [str(record.get("status", "")) for record in variant_records]
@@ -399,6 +402,19 @@ def merge_discovery_reports(reports: list[dict[str, Any]]) -> dict[str, Any]:
     report_ids = [str(report["report_id"]) for report in ordered]
     digest = hashlib.sha256("|".join(report_ids).encode("utf-8")).hexdigest()[:16]
     primary_languages = [str(report["language_summary"]["primary_language"]) for report in ordered]
+    access_profiles_by_id: dict[str, dict[str, Any]] = {}
+    for report in ordered:
+        for profile in report.get("access_profile_runs", []):
+            if not isinstance(profile, dict) or not profile.get("profile_id"):
+                continue
+            profile_id = str(profile["profile_id"])
+            existing = access_profiles_by_id.get(profile_id)
+            if existing and (
+                str(existing.get("role", "")) != str(profile.get("role", ""))
+                or sorted(existing.get("allowed_hosts", [])) != sorted(profile.get("allowed_hosts", []))
+            ):
+                raise ValueError(f"Access profile '{profile_id}' conflicts across discovery reports.")
+            access_profiles_by_id[profile_id] = dict(profile)
     return {
         "report_id": f"discovery_merged_{digest}",
         **({"run_id": next(iter(run_ids))} if run_ids else {}),
@@ -418,4 +434,20 @@ def merge_discovery_reports(reports: list[dict[str, Any]]) -> dict[str, Any]:
         "measurement_opportunity_hints": _merge_hints(ordered),
         "journey_coverage_ledger": merged_ledger,
         "coverage_gaps": _merge_gaps(ordered, merged_ledger),
+        "access_profile_runs": [
+            access_profiles_by_id[key]
+            for key in sorted(access_profiles_by_id)
+        ],
+        "interaction_probe_runs": [
+            item
+            for report in ordered
+            for item in report.get("interaction_probe_runs", [])
+            if isinstance(item, dict)
+        ],
+        "side_effect_log": [
+            item
+            for report in ordered
+            for item in report.get("side_effect_log", [])
+            if isinstance(item, dict)
+        ],
     }

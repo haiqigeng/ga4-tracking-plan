@@ -51,6 +51,12 @@ Read only the relevant scenario reference:
 - Investigate the live website with an interactive browser. Accept the CMP
   choice needed for investigation and use safe synthetic information for
   accessible forms, signup, login, and gated journeys unless the user opts out.
+- When authorised gated access is supplied, use validated access profiles
+  inside this same workflow. Isolate roles and browser contexts, follow only
+  explicit entry URLs and allowed hosts, read credential or storage-state
+  locations only from named environment variables, reauthenticate at most
+  once, and discard raw credentials, cookies, tokens, and storage state after
+  the run. Headful MFA or SSO handoff requires an explicit human continue.
 - Build the rendered candidate universe from supplied entry points, stratified
   sitemap evidence, and discovered links. Explore by distinct journey,
   template, route family, and interaction rather than link order or repeated
@@ -96,6 +102,16 @@ Read only the relevant scenario reference:
 - Keep factual discovery state separate from analyst resolution. `not_tested`
   is not an external blocker; use `externally_blocked` only for an evidenced
   access or execution barrier and never relabel sampling limits as blocked.
+- Require evidence appropriate to every factual claim. Existence needs a
+  rendered-state artifact, execution an action trace, progression a before/
+  after material state, submission an action window, and success a positive
+  selector, expected route or application state, or allowlisted redacted
+  backend outcome. Form disappearance, a generic success word, a cookie, or an
+  existing analytics push cannot prove business success.
+- Probe one safe representative per detected interaction family and relevant
+  state in an isolated or reset context. Rescan material SPA states, forms,
+  controls, finite values, frames, and links after a transition. Detection
+  still creates an analyst decision candidate, not an automatic GA4 event.
 - Include only manually implemented measurement in the tracking plan. Do not
   include automatic or enhanced-measurement events, native/no-push rows, or
   related implementation guidance.
@@ -176,6 +192,17 @@ Read only the relevant scenario reference:
   registry. Default to all parameters actually used; use a custom-only view
   only when the template owner confirms that meaning. Validate every mapped
   semantic region against the canonical model after saving.
+- Bind every supplied-template map to the exact workbook hash and validate its
+  writable value cells, formula-protected cells, capacity, growth policy,
+  table membership, and any explicit event-tab prototype. Run a rich-feature
+  preflight before mutation. Use the ordinary writer only for proven-safe
+  XLSX structures, native Excel for supported rich Windows templates, and
+  otherwise stop with the exact unsupported feature; never fall back to a
+  reduced-fidelity workbook.
+- For mapped cells, authorise value or intended hyperlink changes only.
+  Preserve formulas, comments, styles, number formats, protection, layout,
+  tables, validation, conditional formatting, names, drawings, and package
+  parts unless the mapping explicitly authorises a proven-safe expansion.
 
 ## Adaptive Workflow
 
@@ -202,6 +229,10 @@ Read only the relevant scenario reference:
    resolution rather than aborting the workflow. Require an explicit measure,
    covered-elsewhere, or exclude decision for every generated interaction-
    family hint.
+   When access profiles are supplied, bootstrap each role ephemerally, verify
+   its explicit post-login predicate before each discovery round, then run the
+   same candidate-building engine inside that isolated authenticated context.
+   A dashboard is an entry point, not proof that gated services are covered.
 4. Build the business-value and journey-variant model, then create an internal
    measurement-opportunity ledger covering every material outcome,
    progression signal, and actionable diagnostic. Give every opportunity an
@@ -227,6 +258,9 @@ Read only the relevant scenario reference:
    `assets/default-tracking-plan.xlsx`. Validate the rendered workbook,
    non-overlapping merged-cell structure, supplied-template fidelity,
    per-event schemas, machine contracts, hashes, and approval state.
+   For a supplied template, validate its formal map and capacity, run the
+   richness/writer preflight, expand only approved tables or prototype rows,
+   and prove semantic, structural, and package fidelity after saving.
 9. When a previous plan exists, also import and compare it, then deliver a
    complete updated plan plus a concise change log. Never deliver an addendum
    as the only current source of truth.
@@ -239,6 +273,8 @@ synthetic form progression; use a manual recipe only for a known exception:
 
 ```powershell
 python scripts/discover_site_journeys_playwright.py https://www.example.com/ --output discovery.json
+# Optional authorised gated roles remain part of the same run:
+python scripts/discover_site_journeys_playwright.py https://www.example.com/ --access-profiles access-profiles.json --output discovery.json
 python scripts/build_analysis_context_seed.py discovery.json --output analysis-context.json --target-state as_is
 # Multiple same-site reports from one run merge deterministically:
 python scripts/discover_site_journeys_playwright.py https://www.example.com/ --run-id run_11111111111111111111111111111111 --output discovery-round-1.json
@@ -260,6 +296,7 @@ For a supplied workbook, inspect it once and reuse the hash-bound mapping:
 
 ```powershell
 python scripts/inspect_tracking_plan_template.py client-template.xlsx --output template-map.json
+python scripts/template_preflight.py client-template.xlsx --output template-preflight.json
 python scripts/build_tracking_plan_delivery.py plan.json analysis-context.json --discovery-report discovery.json --template client-template.xlsx --mapping template-map.json --output-dir delivery
 ```
 

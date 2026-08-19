@@ -33,6 +33,12 @@ large, quick, enterprise, or event-count mode.
 - explores rendered public and safely accessible gated journeys;
 - uses synthetic information for safe form, signup, login, and funnel
   investigation unless the user opts out;
+- accepts optional ephemeral access profiles for isolated supplied roles,
+  bounded reauthentication and full post-login rediscovery without storing
+  credentials, cookies, tokens or raw browser state;
+- validates claim-specific evidence for form inventory, progression, failure,
+  submission and success, and safely probes one representative per relevant
+  interaction family/state rather than creating a click inventory;
 - combines website, user, business, Figma, GTM, dataLayer, backend, previous
   plan, and analytics evidence according to what each source can prove;
 - consumes an optional measurement framework as non-governing business input
@@ -48,8 +54,9 @@ large, quick, enterprise, or event-count mode.
   fresh-run binding;
 - specifies exact website triggers, event-specific parameters, source paths,
   and quoted dataLayer pushes;
-- adapts a supplied workbook semantically or uses the integrated default XLSX
-  template;
+- adapts a supplied workbook through a formal hash-bound map, richness/writer
+  preflight, table/prototype-aware expansion and value-only structural/package
+  fidelity gates, or uses the integrated default XLSX template;
 - delivers the workbook atomically with canonical JSON, expected events,
   exact per-event JSON Schemas, official-source verification, hashes, and
   approval state;
@@ -130,6 +137,13 @@ Install dependencies:
 python -m pip install -r requirements.txt
 ```
 
+On Windows, rich supplied templates that the preflight routes to native Excel
+also require Microsoft Excel and the optional adapter dependency:
+
+```powershell
+python -m pip install ".[native-excel]"
+```
+
 For another file- and tool-capable agent, place `skill/` in its supported
 skills directory and load `SKILL.md` as the entry point.
 
@@ -140,6 +154,8 @@ journey:
 
 ```powershell
 python scripts/discover_site_journeys_playwright.py https://www.example.com/ --output discovery.json
+# Optional authorised gated roles use the same discovery workflow:
+python scripts/discover_site_journeys_playwright.py https://www.example.com/ --access-profiles access-profiles.json --output discovery.json
 python scripts/build_analysis_context_seed.py discovery.json --output analysis-context.json
 # Multiple reports from the same site and run merge deterministically:
 python scripts/discover_site_journeys_playwright.py https://www.example.com/ --run-id run_11111111111111111111111111111111 --output discovery-round-1.json
@@ -167,6 +183,7 @@ Inspect and adapt a supplied workbook:
 
 ```powershell
 python scripts/inspect_tracking_plan_template.py client-template.xlsx --output template-map.json
+python scripts/template_preflight.py client-template.xlsx --output template-preflight.json
 python scripts/build_tracking_plan_delivery.py plan.json analysis-context.json --discovery-report discovery.json --template client-template.xlsx --mapping template-map.json --output-dir delivery
 ```
 
@@ -228,6 +245,28 @@ The skill does not:
 - maximize event or parameter counts.
 
 ## Versioning
+
+Version `2.9.0` keeps canonical plan schema `5.0.0` and strengthens two
+North-Star-critical capabilities without adding workflow modes or visible
+workbook machinery. Rendered discovery report `1.4.0` adds optional ephemeral
+role-bound access profiles, bounded reauthentication, the same systematic
+candidate discovery after login, claim-specific form evidence, positive
+success oracles, isolated representative interaction probes, post-transition
+state rescans, and privacy-safe saved evidence. Detection remains an analyst
+candidate rather than an automatic GA4 event, and standalone public discovery
+uses the same adaptive workflow. Analysis-context `1.2.0` carries the new
+role, state, access, and probe evidence while retaining earlier context and
+discovery contracts.
+
+Supplied-template adaptation now uses a hash-bound template-map `2.0.0`, an
+ambiguity/capacity gate, a rich-feature preflight, and explicit writer
+selection. Ordinary XLSX writes authorize values only and preserve formulas,
+styles, comments, hyperlinks, table totals and calculated formulas,
+validations, conditional formatting, names, row prototypes, drawing anchors,
+and package structure. Rich Excel workbooks require the optional native
+Windows adapter when its preservation path is available; unverified or
+unsupported features stop with an exact reason and never fall back to a
+redesigned workbook.
 
 Version `2.8.0` keeps canonical plan schema `5.0.0` and adds optional,
 non-governing measurement-framework intake without changing the adaptive

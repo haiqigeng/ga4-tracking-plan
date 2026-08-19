@@ -36,6 +36,7 @@ REQUIRED_SKILL_FILES = {
     "references/scenario-search-and-listing.md",
     "references/schema-tracking-plan.json",
     "references/schema-analysis-context.json",
+    "references/schema-access-profiles.json",
     "references/schema-discovery-report.json",
     "references/schema-change-request.json",
     "references/schema-delivery-handoff.json",
@@ -43,11 +44,13 @@ REQUIRED_SKILL_FILES = {
     "references/schema-expected-events.json",
     "references/schema-impact-report.json",
     "references/schema-interactive-journey.json",
+    "references/schema-template-map.json",
     "references/example-tracking-plan.json",
     "references/example-analysis-context.json",
     "references/example-discovery-report.json",
     "references/example-change-request.json",
     "references/example-interactive-journey.json",
+    "references/example-access-profiles.json",
     "references/library-ga4-recommended-events.json",
     "scripts/analyze_tracking_plan_change_impact.py",
     "scripts/build_analysis_context_seed.py",
@@ -63,6 +66,13 @@ REQUIRED_SKILL_FILES = {
     "scripts/browser_capture.py",
     "scripts/contract_utils.py",
     "scripts/discovery_quality.py",
+    "scripts/evidence_sanitization.py",
+    "scripts/access_profiles.py",
+    "scripts/interaction_capabilities.py",
+    "scripts/interaction_probes.py",
+    "scripts/journey_evidence.py",
+    "scripts/native_excel_adapter.py",
+    "scripts/template_preflight.py",
     "tests/test_skill.py",
 }
 
@@ -83,6 +93,7 @@ ROOT_WRAPPERS = {
     "import_tracking_plan_workbook.py",
     "inspect_browser_environment.py",
     "inspect_tracking_plan_template.py",
+    "template_preflight.py",
     "validate_analysis_context.py",
     "validate_tracking_plan.py",
     "validate_tracking_plan_workbook.py",
@@ -105,6 +116,8 @@ PUBLIC_HOST_ALLOWLIST = {
     "img.shields.io",
     "invalid.example",
     "json-schema.org",
+    "portal.example.com",
+    "schemas.openxmlformats.org",
     "www.example.com",
     "www.sitemaps.org",
 }
@@ -234,6 +247,7 @@ def check_schemas_and_examples() -> None:
         "example-discovery-report.json": "schema-discovery-report.json",
         "example-change-request.json": "schema-change-request.json",
         "example-interactive-journey.json": "schema-interactive-journey.json",
+        "example-access-profiles.json": "schema-access-profiles.json",
     }
     for example_name, schema_name in example_pairs.items():
         example = load_json(REFERENCES / example_name)
@@ -429,6 +443,7 @@ def check_release_package() -> None:
             "scripts/build_tracking_plan_delivery.py",
             "scripts/build_analysis_context_seed.py",
             "scripts/capture_interactive_journey.py",
+            "scripts/template_preflight.py",
             "scripts/validate_tracking_plan.py",
             "scripts/check_installed_skill_sync.py",
             "README.md",
@@ -499,7 +514,11 @@ def check_repository_cleanliness() -> None:
         text = raw.decode("utf-8", errors="ignore")
         for match in re.finditer(r"https?://([A-Za-z0-9][A-Za-z0-9.-]*)", text, re.I):
             host = match.group(1).split(":", 1)[0].casefold()
-            if host not in PUBLIC_HOST_ALLOWLIST and not host.startswith("127."):
+            if (
+                host not in PUBLIC_HOST_ALLOWLIST
+                and not host.startswith("127.")
+                and not host.endswith(".example.test")
+            ):
                 fail(f"Repository contains a non-public example host '{host}': {relative}")
         if re.search(r"gh[pousr]_[A-Za-z0-9]{30,}", text):
             fail(f"Repository contains a possible GitHub token: {relative}")

@@ -59,7 +59,7 @@ class DiscoveryQualityRegressionTests(unittest.TestCase):
             "https://example.fr/contact/",
             {
                 "title": "Nous contacter",
-                "headings": "Contact carte Contact recharge",
+                "headings": "Support request Billing request",
                 "main": "Choisissez le motif de votre demande.",
                 "global_chrome": "Rechercher Nos offres Voir la carte",
             },
@@ -122,7 +122,7 @@ class DiscoveryQualityRegressionTests(unittest.TestCase):
             """
             <html><head><title>About us</title></head><body>
               <nav>Search Promotions Cart</nav>
-              <main><h1>Our company</h1><p>Our history and commitments.</p></main>
+              <main><h1>About the organisation</h1><p>Our history and commitments.</p></main>
             </body></html>
             """
         )
@@ -229,13 +229,13 @@ class DiscoveryQualityRegressionTests(unittest.TestCase):
             "template": "support_or_contact",
             "forms": [{"selector": "#contact-card"}, {"selector": "#contact-topup"}],
             "interactive_controls": [
-                {"type": "tab", "label": "Contact carte"},
-                {"type": "tab", "label": "Contact recharge"},
+                {"type": "tab", "label": "Support request"},
+                {"type": "tab", "label": "Billing request"},
                 {"type": "tablist", "label": "Type de contact"},
             ],
             "page_surfaces": {
                 "title": "Nous contacter",
-                "headings": ["Contact carte", "Contact recharge"],
+                "headings": ["Support request", "Billing request"],
                 "main_text": "Choisissez un onglet puis envoyez votre demande.",
                 "semantic_counts": {"tab": 2, "tablist": 1, "form": 2},
             },

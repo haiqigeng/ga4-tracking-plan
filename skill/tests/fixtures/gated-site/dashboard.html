@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>Authenticated dashboard</title></head>
+  <body>
+    <main data-authenticated="true">
+      <h1>Account dashboard</h1>
+      <p id="role-label"></p>
+      <nav id="service-links"></nav>
+      <div role="tablist" aria-label="Requests">
+        <button id="current-tab" role="tab" aria-selected="true" aria-controls="current-panel">Current requests</button>
+        <button id="history-tab" role="tab" aria-selected="false" aria-controls="history-panel">Request history</button>
+      </div>
+      <section id="current-panel" role="tabpanel">Current request status</section>
+      <section id="history-panel" role="tabpanel" hidden>Historical request documents</section>
+      <button id="open-modal" type="button" aria-haspopup="dialog" aria-controls="request-modal">Open request form</button>
+      <dialog id="request-modal">
+        <form method="dialog"><label>Subject <input name="subject"></label><button type="submit">Continue</button></form>
+      </dialog>
+      <iframe title="Embedded support form" src="/frame-form.html"></iframe>
+      <video id="help-video" aria-label="Help video" muted></video>
+      <button id="logout" type="button">Logout</button>
+    </main>
+    <script>
+      if (localStorage.getItem("fixtureAuthenticated") !== "yes") location.href = "/login.html";
+      const role = localStorage.getItem("fixtureRole") || "member";
+      document.getElementById("role-label").textContent = role;
+      document.getElementById("service-links").innerHTML = role === "partner"
+        ? '<a href="/partner-service.html">Create partner request</a>'
+        : '<a href="/member-service.html">Download member document</a>';
+      document.getElementById("history-tab").addEventListener("click", () => {
+        document.getElementById("current-panel").hidden = true;
+        document.getElementById("history-panel").hidden = false;
+      });
+      document.getElementById("open-modal").addEventListener("click", () => document.getElementById("request-modal").showModal());
+      document.getElementById("logout").addEventListener("click", () => {
+        localStorage.clear();
+        location.href = "/login.html";
+      });
+    </script>
+  </body>
+</html>

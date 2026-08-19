@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/ga4-tracking-plan/schema-access-profiles.json",
+  "title": "Ephemeral access profiles for rendered journey discovery",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["access_profiles_version", "profiles"],
+  "properties": {
+    "access_profiles_version": {"const": "1.0.0"},
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "profile_id",
+          "role",
+          "entry_urls",
+          "allowed_hosts",
+          "access_method",
+          "success_predicate",
+          "session_disposition"
+        ],
+        "properties": {
+          "profile_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "role": {"type": "string", "minLength": 1, "maxLength": 120},
+          "entry_urls": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "format": "uri", "pattern": "^https?://"}
+          },
+          "allowed_hosts": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "pattern": "^(?:\\*\\.)?[A-Za-z0-9.-]+$"}
+          },
+          "access_method": {
+            "enum": ["storage_state", "login_recipe", "headful_handoff", "public_registration"]
+          },
+          "login_url": {"type": "string", "format": "uri", "pattern": "^https?://"},
+          "storage_state_env": {"type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$"},
+          "login_recipe": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["action"],
+              "properties": {
+                "action": {"enum": ["goto", "click", "fill", "select", "check", "wait"]},
+                "url": {"type": "string", "format": "uri", "pattern": "^https?://"},
+                "selector": {"type": "string", "minLength": 1},
+                "value_source": {"enum": ["environment", "synthetic"]},
+                "environment_name": {"type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$"},
+                "value_kind": {
+                  "enum": ["first_name", "last_name", "email", "phone", "postal_code", "city", "address", "password", "text", "integer"]
+                },
+                "select_value": {"type": "string"},
+                "milliseconds": {"type": "integer", "minimum": 0, "maximum": 10000}
+              },
+              "allOf": [
+                {
+                  "if": {"properties": {"action": {"const": "goto"}}, "required": ["action"]},
+                  "then": {"required": ["url"]}
+                },
+                {
+                  "if": {"properties": {"action": {"enum": ["click", "fill", "select", "check"]}}, "required": ["action"]},
+                  "then": {"required": ["selector"]}
+                },
+                {
+                  "if": {"properties": {"action": {"const": "fill"}}, "required": ["action"]},
+                  "then": {"required": ["value_source"]}
+                },
+                {
+                  "if": {"properties": {"value_source": {"const": "environment"}}, "required": ["value_source"]},
+                  "then": {"required": ["environment_name"]}
+                },
+                {
+                  "if": {"properties": {"value_source": {"const": "synthetic"}}, "required": ["value_source"]},
+                  "then": {"required": ["value_kind"]}
+                },
+                {
+                  "if": {"properties": {"action": {"const": "select"}}, "required": ["action"]},
+                  "then": {"required": ["select_value"]}
+                },
+                {
+                  "if": {"properties": {"action": {"const": "wait"}}, "required": ["action"]},
+                  "then": {"required": ["milliseconds"]}
+                }
+              ]
+            }
+          },
+          "success_predicate": {
+            "type": "object",
+            "additionalProperties": false,
+            "minProperties": 1,
+            "properties": {
+              "url_contains": {"type": "string", "minLength": 1},
+              "selector_visible": {"type": "string", "minLength": 1}
+            }
+          },
+          "consequential_action_patterns": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1, "maxLength": 200}
+          },
+          "session_disposition": {"enum": ["discard_after_run", "user_supplied_state_read_only"]}
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"access_method": {"const": "storage_state"}}, "required": ["access_method"]},
+            "then": {"required": ["storage_state_env"]}
+          },
+          {
+            "if": {"properties": {"access_method": {"enum": ["login_recipe", "public_registration"]}}, "required": ["access_method"]},
+            "then": {"required": ["login_url", "login_recipe"]}
+          },
+          {
+            "if": {"properties": {"access_method": {"const": "headful_handoff"}}, "required": ["access_method"]},
+            "then": {"required": ["login_url"]}
+          }
+        ]
+      }
+    }
+  }
+}

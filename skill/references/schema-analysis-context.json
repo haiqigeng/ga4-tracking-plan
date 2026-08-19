@@ -15,7 +15,7 @@
     "value_domains"
   ],
   "properties": {
-    "context_version": {"enum": ["1.0.0", "1.1.0"]},
+    "context_version": {"enum": ["1.0.0", "1.1.0", "1.2.0"]},
     "run_id": {"type": "string", "pattern": "^run_[a-f0-9]{32}$"},
     "created_at": {"type": "string", "format": "date-time"},
     "target_state": {
@@ -251,13 +251,9 @@
             "type": "array",
             "uniqueItems": true,
             "items": {
-              "enum": [
-                "entry",
-                "progression",
-                "success",
-                "failure",
-                "empty",
-                "post_conversion"
+              "anyOf": [
+                {"enum": ["entry", "progression", "submission", "success", "failure", "empty", "post_conversion"]},
+                {"type": "string", "pattern": "^interaction:[a-z][a-z0-9_]{1,79}$"}
               ]
             }
           },
@@ -288,6 +284,9 @@
               ],
               "properties": {
                 "variant_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+                "access_profile_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+                "role": {"type": "string", "minLength": 1},
+                "state_id": {"type": "string", "minLength": 1},
                 "material": {"type": "boolean"},
                 "status": {"enum": ["observed", "confirmed", "planned", "partial", "not_tested", "externally_blocked", "blocked"]},
                 "evidence_refs": {
@@ -299,7 +298,12 @@
                 "states_covered": {
                   "type": "array",
                   "uniqueItems": true,
-                  "items": {"enum": ["entry", "progression", "success", "failure", "empty", "post_conversion"]}
+                  "items": {
+                    "anyOf": [
+                      {"enum": ["entry", "progression", "submission", "success", "failure", "empty", "post_conversion"]},
+                      {"type": "string", "pattern": "^interaction:[a-z][a-z0-9_]{1,79}$"}
+                    ]
+                  }
                 },
                 "notes": {"type": "string"}
               }
@@ -324,6 +328,9 @@
           "variant_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
           "recipe_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,119}$"},
           "form_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "probe_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,119}$"},
+          "access_profile_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "role": {"type": "string", "minLength": 1},
           "material": {"type": "boolean"},
           "resolution": {
             "enum": ["confirmed_elsewhere", "excluded", "blocked", "unresolved"]
@@ -337,6 +344,33 @@
             "uniqueItems": true,
             "items": {"type": "string", "minLength": 1}
           }
+        }
+      }
+    },
+    "access_profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "profile_id",
+          "role",
+          "status",
+          "entry_urls",
+          "allowed_hosts",
+          "attempt_count",
+          "final_disposition",
+          "evidence_ref"
+        ],
+        "properties": {
+          "profile_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,79}$"},
+          "role": {"type": "string", "minLength": 1},
+          "status": {"enum": ["authenticated_discovery_completed", "session_expired", "externally_blocked"]},
+          "entry_urls": {"type": "array", "items": {"type": "string", "format": "uri"}},
+          "allowed_hosts": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "attempt_count": {"type": "integer", "minimum": 1, "maximum": 2},
+          "final_disposition": {"type": "string", "minLength": 1},
+          "evidence_ref": {"type": "string", "minLength": 1}
         }
       }
     },

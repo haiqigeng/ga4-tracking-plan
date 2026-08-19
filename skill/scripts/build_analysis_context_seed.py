@@ -105,6 +105,9 @@ def build_analysis_context_seed(
         variant_coverage = [
             {
                 "variant_id": str(variant["variant_id"]),
+                "access_profile_id": str(variant.get("access_profile_id", "public")),
+                "role": str(variant.get("role", "public")),
+                "state_id": str(variant.get("state_id", "entry")),
                 "material": bool(variant.get("material")),
                 "status": str(variant.get("status", "partial")),
                 "evidence_refs": [source_id] if variant.get("evidence_urls") else [],
@@ -141,6 +144,9 @@ def build_analysis_context_seed(
                 **({"variant_id": str(gap["variant_id"])} if gap.get("variant_id") else {}),
                 **({"recipe_id": str(gap["recipe_id"])} if gap.get("recipe_id") else {}),
                 **({"form_id": str(gap["form_id"])} if gap.get("form_id") else {}),
+                **({"probe_id": str(gap["probe_id"])} if gap.get("probe_id") else {}),
+                **({"access_profile_id": str(gap["access_profile_id"])} if gap.get("access_profile_id") else {}),
+                **({"role": str(gap["role"])} if gap.get("role") else {}),
                 "material": bool(gap.get("material", True)),
                 **({"evidence_state": str(gap["evidence_state"])} if gap.get("evidence_state") else {}),
                 "resolution": "unresolved",
@@ -187,7 +193,11 @@ def build_analysis_context_seed(
     return {
         **(
             {
-                "context_version": "1.0.0",
+                "context_version": (
+                    "1.2.0"
+                    if report.get("discovery_version") == "1.4.0"
+                    else "1.0.0"
+                ),
                 "run_id": run_id,
                 "created_at": datetime.now(UTC).isoformat(),
             }
@@ -220,6 +230,20 @@ def build_analysis_context_seed(
         ],
         "journey_coverage": journey_coverage,
         "coverage_gaps": coverage_gaps,
+        "access_profiles": [
+            {
+                "profile_id": str(item.get("profile_id", "")),
+                "role": str(item.get("role", "")),
+                "status": str(item.get("status", "externally_blocked")),
+                "entry_urls": [str(value) for value in item.get("entry_urls", [])],
+                "allowed_hosts": [str(value) for value in item.get("allowed_hosts", [])],
+                "attempt_count": int(item.get("attempt_count", 1) or 1),
+                "final_disposition": str(item.get("final_disposition", "")),
+                "evidence_ref": source_id,
+            }
+            for item in report.get("access_profile_runs", [])
+            if isinstance(item, dict) and item.get("profile_id")
+        ],
         "measurement_opportunities": opportunities,
         "value_domains": [],
         "assumptions": [],

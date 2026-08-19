@@ -4,15 +4,23 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 import time
 from collections import Counter
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
+from access_profiles import (
+    bootstrap_access_profile,
+    load_access_profiles,
+    normalized_allowed_hosts,
+    session_is_valid,
+    url_is_allowed,
+)
 from browser_capture import data_layer_capture_init_script, measurement_evidence_script
 from browser_environment import inspect_browser_environment, load_playwright_sync_api, resolve_browser_channel
 from discover_site_journeys import (
@@ -31,6 +39,16 @@ from discover_site_journeys import (
 )
 from discovery_contract import validate_discovery_report
 from discovery_quality import aggregate_coverage_statuses, relevant_forms
+from evidence_sanitization import sanitize_discovery_artifact
+from interaction_capabilities import detect_interaction_capabilities
+from interaction_probes import build_probe_recipes, execute_probe
+from journey_evidence import (
+    evidence_claim,
+    explicit_failure_evidence,
+    highest_form_evidence_state,
+    positive_success_oracle,
+    rendered_state_evidence,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIREMENTS = ROOT / "requirements.txt"
@@ -81,12 +99,36 @@ def parse_args() -> argparse.Namespace:
         "--interaction-limit",
         type=int,
         default=12,
-        help="Maximum representative safe form journeys to execute automatically.",
+        help="Maximum representative safe form journeys per public or authenticated discovery phase.",
     )
     parser.add_argument(
         "--no-auto-interact",
         action="store_true",
         help="Disable safe synthetic form progression and record the resulting coverage boundary.",
+    )
+    parser.add_argument(
+        "--access-profiles",
+        type=Path,
+        help=(
+            "Optional validated access-profiles JSON. Credentials and raw storage state are read only from named environment variables and never written to the report."
+        ),
+    )
+    parser.add_argument(
+        "--access-profile-id",
+        action="append",
+        default=[],
+        help="Run only the named access profile. May be repeated.",
+    )
+    parser.add_argument(
+        "--probe-limit",
+        type=int,
+        default=18,
+        help="Maximum bounded representative interaction-family probes per public or authenticated discovery phase.",
+    )
+    parser.add_argument(
+        "--no-interaction-probes",
+        action="store_true",
+        help="Disable safe bounded interaction-family probes and retain explicit evidence boundaries.",
     )
     return parser.parse_args()
 
@@ -309,255 +351,51 @@ def journey_variant_id(template: str, url: str) -> str:
     return f"{prefix}_{digest}"
 
 
+def record_variant_id(template: str, url: str, record: dict[str, Any]) -> str:
+    profile_id = str(record.get("access_profile_id", "public"))
+    state_id = str(record.get("state_id", "entry"))
+    role = str(record.get("role", "public"))
+    if profile_id == "public" and state_id == "entry":
+        return journey_variant_id(template, url)
+    family = f"{family_for_template(template, url)}|{profile_id}|{role}|{state_id}"
+    digest = hashlib.sha256(family.encode("utf-8")).hexdigest()[:8]
+    prefix = _identifier(
+        f"{infer_journey(template)}_{profile_id}_{state_id}",
+        maximum=70,
+    )
+    return f"{prefix}_{digest}"
+
+
 def candidate_family(url: str, text: str = "") -> str:
     return family_for_template(infer_template(url, text), url)
 
 
-def _capability_context(page: dict[str, Any]) -> dict[str, Any]:
-    surfaces = page.get("page_surfaces", {}) if isinstance(page.get("page_surfaces"), dict) else {}
-    counts = surfaces.get("semantic_counts", {}) if isinstance(surfaces.get("semantic_counts"), dict) else {}
-    forms = relevant_forms(page)
-    controls = [item for item in page.get("interactive_controls", []) if isinstance(item, dict)]
-    control_parts = [
-        " ".join(
-            [
-                str(item.get("type", "")),
-                str(item.get("name", "")),
-                str(item.get("id", "")),
-                str(item.get("label", "")),
-                " ".join(str(value) for value in item.get("option_labels", [])),
-            ]
-        )
-        for item in controls
-    ]
-    form_parts = [
-        " ".join(
-            [
-                str(form.get("id", "")),
-                str(form.get("name", "")),
-                *[
-                    " ".join(str(field.get(key, "")) for key in ("name", "id", "label"))
-                    for field in form.get("fields", [])
-                    if isinstance(field, dict)
-                ],
-            ]
-        )
-        for form in forms
-    ]
-    corpus = " ".join(
-        [
-            str(surfaces.get("title", "")),
-            " ".join(str(value) for value in surfaces.get("headings", [])),
-            str(surfaces.get("main_text", "")),
-            *control_parts,
-            *form_parts,
-        ]
-    )
-    return {
-        "url": str(page.get("url", "")),
-        "template": str(page.get("template", "unknown")),
-        "counts": counts,
-        "forms": forms,
-        "controls": controls,
-        "corpus": corpus,
-        "tab_count": int(counts.get("tab", 0) or 0) + sum(str(item.get("type", "")) == "tab" for item in controls),
-        "tablist_count": int(counts.get("tablist", 0) or 0) + sum(str(item.get("type", "")) == "tablist" for item in controls),
-    }
-
-
-def _semantic_count(context: dict[str, Any], name: str) -> int:
-    return int(context["counts"].get(name, 0) or 0)
-
-
-def _has_local_phrase(context: dict[str, Any], phrases: tuple[str, ...]) -> bool:
-    return any(signal_contains_phrase(context["corpus"], phrase) for phrase in phrases)
-
-
-def _capability(
-    context: dict[str, Any],
-    family: str,
-    category: str,
-    materiality: str,
-    reason: str,
-    evidence: list[str],
-) -> dict[str, Any]:
-    digest = hashlib.sha256(f"{family}|{context['url']}".encode("utf-8")).hexdigest()[:10]
-    return {
-        "capability_id": _identifier(f"capability_{family}_{digest}", maximum=119),
-        "family": family,
-        "category": category,
-        "materiality": materiality,
-        "reason": reason,
-        "evidence": sorted(set(evidence)),
-    }
-
-
-def _tabbed_form_capability(context: dict[str, Any]) -> dict[str, Any] | None:
-    if not context["forms"] or (context["tab_count"] < 2 and context["tablist_count"] < 1):
-        return None
-    return _capability(
-        context,
-        "tabbed_form",
-        "outcome",
-        "material",
-        "Distinct form tabs can represent different intents or outcomes and require an explicit shared-versus-separate measurement decision.",
-        [f"forms:{len(context['forms'])}", f"tabs:{max(context['tab_count'], _semantic_count(context, 'tab'))}"],
-    )
-
-
-def _locator_capability(context: dict[str, Any]) -> dict[str, Any] | None:
-    locator_language = _has_local_phrase(context, ("sur la carte", "on the map", "selectionnez une station", "select a store"))
-    if context["template"] != "store_locator" or not (_semantic_count(context, "map") or _semantic_count(context, "locator_result") or locator_language):
-        return None
-    return _capability(
-        context,
-        "locator_selection",
-        "interaction",
-        "material",
-        "A locator result or map selection is a distinct decision point after the search itself.",
-        [f"maps:{_semantic_count(context, 'map')}", f"results:{_semantic_count(context, 'locator_result')}"],
-    )
-
-
-def _faq_capability(context: dict[str, Any]) -> dict[str, Any] | None:
-    has_accordion = _semantic_count(context, "details") or _semantic_count(context, "accordion")
-    has_faq_context = context["template"] == "support_or_contact" or _has_local_phrase(context, ("faq",))
-    if not has_accordion or not has_faq_context:
-        return None
-    return _capability(
-        context,
-        "faq_accordion",
-        "interaction",
-        "candidate",
-        "FAQ expansion may reveal unresolved support needs, but should be measured only when the resulting question is useful.",
-        [f"details:{_semantic_count(context, 'details')}", f"accordions:{_semantic_count(context, 'accordion')}"],
-    )
-
-
-def _coupon_capability(context: dict[str, Any]) -> dict[str, Any] | None:
-    if not _has_local_phrase(context, ("code promo", "promotion code", "coupon", "voucher")):
-        return None
-    return _capability(
-        context,
-        "coupon_application",
-        "diagnostic",
-        "material" if context["template"] in {"cart", "checkout"} else "candidate",
-        "Coupon submission success and failure can explain conversion friction and discount use.",
-        ["local control or field mentions a coupon/promotion code"],
-    )
-
-
-def _counted_capability(
-    context: dict[str, Any],
-    count_name: str,
-    family: str,
-    category: str,
-    reason: str,
-    evidence_label: str,
-) -> dict[str, Any] | None:
-    count = _semantic_count(context, count_name)
-    if not count:
-        return None
-    return _capability(context, family, category, "candidate", reason, [f"{evidence_label}:{count}"])
-
-
-def _error_capability(context: dict[str, Any]) -> dict[str, Any] | None:
-    error_language = _has_local_phrase(
-        context,
-        ("payment failed", "paiement refuse", "erreur de paiement", "une erreur est survenue"),
-    )
-    if not _semantic_count(context, "error") and not error_language:
-        return None
-    return _capability(
-        context,
-        "meaningful_error",
-        "diagnostic",
-        "material",
-        "An observed business-process error can explain funnel loss and requires an explicit diagnostic decision.",
-        [f"visible_error_regions:{_semantic_count(context, 'error')}"],
-    )
-
-
-def _filter_capability(context: dict[str, Any]) -> dict[str, Any] | None:
-    if not _has_local_phrase(context, ("filter", "filtre", "sort", "trier", "tri")):
-        return None
-    return _capability(
-        context,
-        "filter_sort",
-        "interaction",
-        "candidate",
-        "Applied filters or sorting may explain discovery behavior without requiring one event per control.",
-        ["local filter or sort control"],
-    )
-
-
-def _configurator_capability(context: dict[str, Any]) -> dict[str, Any] | None:
-    if context["template"] != "configurator" or not (context["forms"] or context["controls"]):
-        return None
-    return _capability(
-        context,
-        "configurator_progression",
-        "progression",
-        "material",
-        "Meaningful configurator progression and completion require an explicit measurement decision.",
-        [f"forms:{len(context['forms'])}", f"controls:{len(context['controls'])}"],
-    )
-
-
-def detect_interaction_capabilities(page: dict[str, Any]) -> list[dict[str, Any]]:
-    """Return one evidence record per family, never one event per control."""
-    context = _capability_context(page)
-    capabilities = [
-        _tabbed_form_capability(context),
-        _locator_capability(context),
-        _faq_capability(context),
-        _coupon_capability(context),
-        _counted_capability(
-            context,
-            "dialog",
-            "modal_dialog",
-            "interaction",
-            "A modal can contain a material gated choice or form; its business purpose must be reviewed before measurement.",
-            "dialogs",
-        ),
-        _counted_capability(
-            context,
-            "download",
-            "download",
-            "outcome",
-            "A download can be a meaningful outcome such as an application, brochure, or document acquisition.",
-            "download_links",
-        ),
-        _error_capability(context),
-        _filter_capability(context),
-        _configurator_capability(context),
-    ]
-    return sorted(
-        (item for item in capabilities if item is not None),
-        key=lambda item: str(item["family"]),
-    )
-
-
 def _interaction_run_coverage(run: dict[str, Any]) -> tuple[str | None, str | None]:
+    state = {
+        "inventory_observed": "inventory",
+        "progression_observed": "progression",
+        "failure_observed": "failure",
+        "submission_observed": "submission",
+        "success_confirmed": "success",
+    }.get(str(run.get("evidence_state", "")))
     if run.get("outcome") == "completed":
-        return "observed", "success"
-    if run.get("observed_state") == "failure":
-        return "partial", "failure"
+        return "observed", state or "success"
     if run.get("outcome") == "blocked":
-        return "externally_blocked", None
+        return "externally_blocked", state
     if run.get("outcome") in {"partial", "stopped_before_consequential_action"}:
-        return "partial", None
-    return None, None
+        return "partial", state
+    return None, state
 
 
 def journey_coverage_ledger(
     pages: list[dict[str, Any]],
-    candidates: list[dict[str, str]],
+    candidates: list[dict[str, Any]],
     material_unvisited: list[dict[str, Any]],
     blocked_candidates: list[dict[str, str]],
     root_url: str,
     interaction_runs: list[dict[str, Any]] | None = None,
     interaction_recipes: list[dict[str, Any]] | None = None,
+    probe_runs: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     groups: dict[str, dict[str, Any]] = {}
 
@@ -577,12 +415,15 @@ def journey_coverage_ledger(
             },
         )
 
-    def variant(item: dict[str, Any], template: str, url: str) -> dict[str, Any]:
-        variant_id = journey_variant_id(template, url)
+    def variant(item: dict[str, Any], template: str, url: str, record: dict[str, Any]) -> dict[str, Any]:
+        variant_id = record_variant_id(template, url, record)
         return item["variant_coverage"].setdefault(
             variant_id,
             {
                 "variant_id": variant_id,
+                "access_profile_id": str(record.get("access_profile_id", "public")),
+                "role": str(record.get("role", "public")),
+                "state_id": str(record.get("state_id", "entry")),
                 "material": infer_journey(template) not in {"content_navigation", "unknown"},
                 "status": "not_tested",
                 "entry_points": set(),
@@ -597,7 +438,7 @@ def journey_coverage_ledger(
         journey_id = infer_journey(infer_template(url, str(candidate.get("text", ""))))
         item = group(journey_id)
         template = infer_template(url, str(candidate.get("text", "")))
-        variant_item = variant(item, template, url)
+        variant_item = variant(item, template, url, candidate)
         item["entry_points"].add(url)
         item["variants"].add(_route_variant(url))
         variant_item["entry_points"].add(url)
@@ -608,7 +449,7 @@ def journey_coverage_ledger(
         url = str(page.get("url", ""))
         template = str(page.get("template", infer_template(url)))
         item = group(infer_journey(template))
-        variant_item = variant(item, template, url)
+        variant_item = variant(item, template, url, page)
         item["entry_points"].add(url)
         item["variants"].add(_route_variant(url))
         item["evidence_urls"].add(url)
@@ -631,11 +472,14 @@ def journey_coverage_ledger(
         item = group(journey_id)
         start_url = str(run.get("start_url", ""))
         template = str(run.get("template", infer_template(start_url)))
-        variant_id = str(run.get("variant_id", "")) or journey_variant_id(template, start_url)
+        variant_id = str(run.get("variant_id", "")) or record_variant_id(template, start_url, run)
         variant_item = item["variant_coverage"].setdefault(
             variant_id,
             {
                 "variant_id": variant_id,
+                "access_profile_id": str(run.get("access_profile_id", "public")),
+                "role": str(run.get("role", "public")),
+                "state_id": str(run.get("state_id", "entry")),
                 "material": journey_id not in {"content_navigation", "unknown"},
                 "status": "not_tested",
                 "entry_points": {start_url} if start_url else set(),
@@ -681,11 +525,56 @@ def journey_coverage_ledger(
         variant_item = item["variant_coverage"].get(variant_id)
         if variant_item is not None:
             variant_item["status"] = aggregate_coverage_statuses(statuses)
+    for run in probe_runs or []:
+        if not isinstance(run, dict):
+            continue
+        start_url = str(run.get("start_url", ""))
+        template = str(run.get("template", infer_template(start_url)))
+        journey_id = infer_journey(template)
+        item = group(journey_id)
+        state_id = str(run.get("state_id_after") or run.get("state_id") or "entry")
+        record = {**run, "state_id": state_id}
+        probe_variant_id = record_variant_id(template, start_url, record)
+        probe_variant_preexisting = probe_variant_id in item["variant_coverage"]
+        variant_item = variant(item, template, start_url, record)
+        item["entry_points"].add(start_url)
+        item["evidence_urls"].add(start_url)
+        variant_item["entry_points"].add(start_url)
+        variant_item["evidence_urls"].add(start_url)
+        family_state = f"interaction:{run.get('family', 'unknown')}"
+        item["states_covered"].add(family_state)
+        variant_item["states_covered"].add(family_state)
+        if run.get("evidence_state") in {"progression_observed", "failure_observed", "submission_observed", "success_confirmed"}:
+            status = "observed" if run.get("outcome") in {"observed", "completed"} else "partial"
+        elif run.get("outcome") == "blocked":
+            status = "externally_blocked"
+        else:
+            status = "partial"
+        is_material = str(run.get("materiality", "candidate")) == "material"
+        if is_material:
+            variant_item["material"] = True
+            current_status = str(variant_item.get("status", "not_tested"))
+            variant_item["status"] = (
+                status
+                if current_status == "not_tested"
+                else aggregate_coverage_statuses([current_status, status])
+            )
+            item["material"] = True
+        elif not probe_variant_preexisting:
+            variant_item["material"] = False
+            variant_item["status"] = status
+        elif not variant_item.get("material"):
+            current_status = str(variant_item.get("status", "not_tested"))
+            variant_item["status"] = (
+                status
+                if current_status == "not_tested"
+                else aggregate_coverage_statuses([current_status, status])
+            )
     for candidate in material_unvisited:
         url = str(candidate.get("url", ""))
         template = str(candidate.get("template", infer_template(url)))
         item = group(infer_journey(template))
-        variant_item = variant(item, template, url)
+        variant_item = variant(item, template, url, candidate)
         item["unvisited_material_candidates"].add(url)
         variant_item["unvisited_material_candidates"].add(url)
         variant_item["status"] = "not_tested"
@@ -698,7 +587,7 @@ def journey_coverage_ledger(
             )
         )
         item = group(infer_journey(template))
-        variant_item = variant(item, template, url)
+        variant_item = variant(item, template, url, candidate)
         item["entry_points"].add(url)
         item["variants"].add(_route_variant(url))
         item["unvisited_material_candidates"].add(url)
@@ -818,10 +707,20 @@ def reveal_lazy_content(page: Any) -> None:
         pass
 
 
-def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -> dict[str, Any]:
+def collect_rendered_page(
+    page: Any,
+    url: str,
+    root_url: str,
+    timeout_ms: int,
+    *,
+    allowed_url: Callable[[str], bool] | None = None,
+    navigate: bool = True,
+) -> dict[str, Any]:
     try:
-        page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
-        page.wait_for_timeout(min(1500, max(250, timeout_ms // 10)))
+        if navigate:
+            page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+            page.wait_for_timeout(min(1500, max(250, timeout_ms // 10)))
+        url = canonical_url(str(page.url or url))
     except Exception as error:
         return {"url": url, "template": infer_template(url), "fetch_error": str(error), "links": [], "forms": [], "buttons": []}
 
@@ -865,7 +764,11 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
                         locator_result: countVisible("[data-store-id], [data-station-id], [class*='store-result' i], [class*='station-result' i], [class*='locator-result' i]"),
                         download: countVisible("a[download], a[href$='.pdf' i], a[href$='.doc' i], a[href$='.docx' i], a[href$='.zip' i], a[href*='download' i]"),
                         video: countVisible("video, iframe[src*='youtube' i], iframe[src*='vimeo' i]"),
-                        error: countVisible("[role='alert'], [aria-invalid='true'], .error, .erreur, [class*='error-message' i]")
+                        error: countVisible("[role='alert'], [aria-invalid='true'], .error, .erreur, [class*='error-message' i]"),
+                        search_result: countVisible("[data-search-result], [class*='search-result' i], main [role='listitem']"),
+                        pagination: countVisible("[rel='next'], [aria-label*='next' i], [aria-label*='suivant' i], [class*='pagination' i] button, [data-load-more]"),
+                        print_share: countVisible("[data-print], [data-share], [aria-label*='print' i], [aria-label*='imprimer' i], [aria-label*='share' i], [aria-label*='partager' i]"),
+                        carousel: countVisible("[role='region'][aria-roledescription='carousel'], [class*='carousel' i], [class*='slider' i]")
                     }
                 };
             }"""
@@ -1026,7 +929,9 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
                     selector: selectorFor(field),
                     label: labelFor(field),
                     type: (field.getAttribute("type") || field.tagName).toLowerCase(),
-                    value: field.value || field.getAttribute("data-value") || "",
+                    value: (field.tagName === "SELECT" || ["radio", "checkbox"].includes((field.type || "").toLowerCase()))
+                        ? (field.value || field.getAttribute("data-value") || "")
+                        : "",
                     required: !!field.required,
                     disabled: !!field.disabled,
                     autocomplete: field.getAttribute("autocomplete") || "",
@@ -1063,6 +968,72 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
             (element.innerText || element.value || element.getAttribute("aria-label") || element.getAttribute("title") || element.id || "").trim()
         ).filter(Boolean)""",
     )
+    link_controls = page.eval_on_selector_all(
+        "a[href]",
+        r"""elements => {
+            const visible = element => !!(element && (element.offsetWidth || element.offsetHeight || element.getClientRects().length));
+            const esc = value => (window.CSS && CSS.escape) ? CSS.escape(value) : value.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+            const selectorFor = element => element.id ? `#${esc(element.id)}` : `a[href="${String(element.getAttribute('href') || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"]`;
+            return elements.filter(visible).slice(0, 150).map(element => {
+                const href = new URL(element.getAttribute("href"), document.baseURI);
+                const chrome = element.closest("header, footer, nav, [role='navigation'], [role='banner'], [role='contentinfo']");
+                const surface = element.closest("footer, [role='contentinfo']") ? "footer" :
+                    (element.closest("header, [role='banner']") ? "header" :
+                    (element.closest("nav, [role='navigation']") ? "menu" : "content"));
+                return {
+                    selector: selectorFor(element),
+                    label: (element.innerText || element.getAttribute("aria-label") || element.getAttribute("title") || "").trim(),
+                    url: href.href,
+                    scheme: href.protocol.replace(":", ""),
+                    surface,
+                    inside_main: !!element.closest("main, [role='main'], article"),
+                    download: element.hasAttribute("download") || /\.(?:pdf|docx?|zip)(?:$|\?)/i.test(href.href),
+                    contact_handoff: ["tel:", "mailto:"].includes(href.protocol) || /(?:chat|contact|portal|extranet)/i.test(element.className + " " + element.id),
+                    search_result: !!element.closest("[data-search-result], [class*='search-result' i], main [role='listitem']"),
+                    locator_result: !!element.closest("[data-store-id], [data-station-id], [class*='store-result' i], [class*='station-result' i], [class*='locator-result' i]"),
+                    pagination: element.matches("[rel='next'], [aria-label*='next' i], [aria-label*='suivant' i], [data-load-more]") || !!element.closest("[class*='pagination' i]"),
+                    carousel_selection: !!element.closest("[role='region'][aria-roledescription='carousel'], [class*='carousel' i], [class*='slider' i]")
+                };
+            });
+        }""",
+    )
+    media_controls = page.eval_on_selector_all(
+        "video, iframe[src*='youtube' i], iframe[src*='vimeo' i]",
+        r"""elements => elements.slice(0, 20).map((element, index) => ({
+            selector: element.id ? `#${element.id.replace(/[^a-zA-Z0-9_-]/g, "")}` : `${element.tagName.toLowerCase()}:nth-of-type(${index + 1})`,
+            type: element.tagName.toLowerCase() === "video" ? "video" : "embedded_video",
+            label: element.getAttribute("aria-label") || element.getAttribute("title") || "video",
+            source_host: (() => { try { return new URL(element.currentSrc || element.src || "", document.baseURI).hostname; } catch (_) { return ""; } })()
+        }))""",
+    )
+    embedded_frames: list[dict[str, Any]] = []
+    for frame in page.frames:
+        if frame == page.main_frame:
+            continue
+        try:
+            frame_record = frame.evaluate(
+                r"""() => {
+                    const visible = element => !!(element && (element.offsetWidth || element.offsetHeight || element.getClientRects().length));
+                    return {
+                        url: document.location.href,
+                        title: String(document.title || "").slice(0, 200),
+                        form_count: [...document.querySelectorAll("form")].filter(visible).length,
+                        action_count: [...document.querySelectorAll("button, [role='button'], a[href]")].filter(visible).length
+                    };
+                }"""
+            )
+            if isinstance(frame_record, dict):
+                embedded_frames.append(frame_record)
+        except Exception:
+            embedded_frames.append(
+                {
+                    "url": str(frame.url).split("?", 1)[0],
+                    "title": "",
+                    "form_count": 0,
+                    "action_count": 0,
+                    "inspection_boundary": "frame_dom_unavailable",
+                }
+            )
     button_controls = page.eval_on_selector_all(
         "button, [role='button'], input[type='submit'], input[type='button']",
         r"""elements => {
@@ -1098,6 +1069,14 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
                 selector: selectorFor(element),
                 label: (element.innerText || element.value || element.getAttribute("aria-label") || element.getAttribute("title") || "").trim(),
                 type: (element.getAttribute("type") || element.getAttribute("role") || "button").toLowerCase(),
+                role: (element.getAttribute("role") || "").toLowerCase(),
+                aria_expanded: element.getAttribute("aria-expanded") || "",
+                aria_selected: element.getAttribute("aria-selected") || "",
+                aria_haspopup: element.getAttribute("aria-haspopup") || "",
+                aria_controls: element.getAttribute("aria-controls") || "",
+                surface: element.closest("footer, [role='contentinfo']") ? "footer" :
+                    (element.closest("header, [role='banner']") ? "header" :
+                    (element.closest("nav, [role='navigation']") ? "menu" : "content")),
                 form_action: element.form ? (element.form.action || document.location.href) : "",
                 disabled: !!element.disabled
             })).filter(item => item.label);
@@ -1164,6 +1143,14 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
                     visible: visible(element),
                     inside_main: !!element.closest("main, [role='main'], article"),
                     label: labelFor(element),
+                    role: (element.getAttribute("role") || "").toLowerCase(),
+                    aria_expanded: element.getAttribute("aria-expanded") || "",
+                    aria_selected: element.getAttribute("aria-selected") || "",
+                    aria_haspopup: element.getAttribute("aria-haspopup") || "",
+                    aria_controls: element.getAttribute("aria-controls") || "",
+                    surface: element.closest("footer, [role='contentinfo']") ? "footer" :
+                        (element.closest("header, [role='banner']") ? "header" :
+                        (element.closest("nav, [role='navigation']") ? "menu" : "content")),
                     value: element.value || element.getAttribute("data-value") || element.getAttribute("aria-label") || "",
                     option_count: allOptions.filter(option => !option.disabled && String(option.value || option.getAttribute("data-value") ||
                         option.getAttribute("aria-label") || option.textContent.trim()).trim()).length,
@@ -1178,10 +1165,11 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
         measurement_evidence = page.evaluate(measurement_evidence_script())
     except Exception as error:
         measurement_evidence = {"capture_error": f"{type(error).__name__}: {error}"}
+    in_scope = allowed_url or (lambda candidate: same_host(candidate, root_url))
     clean_links = [
         {"url": canonical_url(item["url"]), "text": clean_text(item.get("text", "")), "source": url}
         for item in links
-        if isinstance(item, dict) and item.get("url") and same_host(str(item["url"]), root_url)
+        if isinstance(item, dict) and item.get("url") and in_scope(str(item["url"]))
     ]
     classification = classify_page_archetype(
         url,
@@ -1202,6 +1190,24 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
         "forms": forms[:25] if isinstance(forms, list) else [],
         "buttons": [clean_text(str(button)) for button in buttons[:50]] if isinstance(buttons, list) else [],
         "button_controls": button_controls[:100] if isinstance(button_controls, list) else [],
+        "link_controls": link_controls[:150] if isinstance(link_controls, list) else [],
+        "navigation_controls": [
+            item
+            for item in (link_controls[:150] if isinstance(link_controls, list) else [])
+            if isinstance(item, dict) and item.get("surface") in {"header", "footer", "menu"}
+        ],
+        "contact_handoffs": [
+            {
+                "selector": str(item.get("selector", "")),
+                "label": str(item.get("label", "")),
+                "scheme": str(item.get("scheme", "")),
+                "surface": str(item.get("surface", "")),
+            }
+            for item in (link_controls[:150] if isinstance(link_controls, list) else [])
+            if isinstance(item, dict) and item.get("contact_handoff")
+        ],
+        "media_controls": media_controls if isinstance(media_controls, list) else [],
+        "embedded_frames": embedded_frames[:20],
         "interactive_controls": controls[:100] if isinstance(controls, list) else [],
         "privacy_statement_accepted": privacy_acceptance,
         "measurement_evidence": (measurement_evidence if isinstance(measurement_evidence, dict) else {}),
@@ -1217,6 +1223,11 @@ def collect_rendered_page(page: Any, url: str, root_url: str, timeout_ms: int) -
         "buttons": record["buttons"],
         "button_controls": record["button_controls"],
         "interactive_controls": record["interactive_controls"],
+        "link_controls": record["link_controls"],
+        "navigation_controls": record["navigation_controls"],
+        "contact_handoffs": record["contact_handoffs"],
+        "media_controls": record["media_controls"],
+        "embedded_frames": record["embedded_frames"],
         "interaction_capabilities": record["interaction_capabilities"],
     }
     record["rendered_structure_sha256"] = hashlib.sha256(
@@ -1280,7 +1291,13 @@ def summarize_languages(pages: list[dict[str, Any]], root_url: str) -> dict[str,
     normalized = [normalize_language(str(page.get("language", "")), root_url) for page in usable]
     counts = Counter(value.split("-", 1)[0] for value in normalized)
     primary = counts.most_common(1)[0][0] if counts else normalize_language("", root_url).split("-", 1)[0]
-    evidence_urls = [str(page.get("url")) for page in usable if normalize_language(str(page.get("language", "")), root_url).split("-", 1)[0] == primary][:25]
+    evidence_urls = list(
+        dict.fromkeys(
+            str(page.get("url"))
+            for page in usable
+            if normalize_language(str(page.get("language", "")), root_url).split("-", 1)[0] == primary
+        )
+    )[:25]
     return {
         "primary_language": primary,
         "observed_languages": sorted(set(normalized)) or [primary],
@@ -1331,7 +1348,7 @@ def build_auto_interaction_recipes(
         if not submission_kind:
             continue
         journey_id = infer_journey(template)
-        variant_id = journey_variant_id(template, str(page.get("url", "")))
+        variant_id = record_variant_id(template, str(page.get("url", "")), page)
         for form in relevant_forms(page):
             form_selector = str(form.get("selector", "form"))
             form_key = (variant_id, form_selector)
@@ -1384,6 +1401,9 @@ def build_auto_interaction_recipes(
                     "form_id": form_id,
                     "start_url": str(page.get("url")),
                     "template": template,
+                    "access_profile_id": str(page.get("access_profile_id", "public")),
+                    "role": str(page.get("role", "public")),
+                    "state_id": str(page.get("state_id", "entry")),
                     "submission_kind": submission_kind,
                     "form_selector": form_selector,
                     "initially_visible": bool(form.get("visible", True)),
@@ -1437,6 +1457,49 @@ def _safe_measurement_request(request: Any) -> dict[str, Any] | None:
         "event_name": (query.get("en") or [None])[0],
         "parameter_names": sorted(key for key in query if key.startswith(("ep.", "epn.", "up.", "upn."))),
     }
+
+
+def _safe_backend_response(response: Any, allowed_hosts: set[str]) -> dict[str, Any] | None:
+    """Capture only allowlisted response metadata; never retain headers, query, body, or cookies."""
+    try:
+        request = response.request
+        parsed = urlparse(str(response.url))
+        host = (parsed.hostname or "").casefold()
+        method = str(request.method).upper()
+        resource_type = str(request.resource_type).casefold()
+        host_allowed = any(
+            host == allowed
+            or (
+                allowed.startswith("*.")
+                and host.endswith("." + allowed[2:])
+                and host != allowed[2:]
+            )
+            for allowed in allowed_hosts
+        )
+        if not host_allowed or resource_type not in {"document", "xhr", "fetch"}:
+            return None
+        return {
+            "host": host,
+            "path": parsed.path or "/",
+            "method": method,
+            "status": int(response.status),
+            "resource_type": resource_type,
+        }
+    except Exception:
+        return None
+
+
+def _url_allowed_by_patterns(url: str, allowed_hosts: set[str]) -> bool:
+    host = (urlparse(url).hostname or "").casefold()
+    return any(
+        host == allowed
+        or (
+            allowed.startswith("*.")
+            and host.endswith("." + allowed[2:])
+            and host != allowed[2:]
+        )
+        for allowed in allowed_hosts
+    )
 
 
 def _visible_form_snapshot(page: Any, preferred_selector: str) -> dict[str, Any] | None:
@@ -1504,7 +1567,9 @@ def _visible_form_snapshot(page: Any, preferred_selector: str) -> dict[str, Any]
                     controls: [...element.querySelectorAll("button, input[type='submit'], [role='button']")].map(control => ({
                         selector: selectorFor(control),
                         label: (control.innerText || control.value || control.getAttribute("aria-label") || "").trim(),
-                        disabled: !!control.disabled
+                        disabled: !!control.disabled,
+                        tag: control.tagName.toLowerCase(),
+                        type: (control.getAttribute("type") || control.getAttribute("role") || "").toLowerCase()
                     }))
                 };
             }"""
@@ -1521,6 +1586,7 @@ def _reveal_recipe_form(
     active_action: dict[str, int],
     captured_pushes: list[dict[str, Any]],
     captured_requests: list[dict[str, Any]],
+    allowed_url: Callable[[str], bool] | None = None,
 ) -> tuple[dict[str, Any] | None, str | None]:
     form_selector = str(recipe.get("form_selector", "form"))
     if _visible_form_snapshot(page, form_selector) is not None:
@@ -1548,6 +1614,8 @@ def _reveal_recipe_form(
             return None, "local_reveal_control_not_visible"
         control.click(timeout=timeout_ms)
         page.wait_for_timeout(500)
+        if allowed_url is not None and not allowed_url(str(page.url)):
+            raise ValueError("Form reveal navigated outside allowed_hosts.")
         action["status"] = "completed"
     except Exception as error:
         action["status"] = "blocked"
@@ -1570,11 +1638,34 @@ def execute_auto_interaction(
     active_action: dict[str, int],
     captured_pushes: list[dict[str, Any]],
     captured_requests: list[dict[str, Any]],
+    captured_responses: list[dict[str, Any]] | None = None,
+    allowed_url: Callable[[str], bool] | None = None,
 ) -> dict[str, Any]:
     actions: list[dict[str, Any]] = []
+    claims: list[dict[str, Any]] = []
+    responses = captured_responses if captured_responses is not None else []
+    is_allowed = allowed_url or (lambda _value: True)
+
+    def finish(outcome: str, **extra: Any) -> dict[str, Any]:
+        result = {
+            **recipe,
+            "outcome": outcome,
+            "privacy_statement_accepted": accepted,
+            "actions": actions,
+            "evidence_claims": claims,
+        }
+        if claims:
+            result["evidence_state"] = highest_form_evidence_state(claims)
+        result.update(extra)
+        return result
+
     try:
+        if not is_allowed(str(recipe["start_url"])):
+            raise ValueError("Interaction start URL is outside allowed_hosts.")
         page.goto(str(recipe["start_url"]), wait_until="domcontentloaded", timeout=timeout_ms)
         page.wait_for_timeout(350)
+        if not is_allowed(str(page.url)):
+            raise ValueError("Interaction start redirected outside allowed_hosts.")
         accepted = accept_privacy_statement(page)
     except Exception as error:
         return {
@@ -1582,6 +1673,7 @@ def execute_auto_interaction(
             "outcome": "blocked",
             "actions": [],
             "blocker": f"navigation: {type(error).__name__}: {error}",
+            "evidence_claims": [],
         }
     if not recipe.get("initially_visible", True):
         reveal_action, reveal_blocker = _reveal_recipe_form(
@@ -1591,17 +1683,13 @@ def execute_auto_interaction(
             active_action=active_action,
             captured_pushes=captured_pushes,
             captured_requests=captured_requests,
+            allowed_url=is_allowed,
         )
         if reveal_action:
             actions.append(reveal_action)
         if reveal_blocker:
-            return {
-                **recipe,
-                "outcome": "partial",
-                "privacy_statement_accepted": accepted,
-                "actions": actions,
-                "blocker": reveal_blocker,
-            }
+            return finish("partial", blocker=reveal_blocker)
+    inventory_recorded = False
     for step in range(int(recipe.get("maximum_steps", 5))):
         page_text = ""
         try:
@@ -1609,22 +1697,35 @@ def execute_auto_interaction(
         except Exception:
             pass
         if CAPTCHA_PATTERN.search(page_text):
-            return {
-                **recipe,
-                "outcome": "blocked",
-                "privacy_statement_accepted": accepted,
-                "actions": actions,
-                "blocker": "captcha_or_human_verification",
-            }
+            return finish("blocked", blocker="captcha_or_human_verification")
         snapshot = _visible_form_snapshot(page, str(recipe.get("form_selector", "form")))
         if snapshot is None:
-            outcome = "completed" if actions else "partial"
-            return {
-                **recipe,
-                "outcome": outcome,
-                "privacy_statement_accepted": accepted,
-                "actions": actions,
-            }
+            return finish(
+                "partial",
+                blocker=(
+                    "form_absent_without_positive_success_oracle"
+                    if actions
+                    else "form_not_observed"
+                ),
+            )
+        if not inventory_recorded:
+            state = rendered_state_evidence(page)
+            claims.append(
+                evidence_claim(
+                    "inventory_observed",
+                    evidence_type="rendered_form",
+                    locator=str(snapshot.get("selector") or recipe.get("form_selector", "form")),
+                    evidence={
+                        "state_sha256": state["state_sha256"],
+                        "field_count": len(snapshot.get("fields", [])),
+                        "control_count": len(snapshot.get("controls", [])),
+                    },
+                )
+            )
+            inventory_recorded = True
+        form_action = str(snapshot.get("action", ""))
+        if form_action and not is_allowed(form_action):
+            return finish("blocked", blocker="form_action_outside_allowed_hosts")
         filled: list[dict[str, str]] = []
         for field in snapshot.get("fields", []):
             if not isinstance(field, dict) or field.get("disabled"):
@@ -1669,32 +1770,30 @@ def execute_auto_interaction(
             controls[0] if controls else None,
         )
         if preferred is None:
-            return {
-                **recipe,
-                "outcome": "partial",
-                "privacy_statement_accepted": accepted,
-                "actions": actions,
-                "blocker": "no_safe_progression_control",
-            }
+            return finish("partial", blocker="no_safe_progression_control")
         label = str(preferred.get("label", ""))
         if UNSAFE_ACTION_PATTERN.search(f"{label} {snapshot.get('action', '')}"):
-            return {
-                **recipe,
-                "outcome": "stopped_before_consequential_action",
-                "privacy_statement_accepted": accepted,
-                "actions": actions,
-                "stopped_control": label,
-            }
+            return finish(
+                "stopped_before_consequential_action",
+                stopped_control=label,
+            )
         active_action["index"] += 1
         action_index = active_action["index"]
         before_push = len(captured_pushes)
         before_request = len(captured_requests)
+        before_response = len(responses)
         before_url = page.url
+        before_state = rendered_state_evidence(page)
+        control_type = str(preferred.get("type", "")).casefold()
+        control_tag = str(preferred.get("tag", "")).casefold()
+        is_submit = control_type == "submit" or (control_tag == "button" and control_type in {"", "submit"})
         action: dict[str, Any] = {
             "action_index": action_index,
             "step": step + 1,
+            "action_type": "submit" if is_submit else "progress",
             "before_url": before_url,
             "control_label": label,
+            "control_selector": str(preferred.get("selector", "")),
             "filled_fields": filled,
         }
         try:
@@ -1705,48 +1804,79 @@ def execute_auto_interaction(
             action["status"] = "blocked"
             action["error"] = f"{type(error).__name__}: {error}"
         action["after_url"] = page.url
+        if not is_allowed(str(page.url)):
+            actions.append(action)
+            return finish("blocked", blocker="interaction_navigated_outside_allowed_hosts")
+        after_state = rendered_state_evidence(page)
+        action["before_state_sha256"] = before_state["state_sha256"]
+        action["after_state_sha256"] = after_state["state_sha256"]
         action["data_layer_pushes"] = captured_pushes[before_push:]
         action["ga4_requests"] = captured_requests[before_request:]
+        action["backend_responses"] = responses[before_response:]
         actions.append(action)
         if action["status"] == "blocked":
-            return {
-                **recipe,
-                "outcome": "blocked",
-                "privacy_statement_accepted": accepted,
-                "actions": actions,
-                "blocker": action["error"],
-            }
-        try:
-            after_text = str(page.locator("body").inner_text(timeout=1500)).casefold()
-        except Exception:
-            after_text = ""
-        if re.search(
-            r"(?:thank\s+you|success|confirmed|request\s+received|merci|confirmation|"
-            r"demande\s+(?:a\s+bien\s+ete|re[cç]ue)|connexion\s+r[eé]ussie)",
-            after_text,
-            re.I,
-        ):
-            return {
-                **recipe,
-                "outcome": "completed",
-                "privacy_statement_accepted": accepted,
-                "actions": actions,
-            }
-        if re.search(r"(?:invalid|required|error|invalide|obligatoire|erreur)", after_text, re.I):
-            return {
-                **recipe,
-                "outcome": "partial",
-                "privacy_statement_accepted": accepted,
-                "actions": actions,
-                "observed_state": "failure",
-            }
-    return {
-        **recipe,
-        "outcome": "partial",
-        "privacy_statement_accepted": accepted,
-        "actions": actions,
-        "blocker": "maximum_safe_steps_reached",
-    }
+            return finish("blocked", blocker=action["error"])
+        if before_state["state_sha256"] != after_state["state_sha256"]:
+            claims.append(
+                evidence_claim(
+                    "progression_observed",
+                    evidence_type="before_after_state",
+                    locator=f"actions/{len(actions) - 1}",
+                    evidence={
+                        "before_state_sha256": before_state["state_sha256"],
+                        "after_state_sha256": after_state["state_sha256"],
+                        "before_url": before_url,
+                        "after_url": page.url,
+                    },
+                )
+            )
+        if is_submit:
+            claims.append(
+                evidence_claim(
+                    "submission_observed",
+                    evidence_type="action_window",
+                    locator=f"actions/{len(actions) - 1}",
+                    evidence={
+                        "control_selector": str(preferred.get("selector", "")),
+                        "before_url": before_url,
+                        "after_url": page.url,
+                        "backend_response_count": len(responses[before_response:]),
+                    },
+                )
+            )
+        failure = explicit_failure_evidence(page)
+        if failure:
+            claims.append(
+                evidence_claim(
+                    "failure_observed",
+                    evidence_type="explicit_failure_component",
+                    locator=str(failure["selector"]),
+                    evidence=failure,
+                )
+            )
+            return finish("partial", observed_state="failure")
+        oracle = positive_success_oracle(
+            page,
+            before_url=str(recipe.get("start_url", before_url)),
+            form_action=str(snapshot.get("action", "")),
+            configured_predicate=(
+                recipe.get("success_predicate")
+                if isinstance(recipe.get("success_predicate"), dict)
+                else None
+            ),
+            responses=responses[before_response:],
+        )
+        if oracle:
+            claims.append(
+                evidence_claim(
+                    "success_confirmed",
+                    evidence_type="positive_outcome_oracle",
+                    locator=f"actions/{len(actions) - 1}",
+                    evidence=oracle,
+                )
+            )
+            return finish("completed")
+    return finish("partial", blocker="maximum_safe_steps_reached")
 
 
 def measurement_opportunity_hints(
@@ -1765,7 +1895,7 @@ def measurement_opportunity_hints(
     ) -> None:
         template = str(page.get("template", ""))
         journey_id = infer_journey(template)
-        variant_id = journey_variant_id(template, str(page.get("url", "")))
+        variant_id = record_variant_id(template, str(page.get("url", "")), page)
         key = (hint_key, journey_id, variant_id)
         suffix = hashlib.sha256(f"{journey_id}|{variant_id}".encode("utf-8")).hexdigest()[:8]
         hint_id = _identifier(f"{hint_key}_{suffix}")
@@ -1982,6 +2112,51 @@ def measurement_opportunity_hints(
                 "progression",
                 "Meaningful configuration progression and completion require an explicit decision.",
             ),
+            "iframe_form": (
+                "embedded_form_progression_and_outcome",
+                "outcome",
+                "An embedded form or widget needs its own progression, failure, submission, and confirmed-outcome decision.",
+            ),
+            "video_media": (
+                "meaningful_media_engagement",
+                "interaction",
+                "Meaningful media engagement requires a concrete content question before it becomes an implementation requirement.",
+            ),
+            "deliberate_contact_handoff": (
+                "contact_channel_handoff",
+                "outcome",
+                "A deliberate telephone, email, chat, or portal transfer may represent contact intent without measuring generic outbound links.",
+            ),
+            "navigation_surface": (
+                "navigation_surface_usage",
+                "interaction",
+                "Header, footer, menu, or drawer use needs one surface-level decision when navigation effectiveness is analysed.",
+            ),
+            "search_result_selection": (
+                "site_search_result_selection",
+                "outcome",
+                "Selecting an internal-search result is a distinct outcome after search submission.",
+            ),
+            "pagination_load_more": (
+                "pagination_or_load_more_usage",
+                "interaction",
+                "Pagination or load-more use may explain discovery depth without creating one event per control.",
+            ),
+            "custom_aria_control": (
+                "custom_choice_progression",
+                "interaction",
+                "A custom ARIA choice can reveal material states or finite values that native-control discovery misses.",
+            ),
+            "print_share": (
+                "print_or_share_intent",
+                "interaction",
+                "Print or share remains a detect-only candidate unless a concrete content-distribution decision justifies collection.",
+            ),
+            "carousel_selection": (
+                "carousel_content_selection",
+                "interaction",
+                "Carousel selection remains a candidate only when the selected content or promotion supports a concrete decision.",
+            ),
         }
         capabilities = page.get("interaction_capabilities")
         if not isinstance(capabilities, list):
@@ -2016,6 +2191,55 @@ def measurement_opportunity_hints(
     return sorted(result, key=lambda item: str(item["hint_id"]))
 
 
+def transition_measurement_opportunity_hints(
+    probe_runs: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Expose new interaction families revealed by a directly evidenced state transition."""
+    hints: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for run in probe_runs:
+        if not isinstance(run, dict) or not run.get("state_id_after"):
+            continue
+        rescan = run.get("rescan") if isinstance(run.get("rescan"), dict) else {}
+        original_families = {
+            str(value) for value in run.get("detected_families_before", []) if value
+        }
+        start_url = str(run.get("start_url", ""))
+        template = str(run.get("template", infer_template(start_url)))
+        journey_id = infer_journey(template)
+        state_id = str(run.get("state_id_after"))
+        variant_id = record_variant_id(
+            template,
+            start_url,
+            {**run, "state_id": state_id},
+        )
+        for family_value in rescan.get("interaction_families", []):
+            family = str(family_value)
+            identity = (journey_id, variant_id, family)
+            if not family or family in original_families or identity in seen:
+                continue
+            digest = hashlib.sha256("|".join(identity).encode("utf-8")).hexdigest()[:8]
+            hints.append(
+                {
+                    "hint_id": _identifier(f"revealed_{family}_{digest}", maximum=79),
+                    "hint_key": _identifier(f"revealed_{family}", maximum=79),
+                    "journey_id": journey_id,
+                    "variant_id": variant_id,
+                    "category": "interaction",
+                    "materiality": "candidate",
+                    "evidence_urls": [start_url],
+                    "evidence_structure_hashes": [str(rescan["rescan_sha256"])],
+                    "reason": (
+                        f"A safe {run.get('family', 'interaction')} transition revealed "
+                        f"the additional '{family}' family; it requires an explicit analyst disposition."
+                    ),
+                    "requires_interactive_review": True,
+                }
+            )
+            seen.add(identity)
+    return sorted(hints, key=lambda item: str(item["hint_id"]))
+
+
 def finite_value_candidates(pages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Collect finite UI choices without deciding their analytics parameter."""
     candidates: dict[tuple[str, str, str], dict[str, Any]] = {}
@@ -2024,7 +2248,7 @@ def finite_value_candidates(pages: list[dict[str, Any]]) -> list[dict[str, Any]]
             continue
         template = str(page.get("template", "content_or_other"))
         journey_id = infer_journey(template)
-        variant_id = journey_variant_id(template, str(page.get("url", "")))
+        variant_id = record_variant_id(template, str(page.get("url", "")), page)
         controls = [
             item
             for item in page.get("interactive_controls", [])
@@ -2146,13 +2370,424 @@ def interaction_coverage_gaps(
     return gaps
 
 
+def crawl_rendered_phase(
+    page: Any,
+    *,
+    root_url: str,
+    seeds: list[dict[str, Any]],
+    args: argparse.Namespace,
+    errors: list[SourceError],
+    robots_rules: Any | None,
+    allowed_url: Callable[[str], bool],
+    phase_id: str,
+    access_profile_id: str = "public",
+    role: str = "public",
+    validity_profile: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    pages: list[dict[str, Any]] = []
+    blocked_candidates: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    queued: set[str] = set()
+    queue: list[dict[str, Any]] = []
+    candidate_universe: dict[str, dict[str, Any]] = {}
+    rounds: list[dict[str, Any]] = []
+    delay_seconds = max(0, args.delay_ms) / 1000
+    session_expired = False
+
+    def enqueue(url: str, text: str, source: str) -> None:
+        candidate_url = canonical_url(url)
+        if not candidate_url or candidate_url in seen or not allowed_url(candidate_url):
+            return
+        normalized_text = clean_text(text)
+        if candidate_url in queued:
+            existing = candidate_universe[candidate_url]
+            if normalized_text and not existing.get("text"):
+                existing["text"] = normalized_text
+                existing["source"] = source
+            return
+        queued.add(candidate_url)
+        record = {
+            "url": candidate_url,
+            "text": normalized_text,
+            "source": source,
+            "access_profile_id": access_profile_id,
+            "role": role,
+            "state_id": "entry",
+        }
+        queue.append(record)
+        candidate_universe[candidate_url] = dict(record)
+
+    for seed in seeds:
+        enqueue(
+            str(seed.get("url", "")),
+            str(seed.get("text", "")),
+            str(seed.get("source", "seed")),
+        )
+
+    material_unvisited: list[dict[str, Any]] = []
+    for round_number in range(1, args.max_rounds + 1):
+        if validity_profile is not None:
+            validity = session_is_valid(page, validity_profile, args.timeout_ms)
+            if not validity.get("passed"):
+                session_expired = True
+                rounds.append(
+                    {
+                        "round_number": round_number,
+                        "phase_id": phase_id,
+                        "access_profile_id": access_profile_id,
+                        "role": role,
+                        "attempted_page_count": 0,
+                        "usable_page_count": 0,
+                        "new_candidate_count": 0,
+                        "material_unvisited_candidate_count": len(queue),
+                        "stop_reason": "session_expired",
+                    }
+                )
+                break
+        page_count_before = len(pages)
+        candidate_count_before = len(candidate_universe)
+        attempted = 0
+        while queue and attempted < args.limit:
+            observed_template_counts = Counter(
+                str(item.get("template"))
+                for item in pages
+                if not item.get("fetch_error")
+            )
+            observed_families = {
+                family_for_template(
+                    str(item.get("template", "content_or_other")),
+                    str(item.get("url", "")),
+                )
+                for item in pages
+                if not item.get("fetch_error")
+            }
+            queue.sort(
+                key=lambda item: candidate_priority(
+                    item,
+                    root_url,
+                    observed_template_counts,
+                    observed_families,
+                ),
+                reverse=True,
+            )
+            selected = queue.pop(0)
+            attempted += 1
+            current_url = canonical_url(str(selected["url"]))
+            queued.discard(current_url)
+            seen.add(current_url)
+            if robots_rules is not None and not robots_rules.can_fetch(USER_AGENT, current_url):
+                errors.append(
+                    SourceError(
+                        "robots_disallow",
+                        current_url,
+                        "Skipped because robots.txt disallows this public crawler.",
+                    )
+                )
+                blocked_candidates.append(
+                    {
+                        **selected,
+                        "template": infer_template(current_url, str(selected.get("text", ""))),
+                        "reason": "robots_disallow",
+                    }
+                )
+                continue
+            rendered = collect_rendered_page(
+                page,
+                current_url,
+                root_url,
+                args.timeout_ms,
+                allowed_url=allowed_url,
+            )
+            rendered.update(
+                {
+                    "access_profile_id": access_profile_id,
+                    "role": role,
+                    "state_id": "entry",
+                    "discovery_phase": phase_id,
+                }
+            )
+            rendered["interaction_capabilities"] = detect_interaction_capabilities(rendered)
+            pages.append(rendered)
+            if delay_seconds:
+                time.sleep(delay_seconds)
+            if rendered.get("fetch_error"):
+                errors.append(
+                    SourceError(
+                        "playwright_crawl",
+                        current_url,
+                        str(rendered["fetch_error"]),
+                    )
+                )
+                continue
+            for link in rendered.get("links", []):
+                enqueue(
+                    str(link.get("url", "")),
+                    str(link.get("text", "")),
+                    "rendered_link",
+                )
+
+        observed_template_counts = Counter(
+            str(item.get("template"))
+            for item in pages
+            if not item.get("fetch_error")
+        )
+        observed_families = {
+            family_for_template(
+                str(item.get("template", "content_or_other")),
+                str(item.get("url", "")),
+            )
+            for item in pages
+            if not item.get("fetch_error")
+        }
+        remaining = [
+            candidate
+            for url, candidate in candidate_universe.items()
+            if url not in seen
+        ]
+        material_unvisited = material_unvisited_candidates(
+            remaining,
+            root_url,
+            observed_template_counts,
+            observed_families,
+        )
+        stop_reason = discovery_round_stop_reason(
+            len(material_unvisited),
+            round_number,
+            args.max_rounds,
+            len(queue),
+        )
+        round_pages = pages[page_count_before:]
+        rounds.append(
+            {
+                "round_number": round_number,
+                "phase_id": phase_id,
+                "access_profile_id": access_profile_id,
+                "role": role,
+                "attempted_page_count": attempted,
+                "usable_page_count": sum(
+                    not item.get("fetch_error") for item in round_pages
+                ),
+                "new_candidate_count": max(
+                    0,
+                    len(candidate_universe) - candidate_count_before,
+                ),
+                "material_unvisited_candidate_count": len(material_unvisited),
+                "stop_reason": stop_reason,
+            }
+        )
+        if stop_reason != "continue_targeted_discovery":
+            break
+    if session_expired:
+        material_unvisited = [
+            {
+                **candidate,
+                "priority": candidate_priority(candidate, root_url),
+                "reason": "session_expired",
+                "template": infer_template(
+                    str(candidate.get("url", "")),
+                    str(candidate.get("text", "")),
+                ),
+            }
+            for candidate in queue
+        ]
+    return {
+        "pages": pages,
+        "blocked_candidates": blocked_candidates,
+        "candidates": list(candidate_universe.values()),
+        "rounds": rounds,
+        "material_unvisited": material_unvisited,
+        "session_expired": session_expired,
+    }
+
+
+def _context_capture(
+    context: Any,
+    page: Any,
+    allowed_hosts: set[str],
+) -> tuple[dict[str, int], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    captured_pushes: list[dict[str, Any]] = []
+    captured_requests: list[dict[str, Any]] = []
+    captured_responses: list[dict[str, Any]] = []
+    active_action = {"index": -1}
+
+    def receive_push(_source: Any, payload: Any) -> None:
+        if active_action["index"] >= 0:
+            captured_pushes.append(
+                {"action_index": active_action["index"], "payload": payload}
+            )
+
+    context.expose_binding("__ga4DiscoveryCapture", receive_push)
+    context.add_init_script(CAPTURE_INIT_SCRIPT)
+
+    def capture_request(request: Any) -> None:
+        if active_action["index"] < 0:
+            return
+        evidence = _safe_measurement_request(request)
+        if evidence:
+            captured_requests.append(
+                {"action_index": active_action["index"], **evidence}
+            )
+
+    def capture_response(response: Any) -> None:
+        if active_action["index"] < 0:
+            return
+        evidence = _safe_backend_response(response, allowed_hosts)
+        if evidence:
+            captured_responses.append(
+                {"action_index": active_action["index"], **evidence}
+            )
+
+    page.on("request", capture_request)
+    page.on("response", capture_response)
+    return active_action, captured_pushes, captured_requests, captured_responses
+
+
+def execute_recipes_isolated(
+    browser: Any,
+    storage_state: dict[str, Any],
+    recipes: list[dict[str, Any]],
+    *,
+    timeout_ms: int,
+    allowed_hosts: set[str],
+) -> list[dict[str, Any]]:
+    runs: list[dict[str, Any]] = []
+    for recipe in recipes:
+        context = browser.new_context(storage_state=storage_state)
+        page = context.new_page()
+        active, pushes, requests, responses = _context_capture(
+            context,
+            page,
+            allowed_hosts,
+        )
+        try:
+            runs.append(
+                execute_auto_interaction(
+                    page,
+                    recipe,
+                    timeout_ms=timeout_ms,
+                    active_action=active,
+                    captured_pushes=pushes,
+                    captured_requests=requests,
+                    captured_responses=responses,
+                    allowed_url=lambda value, patterns=allowed_hosts: _url_allowed_by_patterns(
+                        value,
+                        patterns,
+                    ),
+                )
+            )
+        finally:
+            context.close()
+    return runs
+
+
+def execute_probes_isolated(
+    browser: Any,
+    storage_state: dict[str, Any],
+    recipes: list[dict[str, Any]],
+    *,
+    timeout_ms: int,
+    allowed_url: Callable[[str], bool],
+    consequential_pattern: re.Pattern[str],
+) -> list[dict[str, Any]]:
+    runs: list[dict[str, Any]] = []
+    for recipe in recipes:
+        context = browser.new_context(storage_state=storage_state)
+        page = context.new_page()
+        try:
+            runs.append(
+                execute_probe(
+                    page,
+                    recipe,
+                    timeout_ms=min(timeout_ms, 5000),
+                    allowed_url=allowed_url,
+                    consequential_pattern=consequential_pattern,
+                )
+            )
+        finally:
+            context.close()
+    return runs
+
+
+def interaction_probe_coverage_gaps(
+    recipes: list[dict[str, Any]],
+    runs: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    by_id = {
+        str(run.get("probe_id", "")): run
+        for run in runs
+        if isinstance(run, dict)
+    }
+    gaps: list[dict[str, Any]] = []
+    for recipe in recipes:
+        if recipe.get("materiality") != "material":
+            continue
+        run = by_id.get(str(recipe.get("probe_id", "")))
+        if run and run.get("outcome") in {"observed", "completed"}:
+            continue
+        digest = hashlib.sha256(str(recipe.get("probe_id", "")).encode("utf-8")).hexdigest()[:10]
+        gaps.append(
+            {
+                "gap_id": _identifier(
+                    f"probe_boundary_{recipe.get('family', 'interaction')}_{digest}",
+                    maximum=79,
+                ),
+                "material": True,
+                "evidence_state": (
+                    "externally_blocked"
+                    if run and run.get("outcome") == "blocked"
+                    else ("partial" if run else "not_tested")
+                ),
+                "description": (
+                    f"The material interaction family '{recipe.get('family')}' was detected "
+                    "but its representative safe behaviour was not directly established."
+                ),
+                "candidate_urls": [str(recipe.get("start_url", ""))],
+                "access_profile_id": str(recipe.get("access_profile_id", "public")),
+                "role": str(recipe.get("role", "public")),
+                "probe_id": str(recipe.get("probe_id", "")),
+            }
+        )
+    return gaps
+
+
 def main() -> int:
     args = parse_args()
-    if args.limit <= 0 or args.max_rounds <= 0 or args.interaction_limit < 0:
-        raise SystemExit("--limit and --max-rounds must be positive; --interaction-limit cannot be negative.")
+    if (
+        args.limit <= 0
+        or args.max_rounds <= 0
+        or args.interaction_limit < 0
+        or args.probe_limit < 0
+    ):
+        raise SystemExit(
+            "--limit and --max-rounds must be positive; interaction and probe limits cannot be negative."
+        )
     if args.run_id and not re.fullmatch(r"run_[a-f0-9]{32}", args.run_id):
         raise SystemExit("--run-id must use run_<32 lowercase hex> format.")
     root_url = canonical_url(args.url if "://" in args.url else f"https://{args.url}")
+    access_profiles: list[dict[str, Any]] = []
+    if args.access_profiles:
+        try:
+            access_contract = load_access_profiles(args.access_profiles)
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            raise SystemExit(str(error)) from error
+        access_profiles = [
+            item
+            for item in access_contract["profiles"]
+            if isinstance(item, dict)
+        ]
+        selected_ids = set(args.access_profile_id)
+        known_ids = {str(item["profile_id"]) for item in access_profiles}
+        unknown = sorted(selected_ids - known_ids)
+        if unknown:
+            raise SystemExit(
+                "Unknown --access-profile-id values: " + ", ".join(unknown)
+            )
+        if selected_ids:
+            access_profiles = [
+                item
+                for item in access_profiles
+                if str(item["profile_id"]) in selected_ids
+            ]
     sync_playwright = require_playwright()
     browser_environment = inspect_browser_environment()
     try:
@@ -2162,12 +2797,13 @@ def main() -> int:
     pages: list[dict[str, Any]] = []
     errors: list[SourceError] = []
     blocked_candidates: list[dict[str, str]] = []
-    seen: set[str] = set()
-    queued: set[str] = set()
-    queue: list[dict[str, str]] = []
-    candidate_universe: dict[str, dict[str, str]] = {}
+    candidate_universe: dict[str, dict[str, Any]] = {}
     rounds: list[dict[str, Any]] = []
     automatic_interaction_runs: list[dict[str, Any]] = []
+    interaction_probe_runs: list[dict[str, Any]] = []
+    access_profile_runs: list[dict[str, Any]] = []
+    side_effect_log: list[dict[str, Any]] = []
+    all_probe_recipes: list[dict[str, Any]] = []
     robots_url, robots_sitemaps, robots_rules = discover_robots(
         root_url,
         errors,
@@ -2188,174 +2824,216 @@ def main() -> int:
             break
     sitemap_universe_truncated = args.sitemap_limit > 0 and len(sitemap_urls) >= args.sitemap_limit
 
-    def enqueue(url: str, text: str, source: str) -> None:
-        candidate_url = canonical_url(url)
-        if not candidate_url or candidate_url in seen or not same_host(candidate_url, root_url):
-            return
-        normalized_text = clean_text(text)
-        if candidate_url in queued:
-            for record in queue:
-                if record["url"] != candidate_url:
-                    continue
-                if normalized_text and not record.get("text"):
-                    record["text"] = normalized_text
-                    record["source"] = source
-                break
-            existing = candidate_universe[candidate_url]
-            if normalized_text and not existing.get("text"):
-                existing["text"] = normalized_text
-                existing["source"] = source
-            return
-        queued.add(candidate_url)
-        record = {"url": candidate_url, "text": normalized_text, "source": source}
-        queue.append(record)
-        candidate_universe[candidate_url] = dict(record)
-
-    enqueue(root_url, "homepage", "root")
-    for seed in args.seed_url:
-        enqueue(seed, "explicit journey entry point", "explicit_seed")
-    for sitemap_url in sitemap_urls:
-        enqueue(sitemap_url, "", "sitemap")
+    public_seeds = [
+        {"url": root_url, "text": "homepage", "source": "root"},
+        *[
+            {"url": seed, "text": "explicit journey entry point", "source": "explicit_seed"}
+            for seed in args.seed_url
+        ],
+        *[
+            {"url": sitemap_url, "text": "", "source": "sitemap"}
+            for sitemap_url in sitemap_urls
+        ],
+    ]
     with sync_playwright() as playwright:
         browser = launch_browser(playwright, browser_channel, headless=not args.headful)
         context = browser.new_context()
-        captured_pushes: list[dict[str, Any]] = []
-        captured_requests: list[dict[str, Any]] = []
-        active_action = {"index": -1}
-
-        def receive_push(_source: Any, payload: Any) -> None:
-            if active_action["index"] >= 0:
-                captured_pushes.append({"action_index": active_action["index"], "payload": payload})
-
-        context.expose_binding("__ga4DiscoveryCapture", receive_push)
         context.add_init_script(CAPTURE_INIT_SCRIPT)
         page = context.new_page()
-
-        def capture_request(request: Any) -> None:
-            if active_action["index"] < 0:
-                return
-            evidence = _safe_measurement_request(request)
-            if evidence:
-                captured_requests.append({"action_index": active_action["index"], **evidence})
-
-        page.on("request", capture_request)
-        material_unvisited: list[dict[str, Any]] = []
-        for round_number in range(1, args.max_rounds + 1):
-            page_count_before = len(pages)
-            candidate_count_before = len(candidate_universe)
-            attempted = 0
-            while queue and attempted < args.limit:
-                observed_template_counts = Counter(str(item.get("template")) for item in pages if not item.get("fetch_error"))
-                observed_families = {
-                    family_for_template(
-                        str(item.get("template", "content_or_other")),
-                        str(item.get("url", "")),
-                    )
-                    for item in pages
-                    if not item.get("fetch_error")
-                }
-                queue.sort(
-                    key=lambda item: candidate_priority(
-                        item,
-                        root_url,
-                        observed_template_counts,
-                        observed_families,
-                    ),
-                    reverse=True,
-                )
-                selected = queue.pop(0)
-                attempted += 1
-                current_url = canonical_url(selected["url"])
-                queued.discard(current_url)
-                seen.add(current_url)
-                if robots_rules is not None and not robots_rules.can_fetch(USER_AGENT, current_url):
-                    errors.append(
-                        SourceError(
-                            "robots_disallow",
-                            current_url,
-                            "Skipped because robots.txt disallows this crawler.",
-                        )
-                    )
-                    blocked_candidates.append(
-                        {
-                            **selected,
-                            "template": infer_template(
-                                current_url,
-                                str(selected.get("text", "")),
-                            ),
-                            "reason": "robots_disallow",
-                        }
-                    )
-                    continue
-                rendered = collect_rendered_page(page, current_url, root_url, args.timeout_ms)
-                pages.append(rendered)
-                if delay_seconds:
-                    time.sleep(delay_seconds)
-                if rendered.get("fetch_error"):
-                    errors.append(
-                        SourceError(
-                            "playwright_crawl",
-                            current_url,
-                            str(rendered["fetch_error"]),
-                        )
-                    )
-                    continue
-                for link in rendered.get("links", []):
-                    href = canonical_url(str(link.get("url", "")))
-                    enqueue(href, str(link.get("text", "")), "rendered_link")
-
-            observed_template_counts = Counter(str(item.get("template")) for item in pages if not item.get("fetch_error"))
-            observed_families = {
-                family_for_template(
-                    str(item.get("template", "content_or_other")),
-                    str(item.get("url", "")),
-                )
-                for item in pages
-                if not item.get("fetch_error")
-            }
-            remaining = [candidate for url, candidate in candidate_universe.items() if url not in seen]
-            material_unvisited = material_unvisited_candidates(
-                remaining,
-                root_url,
-                observed_template_counts,
-                observed_families,
-            )
-            stop_reason = discovery_round_stop_reason(
-                len(material_unvisited),
-                round_number,
-                args.max_rounds,
-                len(queue),
-            )
-            round_pages = pages[page_count_before:]
-            rounds.append(
-                {
-                    "round_number": round_number,
-                    "attempted_page_count": attempted,
-                    "usable_page_count": sum(not item.get("fetch_error") for item in round_pages),
-                    "new_candidate_count": max(0, len(candidate_universe) - candidate_count_before),
-                    "material_unvisited_candidate_count": len(material_unvisited),
-                    "stop_reason": stop_reason,
-                }
-            )
-            if stop_reason != "continue_targeted_discovery":
-                break
+        root_host = (urlparse(root_url).hostname or "").casefold()
+        public_phase = crawl_rendered_phase(
+            page,
+            root_url=root_url,
+            seeds=public_seeds,
+            args=args,
+            errors=errors,
+            robots_rules=robots_rules,
+            allowed_url=lambda value: same_host(value, root_url),
+            phase_id="public",
+        )
+        pages.extend(public_phase["pages"])
+        rounds.extend(public_phase["rounds"])
+        blocked_candidates.extend(public_phase["blocked_candidates"])
+        material_unvisited: list[dict[str, Any]] = list(public_phase["material_unvisited"])
+        candidate_universe.update(
+            {str(candidate["url"]): candidate for candidate in public_phase["candidates"]}
+        )
+        public_state = context.storage_state()
+        context.close()
 
         all_recipes = build_auto_interaction_recipes(pages, limit=None)
         recipes = all_recipes[: args.interaction_limit]
-        unexecuted_recipes = all_recipes[args.interaction_limit :]
         if not args.no_auto_interact:
-            for recipe in recipes:
-                automatic_interaction_runs.append(
-                    execute_auto_interaction(
-                        page,
-                        recipe,
+            automatic_interaction_runs.extend(
+                execute_recipes_isolated(
+                    browser,
+                    public_state,
+                    recipes,
+                    timeout_ms=args.timeout_ms,
+                    allowed_hosts={root_host},
+                )
+            )
+        public_probe_recipes = build_probe_recipes(pages, limit=args.probe_limit)
+        all_probe_recipes.extend(public_probe_recipes)
+        if not args.no_interaction_probes:
+            interaction_probe_runs.extend(
+                execute_probes_isolated(
+                    browser,
+                    public_state,
+                    public_probe_recipes,
+                    timeout_ms=args.timeout_ms,
+                    allowed_url=lambda value: same_host(value, root_url),
+                    consequential_pattern=UNSAFE_ACTION_PATTERN,
+                )
+            )
+
+        for profile in access_profiles:
+            profile_id = str(profile["profile_id"])
+            role = str(profile["role"])
+            allowed_patterns = normalized_allowed_hosts(profile)
+            allowed_capture_hosts = set(allowed_patterns)
+            allowed_capture_hosts.update(
+                (urlparse(str(url)).hostname or "").casefold()
+                for url in profile["entry_urls"]
+            )
+            attempts: list[dict[str, Any]] = []
+            final_phase: dict[str, Any] | None = None
+            final_state: dict[str, Any] | None = None
+            maximum_attempts = 1 if profile["access_method"] == "headful_handoff" else 2
+            for attempt in range(1, maximum_attempts + 1):
+                state, access_summary = bootstrap_access_profile(
+                    browser,
+                    profile,
+                    headful=args.headful,
+                    timeout_ms=args.timeout_ms,
+                )
+                access_summary["attempt_count"] = attempt
+                attempts.append(access_summary)
+                if state is None:
+                    break
+                profile_context = browser.new_context(storage_state=state)
+                profile_page = profile_context.new_page()
+                _context_capture(profile_context, profile_page, allowed_capture_hosts)
+                phase = crawl_rendered_phase(
+                    profile_page,
+                    root_url=str(profile["entry_urls"][0]),
+                    seeds=[
+                        {
+                            "url": str(url),
+                            "text": "authorized gated entry point",
+                            "source": "access_profile",
+                        }
+                        for url in profile["entry_urls"]
+                    ],
+                    args=args,
+                    errors=errors,
+                    robots_rules=None,
+                    allowed_url=lambda value, selected=profile: url_is_allowed(value, selected),
+                    phase_id=f"authenticated_{profile_id}",
+                    access_profile_id=profile_id,
+                    role=role,
+                    validity_profile=profile,
+                )
+                final_state = profile_context.storage_state()
+                profile_context.close()
+                final_phase = phase
+                if not phase["session_expired"]:
+                    break
+            summary = {
+                "profile_id": profile_id,
+                "role": role,
+                "access_method": str(profile["access_method"]),
+                "entry_urls": [str(value) for value in profile["entry_urls"]],
+                "allowed_hosts": list(allowed_patterns),
+                "attempt_count": len(attempts),
+                "attempts": attempts,
+                "status": (
+                    "authenticated_discovery_completed"
+                    if final_phase is not None and not final_phase["session_expired"]
+                    else (
+                        "session_expired"
+                        if final_phase is not None
+                        else "externally_blocked"
+                    )
+                ),
+                "final_disposition": "in_memory_state_discarded_after_run",
+            }
+            if final_phase is None or final_state is None:
+                access_profile_runs.append(summary)
+                continue
+            profile_pages = final_phase["pages"]
+            profile_candidates = final_phase["candidates"]
+            pages.extend(profile_pages)
+            rounds.extend(final_phase["rounds"])
+            blocked_candidates.extend(final_phase["blocked_candidates"])
+            material_unvisited.extend(final_phase["material_unvisited"])
+            for candidate in profile_candidates:
+                candidate_universe[f"{profile_id}|{candidate['url']}"] = candidate
+            profile_recipes = build_auto_interaction_recipes(
+                profile_pages,
+                limit=args.interaction_limit,
+            )
+            if not args.no_auto_interact:
+                automatic_interaction_runs.extend(
+                    execute_recipes_isolated(
+                        browser,
+                        final_state,
+                        profile_recipes,
                         timeout_ms=args.timeout_ms,
-                        active_action=active_action,
-                        captured_pushes=captured_pushes,
-                        captured_requests=captured_requests,
+                        allowed_hosts=allowed_capture_hosts,
                     )
                 )
-        context.close()
+            profile_probe_recipes = build_probe_recipes(
+                profile_pages,
+                limit=args.probe_limit,
+            )
+            all_probe_recipes.extend(profile_probe_recipes)
+            if not args.no_interaction_probes:
+                extra_patterns = [
+                    str(value)
+                    for value in profile.get("consequential_action_patterns", [])
+                ]
+                consequential = (
+                    re.compile(
+                        f"(?:{UNSAFE_ACTION_PATTERN.pattern}|"
+                        + "|".join(f"(?:{value})" for value in extra_patterns)
+                        + ")",
+                        re.I,
+                    )
+                    if extra_patterns
+                    else UNSAFE_ACTION_PATTERN
+                )
+                interaction_probe_runs.extend(
+                    execute_probes_isolated(
+                        browser,
+                        final_state,
+                        profile_probe_recipes,
+                        timeout_ms=args.timeout_ms,
+                        allowed_url=lambda value, selected=profile: url_is_allowed(value, selected),
+                        consequential_pattern=consequential,
+                    )
+                )
+            summary.update(
+                {
+                    "usable_page_count": sum(
+                        not item.get("fetch_error") for item in profile_pages
+                    ),
+                    "candidate_count": len(profile_candidates),
+                    "form_recipe_count": len(profile_recipes),
+                    "interaction_probe_count": len(profile_probe_recipes),
+                }
+            )
+            access_profile_runs.append(summary)
+            if profile["access_method"] == "public_registration" and summary["status"] == "authenticated_discovery_completed":
+                side_effect_log.append(
+                    {
+                        "side_effect_type": "synthetic_account_may_have_been_created",
+                        "access_profile_id": profile_id,
+                        "role": role,
+                        "persistent_external_artifact_possible": True,
+                        "contains_synthetic_identity": False,
+                    }
+                )
         browser.close()
 
     observed_template_counts = Counter(str(item.get("template")) for item in pages if not item.get("fetch_error"))
@@ -2367,13 +3045,31 @@ def main() -> int:
         for item in pages
         if not item.get("fetch_error")
     }
-    remaining_candidates = [candidate for url, candidate in candidate_universe.items() if url not in seen]
-    material_unvisited = material_unvisited_candidates(
+    public_seen_urls = {
+        str(page.get("url", ""))
+        for page in pages
+        if page.get("access_profile_id", "public") == "public"
+    }
+    remaining_candidates = [
+        candidate
+        for key, candidate in candidate_universe.items()
+        if "|" not in key
+        and str(candidate.get("url", "")) not in public_seen_urls
+    ]
+    public_material_unvisited = material_unvisited_candidates(
         remaining_candidates,
         root_url,
         observed_template_counts,
         observed_families,
     )
+    material_by_identity = {
+        (
+            str(item.get("access_profile_id", "public")),
+            str(item.get("url", "")),
+        ): item
+        for item in [*material_unvisited, *public_material_unvisited]
+    }
+    material_unvisited = list(material_by_identity.values())
     outcome, usable_page_count, delivery_notice = discovery_outcome(
         pages,
         errors,
@@ -2410,14 +3106,80 @@ def main() -> int:
                 "candidate_urls": [item["url"] for item in blocked_candidates[:50]],
             }
         )
+    for profile_run in access_profile_runs:
+        if profile_run.get("status") == "authenticated_discovery_completed":
+            continue
+        profile_id = str(profile_run.get("profile_id", "access"))
+        coverage_gaps.append(
+            {
+                "gap_id": _identifier(
+                    f"access_profile_{profile_id}_{profile_run.get('status', 'blocked')}",
+                    maximum=79,
+                ),
+                "material": True,
+                "evidence_state": "externally_blocked",
+                "description": (
+                    f"Authorized gated discovery for role '{profile_run.get('role', '')}' "
+                    f"ended as {profile_run.get('status', 'externally_blocked')}."
+                ),
+                "candidate_urls": [
+                    str(value) for value in profile_run.get("entry_urls", [])
+                ],
+                "access_profile_id": profile_id,
+                "role": str(profile_run.get("role", "")),
+            }
+        )
     all_recipes = build_auto_interaction_recipes(pages, limit=None)
-    recipes = all_recipes[: args.interaction_limit]
-    unexecuted_recipes = all_recipes[args.interaction_limit :]
-    if args.no_auto_interact:
-        unexecuted_recipes = all_recipes
+    executed_recipe_ids = {
+        str(run.get("recipe_id", ""))
+        for run in automatic_interaction_runs
+        if isinstance(run, dict)
+    }
+    unexecuted_recipes = [
+        recipe
+        for recipe in all_recipes
+        if args.no_auto_interact or str(recipe.get("recipe_id", "")) not in executed_recipe_ids
+    ]
     coverage_gaps.extend(
         interaction_coverage_gaps(unexecuted_recipes, automatic_interaction_runs)
     )
+    all_probe_recipes = build_probe_recipes(pages, limit=None)
+    coverage_gaps.extend(
+        interaction_probe_coverage_gaps(
+            all_probe_recipes,
+            interaction_probe_runs,
+        )
+    )
+    known_side_effects = {
+        (
+            str(item.get("side_effect_type", "")),
+            str(item.get("access_profile_id", "")),
+            str(item.get("recipe_id", "")),
+        )
+        for item in side_effect_log
+    }
+    for run in automatic_interaction_runs:
+        if run.get("submission_kind") not in {"lead"} or run.get("evidence_state") not in {
+            "submission_observed",
+            "success_confirmed",
+        }:
+            continue
+        record = {
+            "side_effect_type": "synthetic_form_submission_may_have_created_external_record",
+            "access_profile_id": str(run.get("access_profile_id", "public")),
+            "role": str(run.get("role", "public")),
+            "recipe_id": str(run.get("recipe_id", "")),
+            "persistent_external_artifact_possible": True,
+            "contains_synthetic_identity": False,
+        }
+        identity = (
+            record["side_effect_type"],
+            record["access_profile_id"],
+            record["recipe_id"],
+        )
+        if identity not in known_side_effects:
+            side_effect_log.append(record)
+            known_side_effects.add(identity)
     if coverage_gaps and outcome == "completed":
         outcome = "partial"
         delivery_notice = "Rendered discovery has explicit coverage boundaries; resolve them before claiming complete website coverage."
@@ -2429,8 +3191,15 @@ def main() -> int:
         (urlparse(root_url).hostname or "website").casefold(),
     ).strip("_")
     report_id = (f"discovery_{host_slug}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}")[:119].rstrip("_")
+    opportunity_hints = {
+        str(item["hint_id"]): item
+        for item in [
+            *measurement_opportunity_hints(pages),
+            *transition_measurement_opportunity_hints(interaction_probe_runs),
+        ]
+    }
     output = {
-        "discovery_version": "1.3.0",
+        "discovery_version": "1.4.0",
         "run_id": run_id,
         "report_id": report_id,
         "generated_at": generated_at,
@@ -2441,7 +3210,15 @@ def main() -> int:
         "attempted_page_count": len(pages),
         "usable_page_count": usable_page_count,
         "candidate_url_count": len(candidate_universe),
-        "candidate_family_count": len({candidate_family(item["url"], item.get("text", "")) for item in candidate_universe.values()}),
+        "candidate_family_count": len(
+            {
+                (
+                    str(item.get("access_profile_id", "public")),
+                    candidate_family(item["url"], item.get("text", "")),
+                )
+                for item in candidate_universe.values()
+            }
+        ),
         "sitemap_url_count": len(sitemap_urls),
         "rounds": rounds,
         "page_limit_reached": bool(rounds and rounds[-1]["attempted_page_count"] >= args.limit and material_unvisited),
@@ -2472,6 +3249,14 @@ def main() -> int:
                 }
                 for sitemap in sitemap_candidates
             ],
+            *[
+                {
+                    "source_type": "authorized_access_profile",
+                    "source_ref": str(item.get("profile_id", "")),
+                    "used_for": "role-bound authenticated rendered discovery",
+                }
+                for item in access_profile_runs
+            ],
         ],
         "source_errors": [asdict(error) for error in errors],
         "coverage_gaps": coverage_gaps,
@@ -2482,7 +3267,10 @@ def main() -> int:
         "measurement_evidence_summary": summarize_measurement_evidence(pages),
         "finite_value_candidates": finite_value_candidates(pages),
         "journeys_discovered": summarize_journeys(pages),
-        "measurement_opportunity_hints": measurement_opportunity_hints(pages),
+        "measurement_opportunity_hints": sorted(
+            opportunity_hints.values(),
+            key=lambda item: str(item["hint_id"]),
+        ),
         "journey_coverage_ledger": journey_coverage_ledger(
             pages,
             list(candidate_universe.values()),
@@ -2491,22 +3279,35 @@ def main() -> int:
             root_url,
             automatic_interaction_runs,
             all_recipes,
+            interaction_probe_runs,
         ),
         "automatic_interaction_runs": automatic_interaction_runs,
+        "interaction_probe_runs": interaction_probe_runs,
+        "access_profile_runs": access_profile_runs,
+        "side_effect_log": side_effect_log,
         "notes": [
             "This helper stratifies sitemap branches, preserves rendered link signals, and automatically continues targeted rounds while material candidate families remain.",
             "It accepts a visible privacy statement and safely progresses representative non-transactional forms with clearly synthetic data by default.",
             "It stops at CAPTCHA, payment, order, appointment confirmation, contract, deletion, and other consequential boundaries instead of claiming completion.",
+            "Successful form outcomes require a recorded selector, expected route, material state, or allowlisted backend-response oracle; generic success words and disappearing forms are never sufficient.",
+            "Optional access profiles trigger isolated role-aware authenticated rediscovery with in-memory session state; credentials, cookies, tokens, and storage-state paths are never written to this report.",
+            "Detected interaction families are probed once per relevant family and state where safe; detection still creates an analyst decision candidate, never an automatic GA4 event.",
             "Use build_analysis_context_seed.py so every hint becomes an explicit measure, covered-elsewhere, exclude, or unresolved analyst decision.",
             "Technical measurement evidence is internal input. Sensitive-looking dataLayer values are redacted while field structure is retained.",
             "Never claim site-specific gated capabilities from this rendered-DOM inventory. If interactive access fails, record the coverage gap; applicable official or recurrent sector outcomes may remain visibly recommended with to-confirm website data and precise success conditions.",
         ],
     }
+    output = sanitize_discovery_artifact(output)
     report_errors = validate_discovery_report(output)
     if report_errors:
         raise SystemExit("Generated discovery report failed its contract:\n- " + "\n- ".join(report_errors))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
+    if side_effect_log:
+        print(
+            f"NOTICE: {len(side_effect_log)} synthetic interaction(s) may have created persistent external records; inspect side_effect_log in the internal discovery report.",
+            file=sys.stderr,
+        )
     print(args.output)
     return discovery_exit_code(outcome)
 

@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/ga4-tracking-plan/schema-template-map.json",
+  "title": "GA4 Tracking Plan Supplied-Template Map",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mapping_version",
+    "template",
+    "preflight",
+    "regions",
+    "policy",
+    "review_required"
+  ],
+  "properties": {
+    "mapping_version": {"const": "2.0.0"},
+    "template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "extension"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "extension": {"enum": [".xlsx", ".xlsm"]}
+      }
+    },
+    "preflight": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["inventory_version", "recommended_writer", "decision", "blocking_features", "native_required_features"],
+      "properties": {
+        "inventory_version": {"const": "1.0.0"},
+        "recommended_writer": {"enum": ["openpyxl", "native_excel", "blocked"]},
+        "decision": {"enum": ["supported", "native_required", "blocked"]},
+        "blocking_features": {"type": "array", "items": {"type": "object"}},
+        "native_required_features": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "sheets": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "regions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_matrix", "parameter_reference", "data_layer_table", "event_tabs", "event_tab_prototype"],
+      "properties": {
+        "event_matrix": {"$ref": "#/$defs/repeatingRegionOrEmpty"},
+        "parameter_reference": {"$ref": "#/$defs/repeatingRegionOrEmpty"},
+        "data_layer_table": {"$ref": "#/$defs/repeatingRegionOrEmpty"},
+        "event_tabs": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/eventTab"}
+        },
+        "event_tab_prototype": {
+          "oneOf": [
+            {"$ref": "#/$defs/eventTabPrototype"},
+            {"type": "object", "maxProperties": 0}
+          ]
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preserve_unmapped_content", "embed_internal_model", "writer", "allow_reduced_fidelity_fallback"],
+      "properties": {
+        "preserve_unmapped_content": {"const": true},
+        "embed_internal_model": {"type": "boolean"},
+        "writer": {"enum": ["auto", "openpyxl", "native_excel"]},
+        "allow_reduced_fidelity_fallback": {"const": false},
+        "rendered_layout_check": {"enum": ["when_deterministic_renderer_available", "disabled"]}
+      }
+    },
+    "review_required": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "mapping_preview": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["semantic_role", "selected", "confidence", "alternatives"],
+        "properties": {
+          "semantic_role": {"type": "string", "minLength": 1},
+          "selected": {"type": ["string", "null"]},
+          "confidence": {"enum": ["unique", "ambiguous", "missing"]},
+          "alternatives": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "columns": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "integer", "minimum": 1}
+    },
+    "permittedChanges": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["values", "hyperlinks", "auto_filter", "table_ref", "data_validation_ranges", "conditional_formatting_ranges", "defined_names", "row_layout", "sheet_title", "sheet_visibility"],
+      "properties": {
+        "values": {"const": true},
+        "hyperlinks": {"type": "boolean"},
+        "auto_filter": {"type": "boolean"},
+        "table_ref": {"type": "boolean"},
+        "data_validation_ranges": {"type": "boolean"},
+        "conditional_formatting_ranges": {"type": "boolean"},
+        "defined_names": {"type": "boolean"},
+        "row_layout": {"type": "boolean"},
+        "sheet_title": {"type": "boolean"},
+        "sheet_visibility": {"type": "boolean"}
+      }
+    },
+    "tableBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "ref", "totals_row_shown"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "ref": {"type": "string", "pattern": "^[A-Z]+[1-9][0-9]*:[A-Z]+[1-9][0-9]*$"},
+        "totals_row_shown": {"type": "boolean"}
+      }
+    },
+    "repeatingRegion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semantic_role",
+        "sheet",
+        "header_row",
+        "data_start_row",
+        "columns",
+        "writable_value_cells",
+        "protected_formula_cells",
+        "prototype_data_row",
+        "existing_capacity",
+        "row_growth_policy",
+        "table",
+        "permitted_changes",
+        "overflow_policy"
+      ],
+      "properties": {
+        "semantic_role": {"type": "string", "minLength": 1},
+        "sheet": {"type": "string", "minLength": 1},
+        "header_row": {"type": "integer", "minimum": 1},
+        "data_start_row": {"type": "integer", "minimum": 1},
+        "columns": {"$ref": "#/$defs/columns"},
+        "writable_value_cells": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Z]+[1-9][0-9]*$"}
+        },
+        "protected_formula_cells": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Z]+[1-9][0-9]*$"}
+        },
+        "prototype_data_row": {"type": ["integer", "null"], "minimum": 1},
+        "existing_capacity": {"type": "integer", "minimum": 0},
+        "row_growth_policy": {"enum": ["fixed_capacity", "prototype_row", "excel_table"]},
+        "table": {
+          "oneOf": [
+            {"$ref": "#/$defs/tableBinding"},
+            {"type": "object", "maxProperties": 0}
+          ]
+        },
+        "permitted_changes": {"$ref": "#/$defs/permittedChanges"},
+        "overflow_policy": {"enum": ["wrap_preserve_layout", "fixed_layout", "owner_defined"]}
+      }
+    },
+    "repeatingRegionOrEmpty": {
+      "oneOf": [
+        {"$ref": "#/$defs/repeatingRegion"},
+        {"type": "object", "maxProperties": 0}
+      ]
+    },
+    "eventTab": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semantic_role",
+        "sheet",
+        "event_name_cell",
+        "existing_event_name",
+        "reusable",
+        "field_labels",
+        "writable_value_cells",
+        "protected_formula_cells",
+        "parameter_region",
+        "data_layer_cell",
+        "permitted_changes"
+      ],
+      "properties": {
+        "semantic_role": {"const": "event_detail"},
+        "sheet": {"type": "string", "minLength": 1},
+        "event_name_cell": {"type": "string", "pattern": "^[A-Z]+[1-9][0-9]*$"},
+        "existing_event_name": {"type": "string"},
+        "reusable": {"type": "boolean"},
+        "field_labels": {
+          "type": "object",
+          "additionalProperties": {"type": "string", "pattern": "^[A-Z]+[1-9][0-9]*$"}
+        },
+        "writable_value_cells": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Z]+[1-9][0-9]*$"}
+        },
+        "protected_formula_cells": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Z]+[1-9][0-9]*$"}
+        },
+        "parameter_region": {"$ref": "#/$defs/repeatingRegionOrEmpty"},
+        "data_layer_cell": {"type": "string"},
+        "permitted_changes": {"$ref": "#/$defs/permittedChanges"}
+      }
+    },
+    "eventTabPrototype": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sheet", "cloning_allowed", "title_policy", "mapping"],
+      "properties": {
+        "sheet": {"type": "string", "minLength": 1},
+        "cloning_allowed": {"const": true},
+        "title_policy": {"enum": ["event_name"]},
+        "mapping": {"$ref": "#/$defs/eventTab"}
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 [project]
 name = "ga4-tracking-plan-skill"
-version = "2.8.0"
+version = "2.9.0"
 description = "Utility-first GA4 web analyst skill for human-readable, implementation-ready tracking plans"
 requires-python = ">=3.11"
 dependencies = [
@@ -11,6 +11,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+native-excel = [
+  "pywin32>=306; sys_platform == 'win32'",
+]
 dev = [
   "coverage>=7.9,<8",
   "pip-audit>=2.9,<3",

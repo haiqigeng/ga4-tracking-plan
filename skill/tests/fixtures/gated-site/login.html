@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>Portal login</title></head>
+  <body>
+    <main>
+      <h1>Login</h1>
+      <form id="login-form">
+        <label>Role
+          <select id="role" name="role">
+            <option value="member">Member</option>
+            <option value="partner">Partner</option>
+          </select>
+        </label>
+        <label>Email <input id="email" type="email" required></label>
+        <button id="login" type="submit">Login</button>
+      </form>
+    </main>
+    <script>
+      document.getElementById("login-form").addEventListener("submit", event => {
+        event.preventDefault();
+        localStorage.setItem("fixtureAuthenticated", "yes");
+        localStorage.setItem("fixtureRole", document.getElementById("role").value);
+        location.href = "/dashboard.html";
+      });
+    </script>
+  </body>
+</html>

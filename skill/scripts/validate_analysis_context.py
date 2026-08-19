@@ -324,13 +324,13 @@ def _validate_measurement_framework_intake(
     ]
     if not frameworks:
         return
-    if context_version != "1.1.0":
+    if context_version not in {"1.1.0", "1.2.0"}:
         issue(
             issues,
             "error",
             "MEASUREMENT_FRAMEWORK_CONTEXT_VERSION",
             "$.context_version",
-            "Measurement-framework intake requires analysis-context version 1.1.0.",
+            "Measurement-framework intake requires analysis-context version 1.1.0 or later.",
         )
     for source_index, source in frameworks:
         _validate_framework_source(
@@ -359,6 +359,7 @@ def validate_analysis_context(
     gaps = [item for item in context.get("coverage_gaps", []) if isinstance(item, dict)]
     opportunities = [item for item in context.get("measurement_opportunities", []) if isinstance(item, dict)]
     domains = [item for item in context.get("value_domains", []) if isinstance(item, dict)]
+    access_profiles = [item for item in context.get("access_profiles", []) if isinstance(item, dict)]
 
     context_version = str(context.get("context_version", ""))
     context_run_id = str(context.get("run_id", ""))
@@ -401,6 +402,7 @@ def validate_analysis_context(
     opportunity_ids = [str(item.get("opportunity_id", "")) for item in opportunities]
     domain_ids = [str(item.get("domain_id", "")) for item in domains]
     discovery_report_ids = [str(item.get("report_id", "")) for item in discovery_reports]
+    access_profile_ids = [str(item.get("profile_id", "")) for item in access_profiles]
     for label, values, path in (
         ("source", source_ids, "$.sources"),
         ("journey coverage", coverage_ids, "$.journey_coverage"),
@@ -408,6 +410,7 @@ def validate_analysis_context(
         ("measurement opportunity", opportunity_ids, "$.measurement_opportunities"),
         ("value domain", domain_ids, "$.value_domains"),
         ("discovery report", discovery_report_ids, "$.discovery_reports"),
+        ("access profile", access_profile_ids, "$.access_profiles"),
     ):
         duplicate_values = sorted(_duplicates(values))
         if duplicate_values:
@@ -420,6 +423,33 @@ def validate_analysis_context(
             )
 
     _validate_semantic_domain_duplicates(domains, issues)
+
+    known_access_profiles = set(access_profile_ids) | {"public"}
+    variants_by_profile: dict[str, list[dict[str, Any]]] = {}
+    for coverage in coverages:
+        for variant in coverage.get("variant_coverage", []):
+            if not isinstance(variant, dict):
+                continue
+            profile_id = str(variant.get("access_profile_id", "public"))
+            variants_by_profile.setdefault(profile_id, []).append(variant)
+            if profile_id not in known_access_profiles:
+                issue(
+                    issues,
+                    "error",
+                    "UNKNOWN_ACCESS_PROFILE_VARIANT",
+                    "$.journey_coverage",
+                    f"Variant '{variant.get('variant_id', '')}' references unknown access profile '{profile_id}'.",
+                )
+    for index, profile in enumerate(access_profiles):
+        profile_id = str(profile.get("profile_id", ""))
+        if profile.get("status") == "authenticated_discovery_completed" and not variants_by_profile.get(profile_id):
+            issue(
+                issues,
+                "error",
+                "AUTHENTICATED_DISCOVERY_WITHOUT_ROLE_EVIDENCE",
+                f"$.access_profiles[{index}]",
+                f"Access profile '{profile_id}' claims completed discovery without any role-bound journey variant.",
+            )
 
     known_sources = set(source_ids)
     live_source_ids = {
